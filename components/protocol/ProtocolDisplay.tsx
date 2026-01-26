@@ -23,15 +23,15 @@ interface ProtocolDisplayProps {
 
 export function ProtocolDisplay({ protocol, scores }: ProtocolDisplayProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Scores Summary */}
       {scores && (
         <Card>
           <CardHeader>
-            <CardTitle>Protocol Evaluation</CardTitle>
+            <CardTitle>Protocol evaluation</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
               <div className="p-4 rounded-lg bg-muted text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   {scores.requirements_met ? (
@@ -39,38 +39,42 @@ export function ProtocolDisplay({ protocol, scores }: ProtocolDisplayProps) {
                   ) : (
                     <XCircle className="h-5 w-5 text-destructive" />
                   )}
-                  <span className="font-medium">Requirements</span>
+                  <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Requirements</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {scores.requirements_met ? 'All Met' : 'Some Unmet'}
+                <p className="text-sm">
+                  {scores.requirements_met ? 'All met' : 'Some unmet'}
                 </p>
               </div>
               <div className="p-4 rounded-lg bg-muted text-center">
-                <p className="text-2xl font-bold">
+                <p className="font-mono text-2xl font-semibold tabular-nums">
                   {scores.weighted_goal_score?.toFixed(1) ?? 'N/A'}
                 </p>
-                <p className="text-sm text-muted-foreground">Goal Score</p>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mt-1">Goal score</p>
               </div>
               <div className="p-4 rounded-lg bg-muted text-center">
-                <p className="text-2xl font-bold">
+                <p className="font-mono text-2xl font-semibold tabular-nums">
                   {scores.viability_score?.toFixed(1) ?? 'N/A'}
                 </p>
-                <p className="text-sm text-muted-foreground">Viability Score</p>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mt-1">Viability score</p>
               </div>
             </div>
 
             {/* Critiques */}
             {scores.critiques && scores.critiques.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="font-semibold flex items-center gap-2">
+              <div className="space-y-3">
+                <h4 className="text-xs font-medium uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-warning" />
-                  Areas for Improvement
+                  Areas for improvement
                 </h4>
                 <div className="space-y-2">
                   {scores.critiques.slice(0, 3).map((critique, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-warning/10 text-sm">
+                    <div key={i} className={`border-l-2 pl-4 py-2 text-sm ${
+                      critique.severity === 'major' ? 'border-l-destructive' :
+                      critique.severity === 'moderate' ? 'border-l-warning' :
+                      'border-l-border'
+                    }`}>
                       <div className="flex items-start gap-2">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium font-mono ${
                           critique.severity === 'major' ? 'bg-destructive/15 text-destructive' :
                           critique.severity === 'moderate' ? 'bg-warning/15 text-warning' :
                           'bg-muted text-muted-foreground'

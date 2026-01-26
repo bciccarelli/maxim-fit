@@ -137,7 +137,7 @@ export function ImportProtocolButton() {
           />
 
           {/* Dialog */}
-          <div className="relative z-50 w-full max-w-lg mx-4 bg-background border rounded-lg shadow-sm p-6">
+          <div className="relative z-50 w-full max-w-lg mx-4 bg-background border rounded-lg p-5">
             {/* Close button */}
             <button
               onClick={handleClose}

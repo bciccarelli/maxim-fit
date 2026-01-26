@@ -140,7 +140,7 @@ export default function CreateProtocolPage() {
       )}
 
       <div>
-        <h1 className="text-3xl font-bold">Create Protocol</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Create protocol</h1>
         <p className="text-muted-foreground">
           Generate a personalized health protocol with full optimization capabilities.
         </p>
@@ -191,9 +191,9 @@ export default function CreateProtocolPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold">Generated Protocol</h2>
+              <h2 className="text-lg font-semibold tracking-tight">Generated protocol</h2>
               <p className="text-sm text-muted-foreground">
-                Iteration {currentIteration} of {iterations}
+                Iteration <span className="font-mono tabular-nums">{currentIteration}</span> of <span className="font-mono tabular-nums">{iterations}</span>
               </p>
             </div>
             <div className="flex items-center gap-2">

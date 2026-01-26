@@ -93,17 +93,17 @@ export default function HomePage() {
           <>
             {/* Hero Section */}
             <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold mb-4">
-                Your Personalized Health Protocol
+              <h2 className="text-3xl font-bold tracking-tight mb-4">
+                Your personalized health protocol
               </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Generate an evidence-based, wellness routine tailored to your goals,
+              <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+                Generate an evidence-based daily routine tailored to your goals,
                 requirements, and lifestyle. Powered by the latest health research.
               </p>
             </div>
 
             {/* Feature Comparison */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-12 max-w-4xl mx-auto">
               <div className="p-6 rounded-lg border bg-muted/50">
                 <h3 className="font-semibold mb-4">Anonymous Access</h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
@@ -140,7 +140,7 @@ export default function HomePage() {
         ) : (
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Your Protocol</h2>
+              <h2 className="text-lg font-semibold tracking-tight">Your protocol</h2>
               <button
                 onClick={() => {
                   setProtocol(null);

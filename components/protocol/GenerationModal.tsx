@@ -67,7 +67,7 @@ export function GenerationModal({ stage, error }: GenerationModalProps) {
       <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-destructive">Generation Failed</CardTitle>
+            <CardTitle className="text-destructive">Generation failed</CardTitle>
             <CardDescription>
               {error || 'An unexpected error occurred while generating your protocol.'}
             </CardDescription>
@@ -90,8 +90,8 @@ export function GenerationModal({ stage, error }: GenerationModalProps) {
           </div>
           <CardTitle>
             {stage === 'complete'
-              ? 'Protocol Generated!'
-              : `Generating Your Protocol${dots}`}
+              ? 'Protocol generated'
+              : `Generating your protocol${dots}`}
           </CardTitle>
           <CardDescription>
             {stage === 'complete'

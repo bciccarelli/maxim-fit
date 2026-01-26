@@ -19,13 +19,18 @@ Generate a personalized, evidence-based daily health protocol that the user will
 
 ### Design Philosophy
 
-The visual identity is **clinical research tool**, not consumer wellness app. Think peer-reviewed journal meets dark terminal — dense, precise, no decoration. The interface should feel like it was built by someone who reads papers, not someone who reads Dribbble.
+The interface is a **coach, not a classroom**. It doesn't teach you exercise science or explain why vitamin D matters — it tells you exactly what to do today, with enough underlying rigor that a biohacking enthusiast can interrogate every decision and a beginner can just follow it.
 
-Three principles, in order:
+The visual identity should feel like receiving a program from someone who clearly did the homework. Not academic (no one needs to see the papers), not consumer-wellness (no pastel illustrations or "your journey" copy). The aesthetic is **confident, dense, and precise** — a daily briefing you scan in 30 seconds and trust enough to execute.
 
-1. **Density over decoration.** Protocol data is the product. Show more data per screen, not more chrome per card. A user should be able to scan their entire daily protocol without scrolling twice.
-2. **Precision over polish.** Numbers, times, and dosages must feel exact. Monospace type, right-aligned figures, explicit units. Never round for aesthetics.
-3. **Restraint over expression.** One accent color (forest green). No illustrations, no gradients, no animated flourishes. If a visual element doesn't communicate data, remove it.
+The target user takes health seriously, or wants to start. The density and precision signal credibility to both ends: a beginner sees authority and follows the plan; an enthusiast sees the numbers, knows the protocol is substantive, and challenges what they disagree with. The feedback loop — where users push back and the AI re-optimizes — is a first-class interaction, not a settings page buried in a menu.
+
+Four principles, in order:
+
+1. **Execute, then explore.** The default state is a scannable daily protocol. Scores, critiques, and reasoning exist but never compete with the plan itself. A user should be able to open the app in the morning, see their day, and go.
+2. **Density over decoration.** Protocol data is the product. Show more data per screen, not more chrome per card. A user should scan their entire daily protocol without scrolling twice.
+3. **Precision over polish.** Numbers, times, and dosages must feel exact. Monospace type, right-aligned figures, explicit units. Never round for aesthetics.
+4. **Challengeable confidence.** Present the protocol as a strong recommendation, not a tentative suggestion. But make the "I disagree" path obvious and friction-free. When the user pushes back, surface the reasoning — scores, critiques, trade-offs — so the conversation feels like arguing with a well-prepared coach, not overriding a black box.
 
 ### Color Palette
 

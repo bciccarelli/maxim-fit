@@ -37,7 +37,7 @@ export default async function ProtocolPage({ params }: Props) {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Protocol Details</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Protocol details</h1>
             <p className="text-sm text-muted-foreground">
               Created {new Date(protocol.created_at).toLocaleString()}
               {protocol.iteration > 0 && ` | Iteration ${protocol.iteration}`}

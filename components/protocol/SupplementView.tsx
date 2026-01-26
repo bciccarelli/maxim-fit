@@ -10,7 +10,7 @@ interface SupplementViewProps {
 
 export function SupplementView({ supplementation }: SupplementViewProps) {
   return (
-    <Card>
+    <Card className="border-l-2 border-l-primary">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Pill className="h-5 w-5" />
@@ -19,21 +19,21 @@ export function SupplementView({ supplementation }: SupplementViewProps) {
       </CardHeader>
       <CardContent>
         {supplementation.supplements.length === 0 ? (
-          <p className="text-muted-foreground italic">No supplements recommended.</p>
+          <p className="text-sm text-muted-foreground">No supplements recommended.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="divide-y divide-border">
             {supplementation.supplements.map((supplement, index) => (
-              <div key={index} className="p-4 rounded-lg border">
-                <div className="flex items-start justify-between mb-2">
+              <div key={index} className="py-3">
+                <div className="flex items-start justify-between mb-1">
                   <div>
-                    <p className="font-medium">{supplement.name}</p>
-                    <p className="text-sm text-primary">{supplement.dosage}</p>
+                    <p className="font-medium text-sm">{supplement.name}</p>
+                    <p className="font-mono text-sm text-primary">{supplement.dosage}</p>
                   </div>
-                  <span className="text-sm text-muted-foreground">{supplement.timing}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{supplement.timing}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">{supplement.purpose}</p>
                 {supplement.notes && (
-                  <p className="mt-2 text-xs text-muted-foreground italic">{supplement.notes}</p>
+                  <p className="mt-1 text-xs text-muted-foreground italic">{supplement.notes}</p>
                 )}
               </div>
             ))}
@@ -42,8 +42,8 @@ export function SupplementView({ supplementation }: SupplementViewProps) {
 
         {/* General Notes */}
         {supplementation.general_notes.length > 0 && (
-          <div className="mt-6 p-4 rounded-lg bg-muted/50">
-            <h4 className="font-semibold mb-2">Notes</h4>
+          <div className="mt-6 border-t pt-4">
+            <h4 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Notes</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
               {supplementation.general_notes.map((note, index) => (
                 <li key={index}>{note}</li>

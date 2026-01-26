@@ -42,7 +42,7 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back! Here&apos;s your protocol overview.</p>
         </div>
         <div className="flex gap-2">
@@ -57,14 +57,14 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Protocols</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProtocols || 0}</div>
+            <div className="font-mono text-2xl font-semibold tabular-nums">{totalProtocols || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{avgGoalScore.toFixed(1)}</div>
+            <div className="font-mono text-2xl font-semibold tabular-nums">{avgGoalScore.toFixed(1)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{avgViabilityScore.toFixed(1)}</div>
+            <div className="font-mono text-2xl font-semibold tabular-nums">{avgViabilityScore.toFixed(1)}</div>
           </CardContent>
         </Card>
       </div>
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
                 <Link
                   key={protocol.id}
                   href={`/protocols/${protocol.id}`}
-                  className="block p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="block p-4 rounded-lg border hover:bg-muted/50 transition-colors duration-150"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -112,8 +112,8 @@ export default async function DashboardPage() {
                       </p>
                     </div>
                     <div className="text-right text-sm">
-                      <p>Goal: {protocol.weighted_goal_score?.toFixed(1) || 'N/A'}</p>
-                      <p className="text-muted-foreground">
+                      <p className="font-mono text-sm tabular-nums">Goal: {protocol.weighted_goal_score?.toFixed(1) || 'N/A'}</p>
+                      <p className="font-mono text-sm text-muted-foreground tabular-nums">
                         Viability: {protocol.viability_score?.toFixed(1) || 'N/A'}
                       </p>
                     </div>
