@@ -20,11 +20,11 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
       <CardContent>
         <div className="flex items-center gap-4 mb-6 text-sm">
           <div className="flex items-center gap-2">
-            <Sun className="h-4 w-4 text-yellow-500" />
+            <Sun className="h-4 w-4 text-warning" />
             <span>Wake: {schedule.wake_time}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Moon className="h-4 w-4 text-blue-500" />
+            <Moon className="h-4 w-4 text-info" />
             <span>Sleep: {schedule.sleep_time}</span>
           </div>
         </div>
@@ -44,7 +44,7 @@ export function ScheduleView({ schedule }: ScheduleViewProps) {
                     <div>
                       <p className="font-medium">{block.activity}</p>
                       {block.requirement_satisfied && (
-                        <p className="text-xs text-green-600 mt-1">
+                        <p className="text-xs text-success mt-1">
                           Satisfies: {block.requirement_satisfied}
                         </p>
                       )}

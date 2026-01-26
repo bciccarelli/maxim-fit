@@ -35,9 +35,9 @@ export function ProtocolDisplay({ protocol, scores }: ProtocolDisplayProps) {
               <div className="p-4 rounded-lg bg-muted text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   {scores.requirements_met ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <CheckCircle className="h-5 w-5 text-success" />
                   ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
+                    <XCircle className="h-5 w-5 text-destructive" />
                   )}
                   <span className="font-medium">Requirements</span>
                 </div>
@@ -63,17 +63,17 @@ export function ProtocolDisplay({ protocol, scores }: ProtocolDisplayProps) {
             {scores.critiques && scores.critiques.length > 0 && (
               <div className="space-y-2">
                 <h4 className="font-semibold flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-yellow-500" />
+                  <AlertCircle className="h-4 w-4 text-warning" />
                   Areas for Improvement
                 </h4>
                 <div className="space-y-2">
                   {scores.critiques.slice(0, 3).map((critique, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-sm">
+                    <div key={i} className="p-3 rounded-lg bg-warning/10 text-sm">
                       <div className="flex items-start gap-2">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          critique.severity === 'major' ? 'bg-red-100 text-red-700' :
-                          critique.severity === 'moderate' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-gray-100 text-gray-700'
+                          critique.severity === 'major' ? 'bg-destructive/15 text-destructive' :
+                          critique.severity === 'moderate' ? 'bg-warning/15 text-warning' :
+                          'bg-muted text-muted-foreground'
                         }`}>
                           {critique.severity}
                         </span>

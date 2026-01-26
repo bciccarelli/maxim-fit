@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { OptimizeButton } from './OptimizeButton';
+import { ArrowLeft } from 'lucide-react';
+import { OptimizeSection } from './OptimizeSection';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -44,7 +44,7 @@ export default async function ProtocolPage({ params }: Props) {
             </p>
           </div>
         </div>
-        <OptimizeButton
+        <OptimizeSection
           protocolId={protocol.id}
           currentProtocol={protocol.protocol_data}
           critiques={protocol.critiques}

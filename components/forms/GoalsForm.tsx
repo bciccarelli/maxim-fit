@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Trash2 } from 'lucide-react';
 import type { Goal } from '@/lib/schemas/user-config';
 
@@ -14,31 +12,53 @@ interface GoalsFormProps {
   onChange: (goals: Goal[]) => void;
 }
 
+const EXAMPLE_GOALS = [
+  'Build muscle mass and strength',
+  'Improve cardiovascular endurance',
+  'Optimize longevity and healthspan',
+  'Lose body fat while maintaining muscle',
+  'Improve sleep quality and recovery',
+  'Increase energy and mental clarity',
+];
+
+// Distribute weights evenly across goals
+function distributeWeightsEvenly(goalsList: Goal[]): Goal[] {
+  if (goalsList.length === 0) return goalsList;
+  const evenWeight = Math.round((1 / goalsList.length) * 100) / 100;
+  return goalsList.map((goal) => ({ ...goal, weight: evenWeight }));
+}
+
 export function GoalsForm({ goals, onChange }: GoalsFormProps) {
-  const [newGoal, setNewGoal] = useState<Partial<Goal>>({
-    name: '',
-    weight: 0,
-    description: '',
-  });
+  const [newGoalText, setNewGoalText] = useState('');
+  const [autoDistribute, setAutoDistribute] = useState(true);
 
   const totalWeight = goals.reduce((sum, g) => sum + g.weight, 0);
-  const remainingWeight = Math.max(0, 1 - totalWeight);
 
-  const handleAddGoal = () => {
-    if (!newGoal.name || !newGoal.description || !newGoal.weight) return;
-
-    onChange([...goals, newGoal as Goal]);
-    setNewGoal({ name: '', weight: 0, description: '' });
+  const handleAdd = () => {
+    if (!newGoalText.trim()) return;
+    const newGoals = [...goals, { name: newGoalText.trim(), weight: 0 }];
+    onChange(autoDistribute ? distributeWeightsEvenly(newGoals) : newGoals);
+    setNewGoalText('');
   };
 
-  const handleRemoveGoal = (index: number) => {
-    onChange(goals.filter((_, i) => i !== index));
+  const handleRemove = (index: number) => {
+    const newGoals = goals.filter((_, i) => i !== index);
+    onChange(autoDistribute ? distributeWeightsEvenly(newGoals) : newGoals);
   };
 
-  const handleUpdateGoal = (index: number, updates: Partial<Goal>) => {
+  const handleUpdateWeight = (index: number, weight: number) => {
+    // User manually edited a weight, stop auto-distributing
+    setAutoDistribute(false);
     onChange(
-      goals.map((goal, i) => (i === index ? { ...goal, ...updates } : goal))
+      goals.map((goal, i) => (i === index ? { ...goal, weight } : goal))
     );
+  };
+
+  const handleAddExample = (exampleText: string) => {
+    if (!goals.some((g) => g.name === exampleText)) {
+      const newGoals = [...goals, { name: exampleText, weight: 0 }];
+      onChange(autoDistribute ? distributeWeightsEvenly(newGoals) : newGoals);
+    }
   };
 
   const normalizeWeights = () => {
@@ -56,6 +76,12 @@ export function GoalsForm({ goals, onChange }: GoalsFormProps) {
 
   return (
     <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Add your health goals in natural language. Weights are distributed evenly by default.
+        Adjust manually if you want to prioritize certain goals.
+      </p>
+
+      {/* Weight Status */}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
@@ -74,110 +100,79 @@ export function GoalsForm({ goals, onChange }: GoalsFormProps) {
         )}
       </div>
 
-      {/* Existing Goals */}
-      <div className="space-y-4">
+      {/* Current Goals */}
+      <div className="space-y-2">
         {goals.map((goal, index) => (
-          <Card key={index}>
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-4">
-                <div className="flex-1 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Goal Name</Label>
-                      <Input
-                        value={goal.name}
-                        onChange={(e) => handleUpdateGoal(index, { name: e.target.value })}
-                        placeholder="e.g., Muscle Gain"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Weight (0-100%)</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={Math.round(goal.weight * 100)}
-                        onChange={(e) => handleUpdateGoal(index, {
-                          weight: parseFloat(e.target.value) / 100 || 0,
-                        })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea
-                      value={goal.description}
-                      onChange={(e) => handleUpdateGoal(index, { description: e.target.value })}
-                      placeholder="Describe this goal in detail..."
-                      rows={2}
-                    />
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemoveGoal(index)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Add New Goal */}
-      <Card className="border-dashed">
-        <CardContent className="pt-4">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>New Goal Name</Label>
-                <Input
-                  value={newGoal.name}
-                  onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })}
-                  placeholder="e.g., Longevity"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Weight (0-100%)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={Math.round(remainingWeight * 100)}
-                  value={newGoal.weight ? Math.round(newGoal.weight * 100) : ''}
-                  onChange={(e) => setNewGoal({
-                    ...newGoal,
-                    weight: parseFloat(e.target.value) / 100 || 0,
-                  })}
-                  placeholder={`Max: ${Math.round(remainingWeight * 100)}%`}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                value={newGoal.description}
-                onChange={(e) => setNewGoal({ ...newGoal, description: e.target.value })}
-                placeholder="Describe this goal in detail..."
-                rows={2}
+          <div
+            key={index}
+            className="flex items-center gap-2 p-3 rounded-md bg-muted"
+          >
+            <span className="flex-1 text-sm">{goal.name}</span>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={Math.round(goal.weight * 100)}
+                onChange={(e) => handleUpdateWeight(index, parseFloat(e.target.value) / 100 || 0)}
+                className="w-16 h-8 text-xs"
               />
+              <span className="text-xs text-muted-foreground">%</span>
             </div>
             <Button
               type="button"
-              variant="outline"
-              onClick={handleAddGoal}
-              disabled={!newGoal.name || !newGoal.description || !newGoal.weight}
-              className="w-full"
+              variant="ghost"
+              size="icon"
+              onClick={() => handleRemove(index)}
+              className="h-8 w-8 text-destructive hover:text-destructive"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Goal
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        ))}
+        {goals.length === 0 && (
+          <p className="text-sm text-muted-foreground italic p-3">
+            No goals added yet. Add your own or use the examples below.
+          </p>
+        )}
+      </div>
+
+      {/* Add New Goal */}
+      <div className="space-y-2">
+        <Label>Add a Goal</Label>
+        <div className="flex gap-2">
+          <Input
+            value={newGoalText}
+            onChange={(e) => setNewGoalText(e.target.value)}
+            placeholder="e.g., Build muscle and increase strength"
+            className="flex-1"
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAdd())}
+          />
+          <Button type="button" onClick={handleAdd} disabled={!newGoalText.trim()}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add
+          </Button>
+        </div>
+      </div>
+
+      {/* Example Goals */}
+      <div className="space-y-2">
+        <Label>Example Goals (click to add)</Label>
+        <div className="flex flex-wrap gap-2">
+          {EXAMPLE_GOALS.filter((ex) => !goals.some((g) => g.name === ex)).map((example) => (
+            <Button
+              key={example}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleAddExample(example)}
+              className="text-xs"
+            >
+              {example}
+            </Button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -27,7 +27,7 @@ export type AnonymousPersonalInfo = z.infer<typeof anonymousPersonalInfoSchema>;
 export const goalSchema = z.object({
   name: z.string().min(1),
   weight: z.number().min(0).max(1),
-  description: z.string(),
+  description: z.string().optional(),
 });
 
 export type Goal = z.infer<typeof goalSchema>;

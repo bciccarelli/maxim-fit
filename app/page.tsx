@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { ProtocolWizard } from '@/components/forms/ProtocolWizard';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
+import { GenerationModal, type GenerationStage } from '@/components/protocol/GenerationModal';
 import type { DailyProtocol } from '@/lib/schemas/protocol';
 import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
 
@@ -18,24 +18,35 @@ export default function HomePage() {
     weighted_goal_score?: number;
     viability_score?: number;
   } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [generationStage, setGenerationStage] = useState<GenerationStage | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   const handleGenerate = async (config: {
     personal_info: PersonalInfo;
     goals: Goal[];
     requirements: string[];
   }) => {
-    setLoading(true);
     setError(null);
+    setGenerationStage('searching');
 
     try {
+      // Simulate stage progression while waiting for API
+      const stageTimer = setTimeout(() => {
+        setGenerationStage('generating');
+      }, 2000);
+
+      const evaluatingTimer = setTimeout(() => {
+        setGenerationStage('evaluating');
+      }, 8000);
+
       const response = await fetch('/api/protocol/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       });
+
+      clearTimeout(stageTimer);
+      clearTimeout(evaluatingTimer);
 
       const data = await response.json();
 
@@ -43,17 +54,32 @@ export default function HomePage() {
         throw new Error(data.error || 'Failed to generate protocol');
       }
 
+      setGenerationStage('complete');
+
+      // Brief pause to show completion state
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       setProtocol(data.protocol);
       setScores(data.evaluation);
+      setGenerationStage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+      setGenerationStage('error');
+
+      // Reset after showing error
+      setTimeout(() => {
+        setGenerationStage(null);
+      }, 3000);
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Generation Modal */}
+      {generationStage && (
+        <GenerationModal stage={generationStage} error={error} />
+      )}
+
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -71,7 +97,7 @@ export default function HomePage() {
                 Your Personalized Health Protocol
               </h2>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Generate an evidence-based, AI-powered daily routine tailored to your goals,
+                Generate an evidence-based, wellness routine tailored to your goals,
                 requirements, and lifestyle. Powered by the latest health research.
               </p>
             </div>
@@ -97,8 +123,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Error Display */}
-            {error && (
+            {/* Error Display (for non-modal errors) */}
+            {error && !generationStage && (
               <div className="max-w-2xl mx-auto mb-6 p-4 rounded-lg bg-destructive/10 text-destructive">
                 {error}
               </div>
@@ -108,7 +134,7 @@ export default function HomePage() {
             <ProtocolWizard
               isAuthenticated={false}
               onGenerate={handleGenerate}
-              isLoading={loading}
+              isLoading={!!generationStage}
             />
           </>
         ) : (
@@ -119,6 +145,7 @@ export default function HomePage() {
                 onClick={() => {
                   setProtocol(null);
                   setScores(null);
+                  setError(null);
                 }}
                 className="text-sm text-primary hover:underline"
               >
@@ -133,7 +160,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t mt-12">
         <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          <p>Protocol App - AI-Powered Health Optimization</p>
+          <p>Protocol App - Health Optimization</p>
         </div>
       </footer>
     </div>

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ProtocolWizard } from '@/components/forms/ProtocolWizard';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
+import { GenerationModal, type GenerationStage } from '@/components/protocol/GenerationModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,30 +28,41 @@ export default function CreateProtocolPage() {
     requirements: string[];
     iterations: number;
   } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [generationStage, setGenerationStage] = useState<GenerationStage | null>(null);
   const [optimizing, setOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [iterations, setIterations] = useState(3);
   const [currentIteration, setCurrentIteration] = useState(0);
-  const router = useRouter();
 
   const handleGenerate = async (inputConfig: {
     personal_info: PersonalInfo;
     goals: Goal[];
     requirements: string[];
   }) => {
-    setLoading(true);
     setError(null);
+    setGenerationStage('searching');
 
     const fullConfig = { ...inputConfig, iterations };
     setConfig(fullConfig);
 
     try {
+      // Simulate stage progression while waiting for API
+      const stageTimer = setTimeout(() => {
+        setGenerationStage('generating');
+      }, 2000);
+
+      const evaluatingTimer = setTimeout(() => {
+        setGenerationStage('evaluating');
+      }, 8000);
+
       const response = await fetch('/api/protocol/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(fullConfig),
       });
+
+      clearTimeout(stageTimer);
+      clearTimeout(evaluatingTimer);
 
       const data = await response.json();
 
@@ -59,13 +70,23 @@ export default function CreateProtocolPage() {
         throw new Error(data.error || 'Failed to generate protocol');
       }
 
+      setGenerationStage('complete');
+
+      // Brief pause to show completion state
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       setProtocol(data.protocol);
       setScores(data.evaluation);
       setCurrentIteration(0);
+      setGenerationStage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+      setGenerationStage('error');
+
+      // Reset after showing error
+      setTimeout(() => {
+        setGenerationStage(null);
+      }, 3000);
     }
   };
 
@@ -113,6 +134,11 @@ export default function CreateProtocolPage() {
 
   return (
     <div className="space-y-8">
+      {/* Generation Modal */}
+      {generationStage && (
+        <GenerationModal stage={generationStage} error={error} />
+      )}
+
       <div>
         <h1 className="text-3xl font-bold">Create Protocol</h1>
         <p className="text-muted-foreground">
@@ -148,7 +174,8 @@ export default function CreateProtocolPage() {
             </CardContent>
           </Card>
 
-          {error && (
+          {/* Error Display (for non-modal errors) */}
+          {error && !generationStage && (
             <div className="p-4 rounded-lg bg-destructive/10 text-destructive">
               {error}
             </div>
@@ -157,7 +184,7 @@ export default function CreateProtocolPage() {
           <ProtocolWizard
             isAuthenticated={true}
             onGenerate={handleGenerate}
-            isLoading={loading}
+            isLoading={!!generationStage}
           />
         </>
       ) : (
@@ -204,6 +231,7 @@ export default function CreateProtocolPage() {
                   setScores(null);
                   setConfig(null);
                   setCurrentIteration(0);
+                  setError(null);
                 }}
               >
                 Start Over

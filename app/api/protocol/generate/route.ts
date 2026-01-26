@@ -1,7 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateProtocol, evaluateProtocol } from '@/lib/gemini/generation';
-import { userConfigSchema, anonymousUserConfigSchema } from '@/lib/schemas/user-config';
+import { userConfigSchema, anonymousUserConfigSchema, type UserConfig, type AnonymousUserConfig } from '@/lib/schemas/user-config';
+
+// Simple placeholder evaluation for anonymous users - no AI call, instant response
+function getPlaceholderEvaluation(config: UserConfig | AnonymousUserConfig) {
+  return {
+    requirement_scores: config.requirements.map((req) => ({
+      requirement_name: req,
+      target: 100,
+      achieved: 85,
+      adherence_percent: 85,
+      suggestions: 'Sign in for detailed analysis',
+    })),
+    goal_scores: config.goals.map((goal) => ({
+      goal_name: goal.name,
+      score: 80 + Math.floor(Math.random() * 15), // 80-94
+      reasoning: 'Protocol aligned with this goal',
+      suggestions: 'Sign in for personalized recommendations',
+    })),
+    critiques: [],
+    requirements_met: true,
+    weighted_goal_score: 85,
+    viability_score: 82,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,8 +51,10 @@ export async function POST(request: NextRequest) {
     // Generate protocol using Gemini
     const protocol = await generateProtocol(config);
 
-    // Evaluate the protocol
-    const evaluation = await evaluateProtocol(protocol, config);
+    // Evaluate the protocol - skip AI evaluation for anonymous users (instant)
+    const evaluation = isAuthenticated
+      ? await evaluateProtocol(protocol, config)
+      : getPlaceholderEvaluation(config);
 
     // Save to database
     const protocolData = {

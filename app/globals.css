@@ -4,44 +4,84 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 60 10% 98%;
+    --foreground: 150 20% 8%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --card-foreground: 150 20% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 20% 8%;
+    --primary: 152 45% 23%;
+    --primary-foreground: 60 20% 97%;
+    --secondary: 150 12% 93%;
+    --secondary-foreground: 150 20% 12%;
+    --muted: 150 10% 94%;
+    --muted-foreground: 150 8% 45%;
+    --accent: 150 12% 93%;
+    --accent-foreground: 150 20% 12%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 60 20% 97%;
+    --border: 150 12% 89%;
+    --input: 150 12% 89%;
+    --ring: 152 45% 23%;
     --radius: 0.5rem;
+
+    --success: 142 71% 35%;
+    --success-foreground: 60 20% 97%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 38 90% 10%;
+    --info: 210 60% 50%;
+    --info-foreground: 60 20% 97%;
+
+    --forest-50: 150 30% 96%;
+    --forest-100: 150 25% 90%;
+    --forest-200: 150 22% 82%;
+    --forest-300: 151 20% 70%;
+    --forest-400: 152 25% 55%;
+    --forest-500: 152 35% 40%;
+    --forest-600: 152 40% 30%;
+    --forest-700: 152 45% 23%;
+    --forest-800: 153 45% 16%;
+    --forest-900: 155 50% 10%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 155 25% 6%;
+    --foreground: 150 15% 93%;
+    --card: 155 20% 8%;
+    --card-foreground: 150 15% 93%;
+    --popover: 155 20% 8%;
+    --popover-foreground: 150 15% 93%;
+    --primary: 152 40% 48%;
+    --primary-foreground: 155 30% 6%;
+    --secondary: 153 18% 14%;
+    --secondary-foreground: 150 15% 93%;
+    --muted: 153 18% 14%;
+    --muted-foreground: 150 10% 60%;
+    --accent: 153 18% 14%;
+    --accent-foreground: 150 15% 93%;
+    --destructive: 0 62% 35%;
+    --destructive-foreground: 60 20% 97%;
+    --border: 153 18% 16%;
+    --input: 153 18% 16%;
+    --ring: 152 40% 48%;
+
+    --success: 142 60% 40%;
+    --success-foreground: 155 30% 6%;
+    --warning: 38 80% 50%;
+    --warning-foreground: 38 90% 10%;
+    --info: 210 50% 50%;
+    --info-foreground: 155 30% 6%;
+
+    --forest-50: 150 30% 96%;
+    --forest-100: 150 25% 90%;
+    --forest-200: 150 22% 82%;
+    --forest-300: 151 20% 70%;
+    --forest-400: 152 25% 55%;
+    --forest-500: 152 35% 40%;
+    --forest-600: 152 40% 30%;
+    --forest-700: 152 45% 23%;
+    --forest-800: 153 45% 16%;
+    --forest-900: 155 50% 10%;
   }
 }
 

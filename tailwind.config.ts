@@ -34,9 +34,37 @@ const config: Config = {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
         },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
+        },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
+        forest: {
+          50: 'hsl(var(--forest-50))',
+          100: 'hsl(var(--forest-100))',
+          200: 'hsl(var(--forest-200))',
+          300: 'hsl(var(--forest-300))',
+          400: 'hsl(var(--forest-400))',
+          500: 'hsl(var(--forest-500))',
+          600: 'hsl(var(--forest-600))',
+          700: 'hsl(var(--forest-700))',
+          800: 'hsl(var(--forest-800))',
+          900: 'hsl(var(--forest-900))',
         },
       },
       borderRadius: {

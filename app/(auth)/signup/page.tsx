@@ -52,7 +52,7 @@ export default function SignupPage() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-6 w-6 text-green-500" />
+              <CheckCircle className="h-6 w-6 text-success" />
               <CardTitle>Check Your Email</CardTitle>
             </div>
             <CardDescription>

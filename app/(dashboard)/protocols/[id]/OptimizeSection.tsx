@@ -3,31 +3,40 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, MessageSquarePlus } from 'lucide-react';
+import { FeedbackModal } from '@/components/protocol/FeedbackModal';
 import type { DailyProtocol, Critique } from '@/lib/schemas/protocol';
 
-interface OptimizeButtonProps {
+interface OptimizeSectionProps {
   protocolId: string;
   currentProtocol: DailyProtocol;
-  critiques: Critique[];
+  critiques: Critique[] | null;
   iteration: number;
 }
 
-export function OptimizeButton({
+export function OptimizeSection({
   protocolId,
   currentProtocol,
   critiques,
   iteration,
-}: OptimizeButtonProps) {
+}: OptimizeSectionProps) {
   const [loading, setLoading] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const router = useRouter();
 
-  const handleOptimize = async () => {
+  const runOptimize = async (userCritiques?: Critique[]) => {
     setLoading(true);
 
     try {
-      // We need to get the config from somewhere - for now we'll skip this
-      // In a real implementation, you'd store the config with the protocol
+      const isPureIteration = !userCritiques || userCritiques.length === 0;
+      const allCritiques = [
+        ...(critiques ?? []),
+        ...(userCritiques ?? []).map((c) => ({
+          ...c,
+          criticism: `[USER FEEDBACK] ${c.criticism}`,
+        })),
+      ];
+
       const response = await fetch('/api/protocol/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -50,8 +59,9 @@ export function OptimizeButton({
             iterations: 3,
           },
           currentProtocol,
-          critiques,
+          critiques: allCritiques,
           iteration,
+          isPureIteration,
         }),
       });
 
@@ -61,7 +71,6 @@ export function OptimizeButton({
         throw new Error(data.error || 'Failed to optimize');
       }
 
-      // Redirect to new protocol
       router.push(`/protocols/${data.id}`);
       router.refresh();
     } catch (error) {
@@ -69,26 +78,38 @@ export function OptimizeButton({
       alert('Failed to optimize protocol. Please try again.');
     } finally {
       setLoading(false);
+      setFeedbackOpen(false);
     }
   };
 
-  if (critiques.length === 0) {
-    return null;
-  }
-
   return (
-    <Button onClick={handleOptimize} disabled={loading}>
-      {loading ? (
-        <>
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          Optimizing...
-        </>
-      ) : (
-        <>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Optimize Protocol
-        </>
-      )}
-    </Button>
+    <>
+      <div className="flex items-center gap-2">
+        <Button onClick={() => runOptimize()} disabled={loading} variant="outline">
+          {loading && !feedbackOpen ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Optimizing...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Quick Optimize
+            </>
+          )}
+        </Button>
+        <Button onClick={() => setFeedbackOpen(true)} disabled={loading}>
+          <MessageSquarePlus className="h-4 w-4 mr-2" />
+          Add Feedback
+        </Button>
+      </div>
+
+      <FeedbackModal
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        onSubmit={runOptimize}
+        loading={loading}
+      />
+    </>
   );
 }

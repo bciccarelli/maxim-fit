@@ -24,23 +24,23 @@ export function DietPlanView({ diet }: DietPlanViewProps) {
             <p className="text-2xl font-bold">{diet.daily_calories}</p>
             <p className="text-xs text-muted-foreground">Calories</p>
           </div>
-          <div className="p-4 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-center">
+          <div className="p-4 rounded-lg bg-forest-100 dark:bg-forest-800/30 text-center">
             <p className="text-2xl font-bold">{diet.protein_target_g}g</p>
             <p className="text-xs text-muted-foreground">Protein</p>
           </div>
-          <div className="p-4 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 text-center">
+          <div className="p-4 rounded-lg bg-forest-100 dark:bg-forest-800/30 text-center">
             <p className="text-2xl font-bold">{diet.carbs_target_g}g</p>
             <p className="text-xs text-muted-foreground">Carbs</p>
           </div>
-          <div className="p-4 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-center">
+          <div className="p-4 rounded-lg bg-forest-200 dark:bg-forest-800/30 text-center">
             <p className="text-2xl font-bold">{diet.fat_target_g}g</p>
             <p className="text-xs text-muted-foreground">Fat</p>
           </div>
         </div>
 
         {/* Hydration */}
-        <div className="flex items-center gap-2 mb-6 p-3 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
-          <Droplets className="h-5 w-5 text-cyan-600" />
+        <div className="flex items-center gap-2 mb-6 p-3 rounded-lg bg-info/15">
+          <Droplets className="h-5 w-5 text-info" />
           <span className="font-medium">Daily Hydration: {diet.hydration_oz} oz</span>
         </div>
 

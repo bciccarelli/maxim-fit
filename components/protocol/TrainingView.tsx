@@ -45,7 +45,7 @@ export function TrainingView({ training }: TrainingViewProps) {
               <div className="p-4 space-y-4">
                 {/* Warmup */}
                 <div className="text-sm">
-                  <span className="font-medium text-yellow-600">Warmup:</span>{' '}
+                  <span className="font-medium text-warning">Warmup:</span>{' '}
                   <span className="text-muted-foreground">{workout.warmup}</span>
                 </div>
 
@@ -75,7 +75,7 @@ export function TrainingView({ training }: TrainingViewProps) {
 
                 {/* Cooldown */}
                 <div className="text-sm">
-                  <span className="font-medium text-blue-600">Cooldown:</span>{' '}
+                  <span className="font-medium text-info">Cooldown:</span>{' '}
                   <span className="text-muted-foreground">{workout.cooldown}</span>
                 </div>
               </div>
