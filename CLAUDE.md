@@ -2,7 +2,7 @@
 
 ## Mission
 
-Generate a personalized, evidence-based daily health protocol that the user will actually follow. The protocol must satisfy hard requirements (sleep hours, workout frequency, etc.) while optimizing for weighted goals (muscle gain, longevity, etc.). Success is measured by long-term adherence—a perfect protocol nobody follows is worthless.
+Generate a personalized, evidence-based daily health protocol. The protocol must satisfy hard requirements (sleep hours, workout frequency, etc.) while optimizing for weighted goals (muscle gain, longevity, etc.).
 
 ## Gemini API
 
@@ -10,10 +10,81 @@ Generate a personalized, evidence-based daily health protocol that the user will
 
 ## Project Structure
 
-- `optimizer/` - Main package with modular code
-- `routine_optimizer.py` - Entry point (imports from optimizer package)
-- `user_profile.json` - User configuration
-- `knowledge_base.json` - Persistent research findings and optimization insights
+- `app/` - Next.js App Router pages and API routes
+  - `(dashboard)/` - Dashboard layout group (dashboard, create, protocols/[id])
+  - `api/protocol/` - API routes (generate, parse, verify, edit, modify, ask, revert, versions, delete, critiques)
+- `components/protocol/` - Protocol display and editing components
+- `components/forms/` - Wizard and form components
+- `components/ui/` - Shared UI primitives (shadcn)
+- `lib/gemini/` - Gemini API integration (generation, verification, modification, Q&A)
+- `lib/schemas/` - Zod schemas for protocol data and user config
+- `lib/supabase/` - Supabase client and database types
+- `lib/streaming.ts` - SSE stream creation utility
+- `lib/hooks/useSSEStream.ts` - Client-side SSE consumption hook
+
+## Architecture
+
+### Protocol Lifecycle
+
+Protocols follow a **version chain** model. Every change creates a new row in the `protocols` table linked by `version_chain_id`. The `is_current` flag marks the latest version.
+
+Five user-facing actions replace the old optimize/feedback loop:
+
+- **Verify** — AI scores the protocol using Google Search grounding. Updates the current row in-place (sets `verified=true`, stores scores). No new version created.
+- **Modify** — AI-assisted changes. User describes what to change, AI researches and proposes a modified protocol with score comparison. User reviews and accepts/rejects. Accepted proposals create a new version with `change_source='ai_modify'`.
+- **Ask** — Saved Q&A about the protocol. Uses search grounding. Doesn't modify protocol data. History persisted in `protocol_questions` table.
+- **Direct Edit** — Inline editing of protocol fields (schedule, diet, supplements, training). Each section has a "Save changes" button. Creates a new version with `change_source='direct_edit'` and `verified=false`.
+- **Version History** — Slide-out drawer showing all versions in a chain. Non-current versions can be reverted (creates new version with `change_source='revert'`).
+
+### Change Sources
+
+Each protocol version tracks how it was created: `generated`, `imported`, `direct_edit`, `ai_modify`, `critique_apply`, or `revert`.
+
+### Verification State
+
+Protocols have a `verified` boolean. Newly generated/imported protocols are auto-verified. Direct edits mark the protocol as unverified, showing a warning banner prompting re-verification.
+
+### Streaming Architecture
+
+AI-powered features (Generate, Modify, Ask) support real-time streaming via Server-Sent Events (SSE).
+
+**Server-side:**
+- `lib/gemini/generation.ts` exports `*Stream` async generator functions (`generateProtocolStream`, `modifyProtocolStream`, `askAboutProtocolStream`) that yield text chunks and return the final parsed result.
+- `lib/streaming.ts` provides `createSSEStream(generator, onComplete?)` which converts an `AsyncGenerator` into a `ReadableStream` with SSE framing. Chunk format: `data: {"chunk":"..."}\n\n`. Completion: `data: {"done":true,"result":{...}}\n\n`. Errors: `data: {"error":"..."}\n\n`.
+- API routes accept `?stream=true` query param. When streaming, they return `new Response(stream, { headers: SSE_HEADERS })`. Non-streaming paths remain unchanged.
+- The generate route uses a custom SSE stream (not `createSSEStream`) because it sends `stage` messages (`searching`, `generating`, `evaluating`) alongside text chunks.
+
+**Client-side:**
+- `lib/hooks/useSSEStream.ts` provides the `useSSEStream<T>()` hook returning `{ streamedText, result, error, isStreaming, startStream, reset }`.
+- `startStream(url, fetchOptions)` fetches with SSE, reads chunks via `getReader()`, accumulates text, and extracts the final result.
+
+### New Protocol Flow
+
+`NewProtocolButton` is a dropdown with two options: "Generate new" (opens `GenerateProtocolDialog`) and "Import existing" (opens `ImportProtocolDialog`). Both complete without page navigation — the dashboard refreshes in place.
+
+`GenerateProtocolDialog` wraps `ProtocolWizard` + `GenerationModal` inside a Dialog. On submit, it streams the generation process with real stage transitions, then closes and navigates to the new protocol via query param.
+
+### Critique Interaction
+
+Evaluation critiques support multi-select via checkboxes in `ProtocolDisplay`. Two actions:
+- **Dismiss** — removes selected critiques from the display (persisted via `POST /api/protocol/critiques` with `action: 'dismiss'`).
+- **Apply Recommendations** — calls `applyCritiqueSuggestions()` in `lib/gemini/generation.ts`, which performs a lightweight AI modification applying only the selected suggestions. Creates a new protocol version with `change_source: 'critique_apply'`. No full re-evaluation is triggered.
+
+### Ask + Export to Modify
+
+The Ask modal uses streaming (`useSSEStream`) for progressive answer display. The AI prompt is conversational (2-4 sentences, no bullet points unless asked). Responses include a `suggestsModification` boolean.
+
+An "Export to Modify" button appears when there's Q&A history. It builds a context string from the last 3 Q&A pairs and passes it to the Modify modal via `ProtocolActions`, which manages the flow: closes Ask modal → sets prefilled message → opens Modify modal.
+
+The Modify modal accepts an `initialMessage` prop for pre-population and uses streaming to show AI reasoning in real-time before presenting the score comparison and accept/reject options.
+
+### Inline Editing Pattern
+
+All editable sections (Schedule, Diet, Supplements, Training) separate **expand** from **edit**:
+- Chevron click toggles read-only detail expansion (e.g., foods list, exercise details)
+- Pencil button enters edit mode (shows input fields)
+- Both states are independent — editing auto-expands the item
+- A global "Save changes" button commits all draft changes as a new protocol version
 
 ## UI Style Guide
 
@@ -23,7 +94,7 @@ The interface is a **coach, not a classroom**. It doesn't teach you exercise sci
 
 The visual identity should feel like receiving a program from someone who clearly did the homework. Not academic (no one needs to see the papers), not consumer-wellness (no pastel illustrations or "your journey" copy). The aesthetic is **confident, dense, and precise** — a daily briefing you scan in 30 seconds and trust enough to execute.
 
-The target user takes health seriously, or wants to start. The density and precision signal credibility to both ends: a beginner sees authority and follows the plan; an enthusiast sees the numbers, knows the protocol is substantive, and challenges what they disagree with. The feedback loop — where users push back and the AI re-optimizes — is a first-class interaction, not a settings page buried in a menu.
+The target user takes health seriously, or wants to start. The density and precision signal credibility to both ends: a beginner sees authority and follows the plan; an enthusiast sees the numbers, knows the protocol is substantive, and challenges what they disagree with. The modification loop — where users push back, ask questions, and the AI researches and proposes changes — is a first-class interaction, not a settings page buried in a menu.
 
 Four principles, in order:
 

@@ -85,8 +85,95 @@ export type Database = {
         }
         Relationships: []
       }
+      protocol_modifications: {
+        Row: {
+          created_at: string | null
+          current_scores: Json | null
+          id: string
+          proposed_protocol_data: Json | null
+          proposed_scores: Json | null
+          protocol_id: string | null
+          reasoning: string | null
+          status: string | null
+          user_id: string | null
+          user_message: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_scores?: Json | null
+          id?: string
+          proposed_protocol_data?: Json | null
+          proposed_scores?: Json | null
+          protocol_id?: string | null
+          reasoning?: string | null
+          status?: string | null
+          user_id?: string | null
+          user_message: string
+        }
+        Update: {
+          created_at?: string | null
+          current_scores?: Json | null
+          id?: string
+          proposed_protocol_data?: Json | null
+          proposed_scores?: Json | null
+          protocol_id?: string | null
+          reasoning?: string | null
+          status?: string | null
+          user_id?: string | null
+          user_message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_modifications_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_questions: {
+        Row: {
+          answer: string
+          created_at: string | null
+          id: string
+          protocol_id: string | null
+          question: string
+          user_id: string | null
+          version_chain_id: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string | null
+          id?: string
+          protocol_id?: string | null
+          question: string
+          user_id?: string | null
+          version_chain_id: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string | null
+          id?: string
+          protocol_id?: string | null
+          question?: string
+          user_id?: string | null
+          version_chain_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_questions_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       protocols: {
         Row: {
+          change_note: string | null
+          change_source: string | null
           config_id: string | null
           created_at: string | null
           critiques: Json | null
@@ -94,15 +181,23 @@ export type Database = {
           goal_scores: Json | null
           id: string
           is_anonymous: boolean | null
+          is_current: boolean | null
           iteration: number | null
+          parent_version_id: string | null
           protocol_data: Json
           requirement_scores: Json | null
           requirements_met: boolean | null
           user_id: string | null
+          verified: boolean | null
+          verified_at: string | null
+          version: number | null
+          version_chain_id: string | null
           viability_score: number | null
           weighted_goal_score: number | null
         }
         Insert: {
+          change_note?: string | null
+          change_source?: string | null
           config_id?: string | null
           created_at?: string | null
           critiques?: Json | null
@@ -110,15 +205,23 @@ export type Database = {
           goal_scores?: Json | null
           id?: string
           is_anonymous?: boolean | null
+          is_current?: boolean | null
           iteration?: number | null
+          parent_version_id?: string | null
           protocol_data: Json
           requirement_scores?: Json | null
           requirements_met?: boolean | null
           user_id?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          version?: number | null
+          version_chain_id?: string | null
           viability_score?: number | null
           weighted_goal_score?: number | null
         }
         Update: {
+          change_note?: string | null
+          change_source?: string | null
           config_id?: string | null
           created_at?: string | null
           critiques?: Json | null
@@ -126,11 +229,17 @@ export type Database = {
           goal_scores?: Json | null
           id?: string
           is_anonymous?: boolean | null
+          is_current?: boolean | null
           iteration?: number | null
+          parent_version_id?: string | null
           protocol_data?: Json
           requirement_scores?: Json | null
           requirements_met?: boolean | null
           user_id?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          version?: number | null
+          version_chain_id?: string | null
           viability_score?: number | null
           weighted_goal_score?: number | null
         }
@@ -140,6 +249,13 @@ export type Database = {
             columns: ["config_id"]
             isOneToOne: false
             referencedRelation: "user_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocols_parent_version_id_fkey"
+            columns: ["parent_version_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
             referencedColumns: ["id"]
           },
         ]

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { generateProtocol, evaluateProtocol } from '@/lib/gemini/generation';
+import { generateProtocol, generateProtocolStream, verifyProtocol } from '@/lib/gemini/generation';
 import { userConfigSchema, anonymousUserConfigSchema, type UserConfig, type AnonymousUserConfig } from '@/lib/schemas/user-config';
+import { SSE_HEADERS } from '@/lib/streaming';
+import type { DailyProtocol } from '@/lib/schemas/protocol';
 
-// Simple placeholder evaluation for anonymous users - no AI call, instant response
-function getPlaceholderEvaluation(config: UserConfig | AnonymousUserConfig) {
+// Simple placeholder verification for anonymous users - no AI call, instant response
+function getPlaceholderVerification(config: UserConfig | AnonymousUserConfig) {
   return {
     requirement_scores: config.requirements.map((req) => ({
       requirement_name: req,
@@ -26,10 +28,59 @@ function getPlaceholderEvaluation(config: UserConfig | AnonymousUserConfig) {
   };
 }
 
+async function saveProtocol(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string | null | undefined,
+  isAuthenticated: boolean,
+  protocol: DailyProtocol,
+  verification: ReturnType<typeof getPlaceholderVerification> | Awaited<ReturnType<typeof verifyProtocol>>
+) {
+  const protocolData = {
+    user_id: userId ?? null,
+    protocol_data: protocol,
+    weighted_goal_score: verification.weighted_goal_score,
+    viability_score: verification.viability_score,
+    requirements_met: verification.requirements_met,
+    iteration: 0,
+    requirement_scores: verification.requirement_scores,
+    goal_scores: verification.goal_scores,
+    critiques: verification.critiques,
+    is_anonymous: !isAuthenticated,
+    expires_at: !isAuthenticated
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      : null,
+    version: 1,
+    is_current: true,
+    change_source: 'generated',
+    verified: isAuthenticated,
+    verified_at: isAuthenticated ? new Date().toISOString() : null,
+  };
+
+  const { data: savedProtocol, error: saveError } = await supabase
+    .from('protocols')
+    .insert(protocolData)
+    .select()
+    .single();
+
+  if (saveError) {
+    console.error('Error saving protocol:', saveError);
+  }
+
+  if (savedProtocol) {
+    await supabase
+      .from('protocols')
+      .update({ version_chain_id: savedProtocol.id })
+      .eq('id', savedProtocol.id);
+  }
+
+  return savedProtocol;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const supabase = await createClient();
+    const useStreaming = request.nextUrl.searchParams.get('stream') === 'true';
 
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
@@ -48,52 +99,93 @@ export async function POST(request: NextRequest) {
 
     const config = parseResult.data;
 
-    // Generate protocol using Gemini
+    if (useStreaming) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            // Stage 1: Stream generation
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ stage: 'generating' })}\n\n`)
+            );
+
+            const generator = generateProtocolStream(config);
+            let genResult: IteratorResult<string, DailyProtocol>;
+            do {
+              genResult = await generator.next();
+              if (!genResult.done && genResult.value) {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ chunk: genResult.value })}\n\n`)
+                );
+              }
+            } while (!genResult.done);
+
+            const protocol = genResult.value;
+
+            // Stage 2: Verification
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ stage: 'evaluating' })}\n\n`)
+            );
+
+            const verification = isAuthenticated
+              ? await verifyProtocol(protocol, config)
+              : getPlaceholderVerification(config);
+
+            // Stage 3: Save
+            const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification);
+
+            // Stage 4: Complete
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({
+                done: true,
+                result: {
+                  id: savedProtocol?.id,
+                  protocol,
+                  evaluation: {
+                    requirement_scores: verification.requirement_scores,
+                    goal_scores: verification.goal_scores,
+                    critiques: verification.critiques,
+                    requirements_met: verification.requirements_met,
+                    weighted_goal_score: verification.weighted_goal_score,
+                    viability_score: verification.viability_score,
+                  },
+                },
+              })}\n\n`)
+            );
+          } catch (error) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({
+                error: error instanceof Error ? error.message : 'Generation failed',
+              })}\n\n`)
+            );
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, { headers: SSE_HEADERS });
+    }
+
+    // Non-streaming path (existing behavior)
     const protocol = await generateProtocol(config);
 
-    // Evaluate the protocol - skip AI evaluation for anonymous users (instant)
-    const evaluation = isAuthenticated
-      ? await evaluateProtocol(protocol, config)
-      : getPlaceholderEvaluation(config);
+    const verification = isAuthenticated
+      ? await verifyProtocol(protocol, config)
+      : getPlaceholderVerification(config);
 
-    // Save to database
-    const protocolData = {
-      user_id: user?.id ?? null,
-      protocol_data: protocol,
-      weighted_goal_score: evaluation.weighted_goal_score,
-      viability_score: evaluation.viability_score,
-      requirements_met: evaluation.requirements_met,
-      iteration: 0,
-      requirement_scores: evaluation.requirement_scores,
-      goal_scores: evaluation.goal_scores,
-      critiques: evaluation.critiques,
-      is_anonymous: !isAuthenticated,
-      expires_at: !isAuthenticated
-        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        : null,
-    };
-
-    const { data: savedProtocol, error: saveError } = await supabase
-      .from('protocols')
-      .insert(protocolData)
-      .select()
-      .single();
-
-    if (saveError) {
-      console.error('Error saving protocol:', saveError);
-      // Still return the protocol even if save fails
-    }
+    const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification);
 
     return NextResponse.json({
       id: savedProtocol?.id,
       protocol,
       evaluation: {
-        requirement_scores: evaluation.requirement_scores,
-        goal_scores: evaluation.goal_scores,
-        critiques: evaluation.critiques,
-        requirements_met: evaluation.requirements_met,
-        weighted_goal_score: evaluation.weighted_goal_score,
-        viability_score: evaluation.viability_score,
+        requirement_scores: verification.requirement_scores,
+        goal_scores: verification.goal_scores,
+        critiques: verification.critiques,
+        requirements_met: verification.requirements_met,
+        weighted_goal_score: verification.weighted_goal_score,
+        viability_score: verification.viability_score,
       },
     });
   } catch (error) {

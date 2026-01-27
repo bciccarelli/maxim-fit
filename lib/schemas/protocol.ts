@@ -179,18 +179,65 @@ export const critiqueEvaluationSchema = z.object({
 export type CritiqueEvaluation = z.infer<typeof critiqueEvaluationSchema>;
 
 // =============================================================================
-// Optimization Result Schema
+// Verification Result
 // =============================================================================
 
-export const optimizationResultSchema = z.object({
-  protocol: dailyProtocolSchema,
-  requirement_scores: z.array(adherenceScoreSchema),
-  goal_scores: z.array(goalScoreSchema),
-  critiques: z.array(critiqueSchema),
-  requirements_met: z.boolean(),
-  weighted_goal_score: z.number(),
-  viability_score: z.number(),
-  iteration: z.number().int(),
-});
+export type VerificationResult = {
+  requirement_scores: Array<{
+    requirement_name: string;
+    target: number;
+    achieved: number;
+    adherence_percent: number;
+    suggestions: string;
+  }>;
+  goal_scores: Array<{
+    goal_name: string;
+    score: number;
+    reasoning: string;
+    suggestions: string;
+  }>;
+  critiques: Array<{
+    category: string;
+    criticism: string;
+    severity: 'minor' | 'moderate' | 'major';
+    suggestion: string;
+  }>;
+  requirements_met: boolean;
+  weighted_goal_score: number;
+  viability_score: number;
+};
 
-export type OptimizationResult = z.infer<typeof optimizationResultSchema>;
+// =============================================================================
+// Modify Proposal
+// =============================================================================
+
+export type ModifyProposal = {
+  protocol: DailyProtocol;
+  reasoning: string;
+  verification: VerificationResult;
+};
+
+// =============================================================================
+// Version Types
+// =============================================================================
+
+export type ProtocolVersion = {
+  id: string;
+  version: number;
+  version_chain_id: string;
+  is_current: boolean;
+  change_note: string | null;
+  change_source: string | null;
+  verified: boolean;
+  verified_at: string | null;
+  weighted_goal_score: number | null;
+  viability_score: number | null;
+  created_at: string;
+};
+
+export type ProtocolQuestion = {
+  id: string;
+  question: string;
+  answer: string;
+  created_at: string;
+};

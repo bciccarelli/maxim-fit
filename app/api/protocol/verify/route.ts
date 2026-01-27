@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { verifyProtocol } from '@/lib/gemini/generation';
+import { dailyProtocolSchema } from '@/lib/schemas/protocol';
+import { userConfigSchema } from '@/lib/schemas/user-config';
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    const { protocolId } = await request.json();
+
+    if (!protocolId || typeof protocolId !== 'string') {
+      return NextResponse.json({ error: 'Protocol ID is required' }, { status: 400 });
+    }
+
+    // Fetch the protocol
+    const { data: protocol, error: fetchError } = await supabase
+      .from('protocols')
+      .select('*, user_configs(*)')
+      .eq('id', protocolId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !protocol) {
+      return NextResponse.json({ error: 'Protocol not found' }, { status: 404 });
+    }
+
+    const protocolData = dailyProtocolSchema.parse(protocol.protocol_data);
+
+    // Build config from user_configs if available
+    const configData = protocol.user_configs;
+    const config = configData
+      ? userConfigSchema.safeParse({
+          personal_info: configData.personal_info,
+          goals: configData.goals,
+          requirements: configData.requirements,
+          iterations: 1,
+        })
+      : null;
+
+    const fallbackConfig = {
+      personal_info: {
+        age: 30, weight_lbs: 170, height_in: 70, sex: 'other' as const,
+        genetic_background: 'Unknown', health_conditions: [],
+        fitness_level: 'intermediate' as const, dietary_restrictions: [],
+      },
+      goals: [{ name: 'General Health', weight: 1.0, description: 'Improve overall health' }],
+      requirements: [],
+      iterations: 1,
+    };
+
+    const verificationConfig = config?.success ? config.data : fallbackConfig;
+
+    // Run verification
+    const verification = await verifyProtocol(protocolData, verificationConfig);
+
+    // Update the protocol row in-place with verification scores
+    const { error: updateError } = await supabase
+      .from('protocols')
+      .update({
+        weighted_goal_score: verification.weighted_goal_score,
+        viability_score: verification.viability_score,
+        requirements_met: verification.requirements_met,
+        requirement_scores: verification.requirement_scores,
+        goal_scores: verification.goal_scores,
+        critiques: verification.critiques,
+        verified: true,
+        verified_at: new Date().toISOString(),
+      })
+      .eq('id', protocolId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.error('Error updating protocol verification:', updateError);
+    }
+
+    return NextResponse.json({ verification });
+  } catch (error) {
+    console.error('Protocol verification error:', error);
+    return NextResponse.json(
+      { error: 'Failed to verify protocol', message: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}

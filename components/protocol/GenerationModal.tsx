@@ -14,6 +14,8 @@ export type GenerationStage =
 interface GenerationModalProps {
   stage: GenerationStage;
   error?: string | null;
+  /** Render inline (no fixed overlay) for use inside dialogs */
+  inline?: boolean;
 }
 
 const stages: { id: GenerationStage; label: string; description: string; icon: React.ReactNode }[] = [
@@ -31,8 +33,8 @@ const stages: { id: GenerationStage; label: string; description: string; icon: R
   },
   {
     id: 'evaluating',
-    label: 'Evaluating',
-    description: 'Analyzing the protocol for adherence and effectiveness...',
+    label: 'Verifying',
+    description: 'Verifying the protocol against current evidence...',
     icon: <ClipboardCheck className="h-5 w-5" />,
   },
   {
@@ -48,7 +50,7 @@ function getStageIndex(stage: GenerationStage): number {
   return stages.findIndex((s) => s.id === stage);
 }
 
-export function GenerationModal({ stage, error }: GenerationModalProps) {
+export function GenerationModal({ stage, error, inline = false }: GenerationModalProps) {
   const [dots, setDots] = useState('');
   const currentStageIndex = getStageIndex(stage);
 
@@ -62,10 +64,18 @@ export function GenerationModal({ stage, error }: GenerationModalProps) {
     return () => clearInterval(interval);
   }, [stage]);
 
+  const Wrapper = inline
+    ? ({ children }: { children: React.ReactNode }) => <>{children}</>
+    : ({ children }: { children: React.ReactNode }) => (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          {children}
+        </div>
+      );
+
   if (stage === 'error') {
     return (
-      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <Wrapper>
+        <Card className={inline ? 'w-full border-0 shadow-none' : 'w-full max-w-md'}>
           <CardHeader>
             <CardTitle className="text-destructive">Generation failed</CardTitle>
             <CardDescription>
@@ -73,13 +83,13 @@ export function GenerationModal({ stage, error }: GenerationModalProps) {
             </CardDescription>
           </CardHeader>
         </Card>
-      </div>
+      </Wrapper>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg">
+    <Wrapper>
+      <Card className={inline ? 'w-full border-0 shadow-none' : 'w-full max-w-lg'}>
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             {stage === 'complete' ? (
@@ -160,6 +170,6 @@ export function GenerationModal({ stage, error }: GenerationModalProps) {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </Wrapper>
   );
 }

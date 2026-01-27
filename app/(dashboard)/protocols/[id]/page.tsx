@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
-import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { OptimizeSection } from './OptimizeSection';
+import { ProtocolDetailClient } from './ProtocolDetailClient';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -40,29 +39,13 @@ export default async function ProtocolPage({ params }: Props) {
             <h1 className="text-3xl font-bold tracking-tight">Protocol details</h1>
             <p className="text-sm text-muted-foreground">
               Created {new Date(protocol.created_at).toLocaleString()}
-              {protocol.iteration > 0 && ` | Iteration ${protocol.iteration}`}
+              {protocol.version != null && protocol.version > 1 && ` | v${protocol.version}`}
             </p>
           </div>
         </div>
-        <OptimizeSection
-          protocolId={protocol.id}
-          currentProtocol={protocol.protocol_data}
-          critiques={protocol.critiques}
-          iteration={protocol.iteration}
-        />
       </div>
 
-      <ProtocolDisplay
-        protocol={protocol.protocol_data}
-        scores={{
-          requirement_scores: protocol.requirement_scores,
-          goal_scores: protocol.goal_scores,
-          critiques: protocol.critiques,
-          requirements_met: protocol.requirements_met,
-          weighted_goal_score: protocol.weighted_goal_score,
-          viability_score: protocol.viability_score,
-        }}
-      />
+      <ProtocolDetailClient protocol={protocol} />
     </div>
   );
 }
