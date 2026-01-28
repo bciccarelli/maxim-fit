@@ -130,7 +130,7 @@ export default function HomePage() {
                 You have a life.
               </h1>
               <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
-                Get a protocol that works for it. 
+                Get a protocol that works with it. 
               </h1>
               <h2 className="text-1xl font-bold tracking-tight text-primary mb-4">
                 (For free)
