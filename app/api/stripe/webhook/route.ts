@@ -156,6 +156,12 @@ async function upsertSubscription(
       ? 'pro'
       : 'free';
 
+  // Access period timestamps from subscription (cast to any for type safety with Stripe API versions)
+  const sub = subscription as Stripe.Subscription & {
+    current_period_start: number;
+    current_period_end: number;
+  };
+
   const { error } = await supabaseAdmin.from('subscriptions').upsert(
     {
       user_id: userId,
@@ -165,10 +171,10 @@ async function upsertSubscription(
       status: subscription.status,
       tier,
       current_period_start: new Date(
-        subscription.current_period_start * 1000
+        sub.current_period_start * 1000
       ).toISOString(),
       current_period_end: new Date(
-        subscription.current_period_end * 1000
+        sub.current_period_end * 1000
       ).toISOString(),
       cancel_at_period_end: subscription.cancel_at_period_end,
       trial_end: subscription.trial_end
