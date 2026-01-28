@@ -93,3 +93,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .landing-gradient {
+    background:
+      radial-gradient(ellipse 120% 80% at 50% 100%, hsl(var(--forest-300) / 0.7), transparent),
+      radial-gradient(ellipse 80% 60% at 100% 100%, hsl(var(--forest-400) / 0.4), transparent),
+      radial-gradient(ellipse 70% 50% at 0% 100%, hsl(var(--forest-200) / 0.5), transparent),
+      hsl(var(--background));
+  }
+
+  .dark .landing-gradient {
+    background:
+      radial-gradient(ellipse 120% 80% at 50% 100%, hsl(var(--forest-700) / 0.8), transparent),
+      radial-gradient(ellipse 80% 60% at 100% 100%, hsl(var(--forest-600) / 0.5), transparent),
+      radial-gradient(ellipse 70% 50% at 0% 100%, hsl(var(--forest-800) / 0.6), transparent),
+      hsl(var(--background));
+  }
+}

@@ -108,7 +108,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen landing-gradient">
       {generationStage && (
         <GenerationModal stage={generationStage} error={error} />
       )}
