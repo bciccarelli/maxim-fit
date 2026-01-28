@@ -1,10 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { modifyProtocol, modifyProtocolStream, verifyProtocol } from '@/lib/gemini/generation';
+import { modifyProtocol, modifyProtocolStream, verifyProtocol, extractPreferenceNotes } from '@/lib/gemini/generation';
 import { dailyProtocolSchema, type DailyProtocol } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
+
+/**
+ * Extract and save preference notes from a user's modification message.
+ */
+async function saveExtractedNotes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  protocolId: string,
+  userMessage: string
+) {
+  try {
+    const notes = await extractPreferenceNotes(userMessage);
+    if (notes.length === 0) return;
+
+    const notesToInsert = notes.map((note) => ({
+      user_id: userId,
+      note,
+      source: 'modify',
+      protocol_id: protocolId,
+    }));
+
+    await supabase.from('user_notes').insert(notesToInsert);
+    console.log(`[modify] Extracted ${notes.length} preference notes from user message`);
+  } catch (error) {
+    // Don't fail the request if note extraction fails
+    console.error('[modify] Error extracting preference notes:', error);
+  }
+}
 
 function buildConfig(configData: Record<string, unknown> | null) {
   if (!configData) return null;
@@ -119,6 +147,9 @@ export async function POST(request: NextRequest) {
               .select()
               .single();
 
+            // Extract and save preference notes (non-blocking)
+            saveExtractedNotes(supabase, user.id, protocolId, userMessage);
+
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 done: true,
@@ -171,6 +202,9 @@ export async function POST(request: NextRequest) {
     if (saveError) {
       console.error('Error saving modification:', saveError);
     }
+
+    // Extract and save preference notes (non-blocking)
+    saveExtractedNotes(supabase, user.id, protocolId, userMessage);
 
     return NextResponse.json({
       modificationId: modification?.id,

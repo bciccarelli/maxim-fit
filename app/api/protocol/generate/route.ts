@@ -40,14 +40,40 @@ async function saveProtocol(
   protocol: DailyProtocol,
   verification: ReturnType<typeof getPlaceholderVerification> | Awaited<ReturnType<typeof verifyProtocol>>,
   name: string | null,
+  config: UserConfig | AnonymousUserConfig,
 ) {
   const startTime = Date.now();
   const log = (step: string) => console.log(`[saveProtocol] ${step} @ ${Date.now() - startTime}ms`);
 
   log('start');
+
+  // Save user config first (only for authenticated users)
+  let configId: string | null = null;
+  if (isAuthenticated && userId) {
+    log('saving user config');
+    const { data: savedConfig, error: configError } = await supabase
+      .from('user_configs')
+      .insert({
+        user_id: userId,
+        personal_info: config.personal_info,
+        goals: config.goals,
+        requirements: config.requirements,
+      })
+      .select('id')
+      .single();
+
+    if (configError) {
+      console.error('Error saving user config:', configError);
+    } else {
+      configId = savedConfig?.id ?? null;
+    }
+    log('user config saved');
+  }
+
   const protocolData = {
     user_id: userId ?? null,
     protocol_data: protocol,
+    config_id: configId,
     name,
     weighted_goal_score: verification.weighted_goal_score,
     viability_score: verification.viability_score,
@@ -124,6 +150,20 @@ export async function POST(request: NextRequest) {
 
     const config = parseResult.data;
 
+    // Fetch user notes for authenticated users
+    let userNotes: string[] = [];
+    if (isAuthenticated && user) {
+      log('fetching user notes');
+      const { data: notes } = await supabase
+        .from('user_notes')
+        .select('note')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      userNotes = notes?.map((n) => n.note) ?? [];
+      log(`fetched ${userNotes.length} user notes`);
+    }
+
     if (useStreaming) {
       log('using streaming path');
       const encoder = new TextEncoder();
@@ -139,7 +179,7 @@ export async function POST(request: NextRequest) {
               encoder.encode(`data: ${JSON.stringify({ stage: 'generating' })}\n\n`)
             );
 
-            const generator = generateProtocolStream(config);
+            const generator = generateProtocolStream(config, userNotes);
             let genResult: IteratorResult<string, DailyProtocol>;
             let chunkCount = 0;
             do {
@@ -169,7 +209,7 @@ export async function POST(request: NextRequest) {
             // Stage 3: Save
             streamLog('starting save');
             const protocolName = generateProtocolName(config.goals);
-            const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName);
+            const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName, config);
             streamLog('save complete');
 
             // Stage 4: Complete
@@ -210,7 +250,7 @@ export async function POST(request: NextRequest) {
     // Non-streaming path (existing behavior)
     log('using non-streaming path');
     log('starting generation');
-    const protocol = await generateProtocol(config);
+    const protocol = await generateProtocol(config, userNotes);
     log('generation complete');
 
     log('starting verification');
@@ -221,7 +261,7 @@ export async function POST(request: NextRequest) {
 
     log('starting save');
     const protocolName = generateProtocolName(config.goals);
-    const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName);
+    const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName, config);
     log('save complete');
 
     log('sending response');

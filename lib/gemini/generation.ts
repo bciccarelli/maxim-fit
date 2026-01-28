@@ -3,6 +3,26 @@ import { dailyProtocolSchema, type DailyProtocol, type VerificationResult } from
 import type { UserConfig, AnonymousUserConfig } from '../schemas/user-config';
 import { goalSchema, type Goal } from '../schemas/user-config';
 
+/**
+ * Validate and fix corrupted exercise data from Gemini responses.
+ * Catches impossibly large sets values that indicate data corruption.
+ */
+function validateExerciseData(parsed: Record<string, unknown>): void {
+  const training = parsed.training as { workouts?: Array<{ exercises?: Array<{ name?: string; sets?: number }> }> } | undefined;
+  for (const workout of training?.workouts ?? []) {
+    for (const exercise of workout.exercises ?? []) {
+      if (exercise.sets !== null && exercise.sets !== undefined) {
+        // Catch impossibly large sets values (likely corruption from Gemini)
+        if (typeof exercise.sets === 'number' && exercise.sets > 100) {
+          console.error(`[validateExerciseData] Detected corrupted sets value: ${exercise.sets} for exercise: ${exercise.name}`);
+          // Recover with a reasonable default
+          exercise.sets = 3;
+        }
+      }
+    }
+  }
+}
+
 // Gemini-compatible schema (flat, no $ref or definitions)
 export const dailyProtocolGeminiSchema = {
   type: 'object',
@@ -123,7 +143,8 @@ export const dailyProtocolGeminiSchema = {
 } as const;
 
 export async function generateProtocol(
-  config: UserConfig | AnonymousUserConfig
+  config: UserConfig | AnonymousUserConfig,
+  userNotes?: string[]
 ): Promise<DailyProtocol> {
   const startTime = Date.now();
   const log = (step: string) => console.log(`[gemini:generateProtocol] ${step} @ ${Date.now() - startTime}ms`);
@@ -132,7 +153,7 @@ export async function generateProtocol(
   const client = getGeminiClient();
   log('got client');
 
-  const prompt = buildGenerationPrompt(config);
+  const prompt = buildGenerationPrompt(config, userNotes);
   log(`built prompt (${prompt.length} chars)`);
 
   log(`calling Gemini API with model: ${MODEL_FAST} (no grounding)...`);
@@ -166,7 +187,7 @@ export async function generateProtocol(
   }
 }
 
-function buildGenerationPrompt(config: UserConfig | AnonymousUserConfig): string {
+function buildGenerationPrompt(config: UserConfig | AnonymousUserConfig, userNotes?: string[]): string {
   const { personal_info, goals, requirements } = config;
 
   const goalsText = goals
@@ -176,6 +197,10 @@ function buildGenerationPrompt(config: UserConfig | AnonymousUserConfig): string
   const requirementsText = requirements.length > 0
     ? requirements.map((r) => `- ${r}`).join('\n')
     : 'No specific requirements provided.';
+
+  const notesText = userNotes && userNotes.length > 0
+    ? `\n\n**User Preferences (from previous interactions):**\n${userNotes.map((n) => `- ${n}`).join('\n')}`
+    : '';
 
   return `You are an expert health protocol designer. Create a comprehensive, personalized daily health protocol based on the following user information.
 
@@ -194,7 +219,7 @@ function buildGenerationPrompt(config: UserConfig | AnonymousUserConfig): string
 ${goalsText}
 
 **Requirements:**
-${requirementsText}
+${requirementsText}${notesText}
 
 ## Instructions
 
@@ -363,6 +388,7 @@ Generate the modified protocol with reasoning now.`;
   }
 
   const parsed = JSON.parse(text);
+  validateExerciseData(parsed);
   const protocolData = dailyProtocolSchema.parse(parsed);
 
   return {
@@ -563,14 +589,15 @@ Parse the protocol and determine goals now.`;
  * Stream protocol generation. Yields text chunks, returns parsed DailyProtocol.
  */
 export async function* generateProtocolStream(
-  config: UserConfig | AnonymousUserConfig
+  config: UserConfig | AnonymousUserConfig,
+  userNotes?: string[]
 ): AsyncGenerator<string, DailyProtocol, unknown> {
   const startTime = Date.now();
   const log = (step: string) => console.log(`[gemini:generateProtocolStream] ${step} @ ${Date.now() - startTime}ms`);
 
   log('start');
   const client = getGeminiClient();
-  const prompt = buildGenerationPrompt(config);
+  const prompt = buildGenerationPrompt(config, userNotes);
   log(`built prompt, calling Gemini stream API with model: ${MODEL_FAST} (no grounding)...`);
 
   const stream = await client.models.generateContentStream({
@@ -658,6 +685,7 @@ Generate the modified protocol with reasoning now.`;
   }
 
   const parsed = JSON.parse(fullText);
+  validateExerciseData(parsed);
   const protocolData = dailyProtocolSchema.parse(parsed);
 
   return {
@@ -726,10 +754,19 @@ ${JSON.stringify(protocol, null, 2)}
 ## Suggestions to Apply
 ${suggestionsText}
 
+## CRITICAL: Data Preservation Rules
+- Exercise fields (sets, reps, duration_min, rest_sec, notes) must be preserved EXACTLY as-is unless the suggestion specifically addresses them
+- "sets" is always an integer (e.g., 3 or 4), never a combined value
+- "reps" is always a string (e.g., "8-12" or "10"), separate from sets
+- Do NOT combine or concatenate numeric values
+- If an exercise has sets: 3 and reps: "8-12", keep them as separate fields
+- Copy all exercise data verbatim unless explicitly changing it
+
 ## Instructions
 1. Apply each suggestion as directly and minimally as possible.
-2. Only change the parts of the protocol that the suggestions address.
-3. Keep everything else exactly the same.
+2. Only change the parts of the protocol that the suggestions specifically address.
+3. For training exercises: preserve all existing values for sets, reps, duration_min, rest_sec, and notes unless the suggestion explicitly asks to change them.
+4. Keep everything else EXACTLY the same - copy values directly from the input.
 
 Return the updated protocol now.`;
 
@@ -747,5 +784,68 @@ Return the updated protocol now.`;
     throw new Error('No response from Gemini when applying critique suggestions');
   }
 
-  return dailyProtocolSchema.parse(JSON.parse(text));
+  const parsed = JSON.parse(text);
+  validateExerciseData(parsed);
+  return dailyProtocolSchema.parse(parsed);
+}
+
+// ---------------------------------------------------------------------------
+// Preference Note Extraction
+// ---------------------------------------------------------------------------
+
+const noteExtractionSchema = {
+  type: 'object',
+  properties: {
+    notes: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Preference notes extracted from the user message. Each note should be a concise statement about what the user prefers or dislikes.',
+    },
+  },
+  required: ['notes'],
+} as const;
+
+/**
+ * Extract preference notes from a user's modification request.
+ * Returns an array of concise preference statements.
+ */
+export async function extractPreferenceNotes(userMessage: string): Promise<string[]> {
+  const client = getGeminiClient();
+
+  const prompt = `Analyze the following user message about modifying their health protocol. Extract any preferences, likes, dislikes, or constraints they mention. Return them as concise, reusable preference notes.
+
+Only extract clear preferences - don't make assumptions. If no preferences are expressed, return an empty array.
+
+Examples of preferences to extract:
+- "I prefer morning workouts" → "Prefers morning workouts"
+- "I don't like running" → "Dislikes running"
+- "Can we reduce the protein?" → "Prefers lower protein intake"
+- "I need to be done by 8pm" → "Needs to finish activities by 8pm"
+
+User message:
+${userMessage}
+
+Extract preference notes now.`;
+
+  try {
+    const response = await client.models.generateContent({
+      model: MODEL_FAST,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: noteExtractionSchema as any,
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      return [];
+    }
+
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed.notes) ? parsed.notes.filter((n: unknown) => typeof n === 'string' && n.length > 0) : [];
+  } catch (error) {
+    console.error('[extractPreferenceNotes] Error:', error);
+    return [];
+  }
 }

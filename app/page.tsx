@@ -127,10 +127,10 @@ export default function HomePage() {
             {/* Hero */}
             <section className="container mx-auto px-4 pt-4 pb-8 text-center">
               <h1 className="text-3xl font-bold tracking-tight pt-4 mt-4 mb-2">
-                You have a life.
+                Your life is unique.
               </h1>
               <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
-                Get a protocol that works with it. 
+                Get a protocol that works for it. 
               </h1>
               <h2 className="text-1xl font-bold tracking-tight text-primary mb-4">
                 (For free)
