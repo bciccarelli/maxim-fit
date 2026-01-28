@@ -209,8 +209,8 @@ export function ScheduleView({ schedule, editable = false, onChange }: ScheduleV
                       isEditing
                         ? 'bg-card border-primary/50 ring-1 ring-primary/20'
                         : editable
-                          ? 'bg-muted border-gray-700 cursor-pointer hover:bg-muted/70'
-                          : 'bg-muted border-gray-700'
+                          ? 'bg-muted border-white cursor-pointer hover:bg-muted/70'
+                          : 'bg-muted border-white'
                     }`}
                     style={{
                       top,

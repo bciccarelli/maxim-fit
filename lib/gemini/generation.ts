@@ -1,4 +1,4 @@
-import { getGeminiClient, MODEL_NAME } from './client';
+import { getGeminiClient, MODEL_GROUNDED, MODEL_FAST } from './client';
 import { dailyProtocolSchema, type DailyProtocol, type VerificationResult } from '../schemas/protocol';
 import type { UserConfig, AnonymousUserConfig } from '../schemas/user-config';
 import { goalSchema, type Goal } from '../schemas/user-config';
@@ -125,27 +125,45 @@ export const dailyProtocolGeminiSchema = {
 export async function generateProtocol(
   config: UserConfig | AnonymousUserConfig
 ): Promise<DailyProtocol> {
+  const startTime = Date.now();
+  const log = (step: string) => console.log(`[gemini:generateProtocol] ${step} @ ${Date.now() - startTime}ms`);
+
+  log('start');
   const client = getGeminiClient();
+  log('got client');
 
   const prompt = buildGenerationPrompt(config);
+  log(`built prompt (${prompt.length} chars)`);
 
-  const response = await client.models.generateContent({
-    model: MODEL_NAME,
-    contents: prompt,
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: 'application/json',
-      responseSchema: dailyProtocolGeminiSchema as any,
-    },
-  });
+  log(`calling Gemini API with model: ${MODEL_FAST} (no grounding)...`);
+  try {
+    const response = await client.models.generateContent({
+      model: MODEL_FAST,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: dailyProtocolGeminiSchema as any,
+      },
+    });
+    log('Gemini API response received');
 
-  const text = response.text;
-  if (!text) {
-    throw new Error('No response from Gemini');
+    const text = response.text;
+    if (!text) {
+      throw new Error('No response from Gemini');
+    }
+
+    log('parsing response');
+    const parsed = JSON.parse(text);
+    const result = dailyProtocolSchema.parse(parsed);
+    log('done');
+    return result;
+  } catch (error) {
+    log(`Gemini API error: ${error instanceof Error ? error.message : 'unknown'}`);
+    if (error instanceof Error) {
+      console.error('[gemini:generateProtocol] Full error:', error);
+    }
+    throw error;
   }
-
-  const parsed = JSON.parse(text);
-  return dailyProtocolSchema.parse(parsed);
 }
 
 function buildGenerationPrompt(config: UserConfig | AnonymousUserConfig): string {
@@ -272,7 +290,7 @@ ${JSON.stringify(protocol, null, 2)}
 Be thorough and honest. A protocol that won't be followed is worthless.`;
 
   const response = await client.models.generateContent({
-    model: MODEL_NAME,
+    model: MODEL_GROUNDED,
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -330,7 +348,7 @@ ${userMessage}
 Generate the modified protocol with reasoning now.`;
 
   const response = await client.models.generateContent({
-    model: MODEL_NAME,
+    model: MODEL_GROUNDED,
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -394,7 +412,7 @@ export async function askAboutProtocol(
   const prompt = buildAskPrompt(protocol, config, question);
 
   const response = await client.models.generateContent({
-    model: MODEL_NAME,
+    model: MODEL_GROUNDED,
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -502,7 +520,7 @@ Return 1-5 goals with weights summing to 1.0. Weight the most prominent goal hig
 Parse the protocol and determine goals now.`;
 
   const response = await client.models.generateContent({
-    model: MODEL_NAME,
+    model: MODEL_GROUNDED,
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
@@ -547,30 +565,46 @@ Parse the protocol and determine goals now.`;
 export async function* generateProtocolStream(
   config: UserConfig | AnonymousUserConfig
 ): AsyncGenerator<string, DailyProtocol, unknown> {
+  const startTime = Date.now();
+  const log = (step: string) => console.log(`[gemini:generateProtocolStream] ${step} @ ${Date.now() - startTime}ms`);
+
+  log('start');
   const client = getGeminiClient();
   const prompt = buildGenerationPrompt(config);
+  log(`built prompt, calling Gemini stream API with model: ${MODEL_FAST} (no grounding)...`);
 
   const stream = await client.models.generateContentStream({
-    model: MODEL_NAME,
+    model: MODEL_FAST,
     contents: prompt,
     config: {
-      tools: [{ googleSearch: {} }],
       responseMimeType: 'application/json',
       responseSchema: dailyProtocolGeminiSchema as any,
     },
   });
+  log('stream created, waiting for first chunk...');
 
   let fullText = '';
+  let chunkCount = 0;
+  let firstChunkTime: number | null = null;
   for await (const chunk of stream) {
+    if (firstChunkTime === null) {
+      firstChunkTime = Date.now() - startTime;
+      log(`first chunk received @ ${firstChunkTime}ms`);
+    }
+    chunkCount++;
     const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (text) {
       fullText += text;
       yield text;
     }
   }
+  log(`stream complete (${chunkCount} chunks, ${fullText.length} chars)`);
 
+  log('parsing response');
   const parsed = JSON.parse(fullText);
-  return dailyProtocolSchema.parse(parsed);
+  const result = dailyProtocolSchema.parse(parsed);
+  log('done');
+  return result;
 }
 
 /**
@@ -605,7 +639,7 @@ ${userMessage}
 Generate the modified protocol with reasoning now.`;
 
   const stream = await client.models.generateContentStream({
-    model: MODEL_NAME,
+    model: MODEL_GROUNDED,
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -644,7 +678,7 @@ export async function* askAboutProtocolStream(
   const prompt = buildAskPrompt(protocol, config, question);
 
   const stream = await client.models.generateContentStream({
-    model: MODEL_NAME,
+    model: MODEL_GROUNDED,
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -700,7 +734,7 @@ ${suggestionsText}
 Return the updated protocol now.`;
 
   const response = await client.models.generateContent({
-    model: MODEL_NAME,
+    model: MODEL_GROUNDED,
     contents: prompt,
     config: {
       responseMimeType: 'application/json',

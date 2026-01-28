@@ -10,7 +10,6 @@ import type { PersonalInfo } from '@/lib/schemas/user-config';
 interface PersonalInfoFormProps {
   data: Partial<PersonalInfo>;
   onChange: (data: Partial<PersonalInfo>) => void;
-  isAuthenticated?: boolean;
 }
 
 type HeightUnit = 'imperial' | 'metric';
@@ -20,7 +19,7 @@ type WeightUnit = 'lbs' | 'kg';
 const CM_PER_INCH = 2.54;
 const KG_PER_LB = 0.453592;
 
-export function PersonalInfoForm({ data, onChange, isAuthenticated = false }: PersonalInfoFormProps) {
+export function PersonalInfoForm({ data, onChange }: PersonalInfoFormProps) {
   const [heightUnit, setHeightUnit] = useState<HeightUnit>('imperial');
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('lbs');
   const [editingInches, setEditingInches] = useState<string | null>(null);
@@ -91,8 +90,19 @@ export function PersonalInfoForm({ data, onChange, isAuthenticated = false }: Pe
 
         {/* Weight with unit toggle */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="weight">Weight</Label>
+          <Label htmlFor="weight">Weight</Label>
+          <div className="flex gap-2">
+            <Input
+              id="weight"
+              type="number"
+              min={weightUnit === 'lbs' ? 50 : 23}
+              max={weightUnit === 'lbs' ? 500 : 227}
+              step={weightUnit === 'kg' ? 0.1 : 1}
+              value={weightUnit === 'lbs' ? (data.weight_lbs || '') : (weightKg || '')}
+              onChange={(e) => handleWeightChange(parseFloat(e.target.value) || undefined, weightUnit)}
+              placeholder={weightUnit === 'lbs' ? 'Weight' : 'Weight'}
+              className="flex-1"
+            />
             <Select
               id="weight_unit"
               value={weightUnit}
@@ -101,37 +111,17 @@ export function PersonalInfoForm({ data, onChange, isAuthenticated = false }: Pe
                 { value: 'lbs', label: 'lbs' },
                 { value: 'kg', label: 'kg' },
               ]}
-                          />
+              className="w-20"
+            />
           </div>
-          <Input
-            id="weight"
-            type="number"
-            min={weightUnit === 'lbs' ? 50 : 23}
-            max={weightUnit === 'lbs' ? 500 : 227}
-            step={weightUnit === 'kg' ? 0.1 : 1}
-            value={weightUnit === 'lbs' ? (data.weight_lbs || '') : (weightKg || '')}
-            onChange={(e) => handleWeightChange(parseFloat(e.target.value) || undefined, weightUnit)}
-            placeholder={weightUnit === 'lbs' ? 'Enter weight in pounds' : 'Enter weight in kg'}
-          />
         </div>
 
         {/* Height with unit toggle */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Height</Label>
-            <Select
-              id="height_unit"
-              value={heightUnit}
-              onChange={(e) => setHeightUnit(e.target.value as HeightUnit)}
-              options={[
-                { value: 'imperial', label: 'ft/in' },
-                { value: 'metric', label: 'cm' },
-              ]}
-                          />
-          </div>
-          {heightUnit === 'imperial' ? (
-            <div className="flex gap-2">
-              <div className="flex-1">
+          <Label>Height</Label>
+          <div className="flex gap-2">
+            {heightUnit === 'imperial' ? (
+              <>
                 <Input
                   id="height_feet"
                   type="number"
@@ -144,9 +134,8 @@ export function PersonalInfoForm({ data, onChange, isAuthenticated = false }: Pe
                     handleHeightImperialChange(feet, inches);
                   }}
                   placeholder="ft"
+                  className="flex-1"
                 />
-              </div>
-              <div className="flex-1">
                 <Input
                   id="height_inches"
                   type="number"
@@ -162,20 +151,32 @@ export function PersonalInfoForm({ data, onChange, isAuthenticated = false }: Pe
                   onFocus={() => setEditingInches(String(heightInches))}
                   onBlur={() => setEditingInches(null)}
                   placeholder="in"
+                  className="flex-1"
                 />
-              </div>
-            </div>
-          ) : (
-            <Input
-              id="height_cm"
-              type="number"
-              min={100}
-              max={250}
-              value={heightCm}
-              onChange={(e) => handleHeightMetricChange(parseInt(e.target.value) || undefined)}
-              placeholder="Enter height in cm"
+              </>
+            ) : (
+              <Input
+                id="height_cm"
+                type="number"
+                min={100}
+                max={250}
+                value={heightCm}
+                onChange={(e) => handleHeightMetricChange(parseInt(e.target.value) || undefined)}
+                placeholder="Height"
+                className="flex-1"
+              />
+            )}
+            <Select
+              id="height_unit"
+              value={heightUnit}
+              onChange={(e) => setHeightUnit(e.target.value as HeightUnit)}
+              options={[
+                { value: 'imperial', label: 'ft/in' },
+                { value: 'metric', label: 'cm' },
+              ]}
+              className="w-20"
             />
-          )}
+          </div>
         </div>
 
         <div className="space-y-2">

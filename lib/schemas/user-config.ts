@@ -16,10 +16,8 @@ export const personalInfoSchema = z.object({
 
 export type PersonalInfo = z.infer<typeof personalInfoSchema>;
 
-// Schema for anonymous users (no advanced fitness level)
-export const anonymousPersonalInfoSchema = personalInfoSchema.extend({
-  fitness_level: z.enum(['beginner', 'intermediate']),
-});
+// Schema for anonymous users
+export const anonymousPersonalInfoSchema = personalInfoSchema;
 
 export type AnonymousPersonalInfo = z.infer<typeof anonymousPersonalInfoSchema>;
 

@@ -25,7 +25,7 @@ export function NewProtocolButton() {
 
   return (
     <>
-      <div className="relative" ref={ref}>
+      <div className="relative inline-flex" ref={ref}>
         <Button onClick={() => setDropdownOpen(!dropdownOpen)}>
           <Plus className="h-4 w-4 mr-2" />
           New protocol

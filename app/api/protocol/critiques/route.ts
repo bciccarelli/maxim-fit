@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { applyCritiqueSuggestions } from '@/lib/gemini/generation';
 import { dailyProtocolSchema } from '@/lib/schemas/protocol';
+import { getUserTier, isPro } from '@/lib/stripe/subscription';
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,6 +70,16 @@ export async function POST(request: NextRequest) {
     }
 
     // action === 'apply'
+    // Check Pro subscription for apply action (uses AI)
+    const tier = await getUserTier(user.id);
+    if (!isPro(tier)) {
+      return NextResponse.json({
+        error: 'Applying recommendations requires a Pro subscription',
+        code: 'UPGRADE_REQUIRED',
+        currentTier: tier,
+      }, { status: 402 });
+    }
+
     const protocolData = dailyProtocolSchema.parse(protocol.protocol_data);
     const suggestionsToApply = validIndices.map((i: number) => currentCritiques[i].suggestion);
 

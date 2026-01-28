@@ -12,6 +12,7 @@ import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
 import { CritiquesSection } from '@/components/protocol/CritiquesSection';
 import { Trash2, Loader2, History } from 'lucide-react';
 import type { DailyProtocol, AdherenceScore, GoalScore, Critique } from '@/lib/schemas/protocol';
+import type { Tier } from '@/lib/stripe/config';
 
 interface ProtocolListItem {
   id: string;
@@ -42,6 +43,7 @@ interface SelectedProtocol {
 interface DashboardProtocolViewProps {
   protocols: ProtocolListItem[];
   selectedProtocol: SelectedProtocol;
+  tier?: Tier;
 }
 
 function formatDate(dateString: string): string {
@@ -61,6 +63,7 @@ function formatLabel(p: ProtocolListItem): string {
 export function DashboardProtocolView({
   protocols,
   selectedProtocol,
+  tier = 'free',
 }: DashboardProtocolViewProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -197,6 +200,7 @@ export function DashboardProtocolView({
             versionChainId={versionChainId}
             onVerify={handleVerify}
             onModificationAccepted={handleModificationAccepted}
+            tier={tier}
           />
           <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
             <History className="h-4 w-4 mr-2" />

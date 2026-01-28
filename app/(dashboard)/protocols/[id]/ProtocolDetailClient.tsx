@@ -10,6 +10,7 @@ import { CritiquesSection } from '@/components/protocol/CritiquesSection';
 import { Button } from '@/components/ui/button';
 import { History } from 'lucide-react';
 import type { DailyProtocol, AdherenceScore, GoalScore, Critique } from '@/lib/schemas/protocol';
+import type { Tier } from '@/lib/stripe/config';
 
 interface ProtocolData {
   id: string;
@@ -30,9 +31,10 @@ interface ProtocolData {
 
 interface ProtocolDetailClientProps {
   protocol: ProtocolData;
+  tier?: Tier;
 }
 
-export function ProtocolDetailClient({ protocol }: ProtocolDetailClientProps) {
+export function ProtocolDetailClient({ protocol, tier = 'free' }: ProtocolDetailClientProps) {
   const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -124,6 +126,7 @@ export function ProtocolDetailClient({ protocol }: ProtocolDetailClientProps) {
             versionChainId={versionChainId}
             onVerify={handleVerify}
             onModificationAccepted={handleModificationAccepted}
+            tier={tier}
           />
           <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
             <History className="h-4 w-4 mr-2" />

@@ -4,6 +4,7 @@ import { askAboutProtocol, askAboutProtocolStream } from '@/lib/gemini/generatio
 import { dailyProtocolSchema } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
+import { getUserTier, isPro } from '@/lib/stripe/subscription';
 
 function buildConfig(configData: Record<string, unknown> | null) {
   if (!configData) return null;
@@ -66,6 +67,16 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Check Pro subscription
+    const tier = await getUserTier(user.id);
+    if (!isPro(tier)) {
+      return NextResponse.json({
+        error: 'Protocol Q&A requires a Pro subscription',
+        code: 'UPGRADE_REQUIRED',
+        currentTier: tier,
+      }, { status: 402 });
     }
 
     const { protocolId, question } = await request.json();

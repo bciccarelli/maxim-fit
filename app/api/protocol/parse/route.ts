@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { parseProtocolWithGoals, verifyProtocol } from '@/lib/gemini/generation';
+import { getUserTier, isPro } from '@/lib/stripe/subscription';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,16 @@ export async function POST(request: NextRequest) {
         { error: 'Authentication required to parse protocols' },
         { status: 401 }
       );
+    }
+
+    // Check Pro subscription
+    const tier = await getUserTier(user.id);
+    if (!isPro(tier)) {
+      return NextResponse.json({
+        error: 'Protocol Import requires a Pro subscription',
+        code: 'UPGRADE_REQUIRED',
+        currentTier: tier,
+      }, { status: 402 });
     }
 
     const body = await request.json();

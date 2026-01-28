@@ -26,7 +26,7 @@ export function GenerateProtocolDialog({ open, onOpenChange }: GenerateProtocolD
     requirements: string[];
   }) => {
     setError(null);
-    setGenerationStage('searching');
+    setGenerationStage('generating');
 
     const fullConfig = { ...inputConfig, iterations: 1 };
 
@@ -129,7 +129,6 @@ export function GenerateProtocolDialog({ open, onOpenChange }: GenerateProtocolD
             )}
 
             <ProtocolWizard
-              isAuthenticated={true}
               onGenerate={handleGenerate}
               isLoading={!!generationStage}
             />

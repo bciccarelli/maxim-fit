@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NewProtocolButton } from '@/components/protocol/NewProtocolButton';
 import { DashboardProtocolView } from './DashboardProtocolView';
+import { getUserTier } from '@/lib/stripe/subscription';
 
 interface Props {
   searchParams: Promise<{ protocol?: string }>;
@@ -35,6 +36,9 @@ export default async function DashboardPage({ searchParams }: Props) {
     selectedProtocol = data;
   }
 
+  // Get user's subscription tier
+  const tier = user ? await getUserTier(user.id) : 'free';
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -49,6 +53,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         <DashboardProtocolView
           protocols={protocols}
           selectedProtocol={selectedProtocol}
+          tier={tier}
         />
       ) : (
         <div className="text-center py-16 text-muted-foreground">

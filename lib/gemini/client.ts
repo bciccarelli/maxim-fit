@@ -1,7 +1,11 @@
 import { GoogleGenAI } from '@google/genai';
 
-// CRITICAL: Only this model supports grounding + structured output
-export const MODEL_NAME = 'gemini-3-flash-preview';
+// Fast model for initial generation (no grounding needed)
+export const MODEL_FAST = 'gemini-2.5-flash-lite';
+
+// Model with grounding + structured output for verification/modification
+export const MODEL_GROUNDED = 'gemini-3-flash-preview';
+
 
 let client: GoogleGenAI | null = null;
 

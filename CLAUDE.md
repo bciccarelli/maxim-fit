@@ -1,5 +1,10 @@
 # Claude Code Notes
 
+## Marketing
+
+Get an evidence-based daily health protocol that fits your lifestyle. The protocol will satisfy hard requirements (work schedule, workout frequency, etc.) while optimizing for  goals (muscle gain, longevity, etc.).
+
+
 ## Mission
 
 Generate a personalized, evidence-based daily health protocol. The protocol must satisfy hard requirements (sleep hours, workout frequency, etc.) while optimizing for weighted goals (muscle gain, longevity, etc.).

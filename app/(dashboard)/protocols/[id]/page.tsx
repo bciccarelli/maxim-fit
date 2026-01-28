@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { EditableProtocolName } from '@/components/protocol/EditableProtocolName';
 import { ProtocolDetailClient } from './ProtocolDetailClient';
+import { getUserTier } from '@/lib/stripe/subscription';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -27,6 +28,9 @@ export default async function ProtocolPage({ params }: Props) {
     notFound();
   }
 
+  // Get user's subscription tier
+  const tier = user ? await getUserTier(user.id) : 'free';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -46,7 +50,7 @@ export default async function ProtocolPage({ params }: Props) {
         </div>
       </div>
 
-      <ProtocolDetailClient protocol={protocol} />
+      <ProtocolDetailClient protocol={protocol} tier={tier} />
     </div>
   );
 }

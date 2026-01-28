@@ -41,6 +41,10 @@ async function saveProtocol(
   verification: ReturnType<typeof getPlaceholderVerification> | Awaited<ReturnType<typeof verifyProtocol>>,
   name: string | null,
 ) {
+  const startTime = Date.now();
+  const log = (step: string) => console.log(`[saveProtocol] ${step} @ ${Date.now() - startTime}ms`);
+
+  log('start');
   const protocolData = {
     user_id: userId ?? null,
     protocol_data: protocol,
@@ -63,34 +67,48 @@ async function saveProtocol(
     verified_at: isAuthenticated ? new Date().toISOString() : null,
   };
 
+  log('inserting protocol');
   const { data: savedProtocol, error: saveError } = await supabase
     .from('protocols')
     .insert(protocolData)
     .select()
     .single();
+  log('insert complete');
 
   if (saveError) {
     console.error('Error saving protocol:', saveError);
   }
 
   if (savedProtocol) {
+    log('updating version_chain_id');
     await supabase
       .from('protocols')
       .update({ version_chain_id: savedProtocol.id })
       .eq('id', savedProtocol.id);
+    log('update complete');
   }
 
+  log('done');
   return savedProtocol;
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const log = (step: string) => console.log(`[generate] ${step} @ ${Date.now() - startTime}ms`);
+
   try {
+    log('start');
     const body = await request.json();
+    log('parsed body');
+
     const supabase = await createClient();
+    log('created supabase client');
+
     const useStreaming = request.nextUrl.searchParams.get('stream') === 'true';
 
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
+    log(`auth check complete (authenticated: ${!!user})`);
     const isAuthenticated = !!user;
 
     // Validate config based on auth status
@@ -107,26 +125,34 @@ export async function POST(request: NextRequest) {
     const config = parseResult.data;
 
     if (useStreaming) {
+      log('using streaming path');
       const encoder = new TextEncoder();
+      const streamStartTime = startTime;
+      const streamLog = (step: string) => console.log(`[generate:stream] ${step} @ ${Date.now() - streamStartTime}ms`);
+
       const stream = new ReadableStream({
         async start(controller) {
           try {
             // Stage 1: Stream generation
+            streamLog('starting generation');
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ stage: 'generating' })}\n\n`)
             );
 
             const generator = generateProtocolStream(config);
             let genResult: IteratorResult<string, DailyProtocol>;
+            let chunkCount = 0;
             do {
               genResult = await generator.next();
               if (!genResult.done && genResult.value) {
+                chunkCount++;
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ chunk: genResult.value })}\n\n`)
                 );
               }
             } while (!genResult.done);
 
+            streamLog(`generation complete (${chunkCount} chunks)`);
             const protocol = genResult.value;
 
             // Stage 2: Verification
@@ -134,13 +160,17 @@ export async function POST(request: NextRequest) {
               encoder.encode(`data: ${JSON.stringify({ stage: 'evaluating' })}\n\n`)
             );
 
+            streamLog('starting verification');
             const verification = isAuthenticated
               ? await verifyProtocol(protocol, config)
               : getPlaceholderVerification(config);
+            streamLog('verification complete');
 
             // Stage 3: Save
+            streamLog('starting save');
             const protocolName = generateProtocolName(config.goals);
             const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName);
+            streamLog('save complete');
 
             // Stage 4: Complete
             controller.enqueue(
@@ -160,7 +190,9 @@ export async function POST(request: NextRequest) {
                 },
               })}\n\n`)
             );
+            streamLog('response sent');
           } catch (error) {
+            streamLog(`error: ${error instanceof Error ? error.message : 'unknown'}`);
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 error: error instanceof Error ? error.message : 'Generation failed',
@@ -176,15 +208,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming path (existing behavior)
+    log('using non-streaming path');
+    log('starting generation');
     const protocol = await generateProtocol(config);
+    log('generation complete');
 
+    log('starting verification');
     const verification = isAuthenticated
       ? await verifyProtocol(protocol, config)
       : getPlaceholderVerification(config);
+    log('verification complete');
 
+    log('starting save');
     const protocolName = generateProtocolName(config.goals);
     const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName);
+    log('save complete');
 
+    log('sending response');
     return NextResponse.json({
       id: savedProtocol?.id,
       protocol,

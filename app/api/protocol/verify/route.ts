@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { verifyProtocol } from '@/lib/gemini/generation';
 import { dailyProtocolSchema } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
+import { getUserTier, isPro } from '@/lib/stripe/subscription';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +12,16 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Check Pro subscription
+    const tier = await getUserTier(user.id);
+    if (!isPro(tier)) {
+      return NextResponse.json({
+        error: 'AI Verification requires a Pro subscription',
+        code: 'UPGRADE_REQUIRED',
+        currentTier: tier,
+      }, { status: 402 });
     }
 
     const { protocolId } = await request.json();

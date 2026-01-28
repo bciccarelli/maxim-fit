@@ -11,7 +11,6 @@ import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
 import type { DailyProtocol } from '@/lib/schemas/protocol';
 
 interface ProtocolWizardProps {
-  isAuthenticated?: boolean;
   onGenerate: (config: {
     personal_info: PersonalInfo;
     goals: Goal[];
@@ -26,7 +25,7 @@ const STEPS = [
   { id: 'personal', title: 'Personal Info', description: 'Tell us about yourself' },
 ];
 
-export function ProtocolWizard({ isAuthenticated = false, onGenerate, isLoading = false }: ProtocolWizardProps) {
+export function ProtocolWizard({ onGenerate, isLoading = false }: ProtocolWizardProps) {
   const [step, setStep] = useState(0);
   const [personalInfo, setPersonalInfo] = useState<Partial<PersonalInfo>>({
     lifestyle_considerations: [],
@@ -106,7 +105,6 @@ export function ProtocolWizard({ isAuthenticated = false, onGenerate, isLoading 
             <PersonalInfoForm
               data={personalInfo}
               onChange={setPersonalInfo}
-              isAuthenticated={isAuthenticated}
             />
           )}
         </div>

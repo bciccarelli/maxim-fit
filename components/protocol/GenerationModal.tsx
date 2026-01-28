@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Search, Brain, ClipboardCheck, Sparkles, CheckCircle } from 'lucide-react';
+import { Loader2, Brain, ClipboardCheck, Sparkles, CheckCircle } from 'lucide-react';
 
 export type GenerationStage =
-  | 'searching'
   | 'generating'
   | 'evaluating'
   | 'complete'
@@ -20,21 +19,15 @@ interface GenerationModalProps {
 
 const stages: { id: GenerationStage; label: string; description: string; icon: React.ReactNode }[] = [
   {
-    id: 'searching',
-    label: 'Researching',
-    description: 'Searching for the latest evidence-based health recommendations...',
-    icon: <Search className="h-5 w-5" />,
-  },
-  {
     id: 'generating',
     label: 'Generating Protocol',
-    description: 'Creating your personalized health protocol based on your goals...',
+    description: 'Creating your personalized health protocol...',
     icon: <Brain className="h-5 w-5" />,
   },
   {
     id: 'evaluating',
-    label: 'Verifying',
-    description: 'Verifying the protocol against current evidence...',
+    label: 'Finalizing',
+    description: 'Preparing your protocol for viewing...',
     icon: <ClipboardCheck className="h-5 w-5" />,
   },
   {
@@ -106,7 +99,7 @@ export function GenerationModal({ stage, error, inline = false }: GenerationModa
           <CardDescription>
             {stage === 'complete'
               ? 'Your personalized health protocol is ready to view.'
-              : 'This may take a minute. We\'re using real-time research to create your protocol.'}
+              : 'This should only take a few seconds.'}
           </CardDescription>
         </CardHeader>
         <CardContent>

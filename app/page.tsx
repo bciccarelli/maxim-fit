@@ -59,16 +59,12 @@ export default function HomePage() {
     requirements: string[];
   }) => {
     setError(null);
-    setGenerationStage('searching');
+    setGenerationStage('generating');
 
     try {
-      const stageTimer = setTimeout(() => {
-        setGenerationStage('generating');
-      }, 2000);
-
       const evaluatingTimer = setTimeout(() => {
         setGenerationStage('evaluating');
-      }, 8000);
+      }, 5000);
 
       const response = await fetch('/api/protocol/generate', {
         method: 'POST',
@@ -76,7 +72,6 @@ export default function HomePage() {
         body: JSON.stringify(config),
       });
 
-      clearTimeout(stageTimer);
       clearTimeout(evaluatingTimer);
 
       const data = await response.json();
@@ -113,7 +108,7 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Image src="/wordmark.png" alt="oo.coach" width={120} height={30} />
+          <Image src="/wordmark.png" alt="oo.coach" width={80} height={30} />
           <AuthButton />
         </div>
       </header>
@@ -126,9 +121,13 @@ export default function HomePage() {
               <h1 className="text-3xl font-bold tracking-tight pt-4 mt-4 mb-2">
                 You have a life.
               </h1>
-              <h1 className="text-3xl font-bold tracking-tight text-primary mb-4">
-                Get a protocol that fits it.
+              <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
+                Get a protocol that works around it. 
               </h1>
+              <h2 className="text-1xl font-bold tracking-tight text-primary mb-4">
+                (For free)
+              </h2>
+              
               <p className="text-sm text-muted-foreground max-w-lg mx-auto">
                 Evidence-based daily routines — schedule, diet, supplements,
                 training — tailored to your goals. Scored, verifiable,
@@ -146,7 +145,6 @@ export default function HomePage() {
                 )}
 
                 <ProtocolWizard
-                  isAuthenticated={false}
                   onGenerate={handleGenerate}
                   isLoading={!!generationStage}
                 />
