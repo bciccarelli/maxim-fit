@@ -73,7 +73,7 @@ export function PricingCard({
         onClick={onSelect}
         disabled={currentPlan || loading}
       >
-        {currentPlan ? 'Current plan' : loading ? 'Loading...' : 'Get started'}
+        {currentPlan ? 'Current plan' : loading ? 'Loading...' : 'Start Free Trial'}
       </Button>
     </div>
   );

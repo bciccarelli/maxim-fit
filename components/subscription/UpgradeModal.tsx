@@ -88,16 +88,13 @@ export function UpgradeModal({
           <button
             onClick={() => setBillingInterval('year')}
             className={cn(
-              'px-3 py-1.5 text-xs font-medium rounded-md transition-colors relative',
+              'px-3 py-1.5 text-xs font-medium rounded-md transition-colors relative overflow-visible',
               billingInterval === 'year'
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:text-foreground'
             )}
           >
             Annual
-            <span className="absolute -top-1.5 -right-1.5 px-1 py-0.5 text-[9px] font-semibold bg-success text-success-foreground rounded">
-              27% off
-            </span>
           </button>
         </div>
 
