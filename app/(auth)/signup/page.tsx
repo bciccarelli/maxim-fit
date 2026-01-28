@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { getPendingProtocol } from '@/lib/hooks/useClaimPendingProtocol';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +19,13 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [hasPendingProtocol, setHasPendingProtocol] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    setHasPendingProtocol(!!getPendingProtocol());
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +69,11 @@ export default function SignupPage() {
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Click the link in the email to verify your account. Once verified, you can sign in to access all features.
+              {hasPendingProtocol && (
+                <strong className="block mt-2">
+                  Please confirm from this browser to automatically save your protocol.
+                </strong>
+              )}
             </p>
           </CardContent>
           <CardFooter>
@@ -81,7 +92,9 @@ export default function SignupPage() {
         <CardHeader>
           <CardTitle>Create Account</CardTitle>
           <CardDescription>
-            Sign up to unlock all features including protocol optimization and history
+            {hasPendingProtocol
+              ? 'Sign up to save your protocol and unlock all features'
+              : 'Sign up to unlock all features including protocol optimization and history'}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSignup}>

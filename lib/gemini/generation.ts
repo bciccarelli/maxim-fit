@@ -31,10 +31,10 @@ export const dailyProtocolGeminiSchema = {
     diet: {
       type: 'object',
       properties: {
-        daily_calories: { type: 'integer' },
-        protein_target_g: { type: 'number' },
-        carbs_target_g: { type: 'number' },
-        fat_target_g: { type: 'number' },
+        daily_calories: { type: 'integer', minimum: 1 },
+        protein_target_g: { type: 'number', minimum: 0 },
+        carbs_target_g: { type: 'number', minimum: 0 },
+        fat_target_g: { type: 'number', minimum: 0 },
         meals: {
           type: 'array',
           items: {
@@ -43,16 +43,16 @@ export const dailyProtocolGeminiSchema = {
               name: { type: 'string' },
               time: { type: 'string', description: 'Meal time in HH:MM 24-hour format, e.g. "12:00"' },
               foods: { type: 'array', items: { type: 'string' } },
-              calories: { type: 'integer' },
-              protein_g: { type: 'number' },
-              carbs_g: { type: 'number' },
-              fat_g: { type: 'number' },
+              calories: { type: 'integer', minimum: 1 },
+              protein_g: { type: 'number', minimum: 0 },
+              carbs_g: { type: 'number', minimum: 0 },
+              fat_g: { type: 'number', minimum: 0 },
               notes: { type: 'string' },
             },
             required: ['name', 'time', 'foods', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
           },
         },
-        hydration_oz: { type: 'number' },
+        hydration_oz: { type: 'number', minimum: 0 },
         dietary_notes: { type: 'array', items: { type: 'string' } },
       },
       required: ['daily_calories', 'protein_target_g', 'carbs_target_g', 'fat_target_g', 'meals', 'hydration_oz', 'dietary_notes'],
@@ -82,7 +82,7 @@ export const dailyProtocolGeminiSchema = {
       type: 'object',
       properties: {
         program_name: { type: 'string' },
-        days_per_week: { type: 'integer' },
+        days_per_week: { type: 'integer', minimum: 1, maximum: 7 },
         workouts: {
           type: 'array',
           items: {
@@ -90,17 +90,17 @@ export const dailyProtocolGeminiSchema = {
             properties: {
               name: { type: 'string' },
               day: { type: 'string' },
-              duration_min: { type: 'integer' },
+              duration_min: { type: 'integer', minimum: 1 },
               exercises: {
                 type: 'array',
                 items: {
                   type: 'object',
                   properties: {
                     name: { type: 'string' },
-                    sets: { type: 'integer' },
+                    sets: { type: 'integer', minimum: 1 },
                     reps: { type: 'string' },
-                    duration_min: { type: 'integer' },
-                    rest_sec: { type: 'integer' },
+                    duration_min: { type: 'integer', minimum: 1 },
+                    rest_sec: { type: 'integer', minimum: 1 },
                     notes: { type: 'string' },
                   },
                   required: ['name'],

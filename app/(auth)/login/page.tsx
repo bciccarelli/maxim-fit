@@ -1,9 +1,10 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { getPendingProtocol } from '@/lib/hooks/useClaimPendingProtocol';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,10 +17,15 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasPendingProtocol, setHasPendingProtocol] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/dashboard';
   const supabase = createClient();
+
+  useEffect(() => {
+    setHasPendingProtocol(!!getPendingProtocol());
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +52,9 @@ function LoginForm() {
       <CardHeader>
         <CardTitle>Sign In</CardTitle>
         <CardDescription>
-          Sign in to your account to access all features
+          {hasPendingProtocol
+            ? 'Sign in to save your protocol and access all features'
+            : 'Sign in to your account to access all features'}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleLogin}>

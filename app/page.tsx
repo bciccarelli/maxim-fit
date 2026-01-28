@@ -8,6 +8,8 @@ import { ProtocolWizard } from '@/components/forms/ProtocolWizard';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
 import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
 import { GenerationModal, type GenerationStage } from '@/components/protocol/GenerationModal';
+import { buttonVariants } from '@/components/ui/button';
+import { setPendingProtocol } from '@/lib/hooks/useClaimPendingProtocol';
 import type { DailyProtocol } from '@/lib/schemas/protocol';
 import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
 
@@ -89,6 +91,12 @@ export default function HomePage() {
         weighted_goal_score: data.evaluation.weighted_goal_score,
         viability_score: data.evaluation.viability_score,
       } : null);
+
+      // Store protocol ID for claiming after sign-up
+      if (data.id) {
+        setPendingProtocol(data.id);
+      }
+
       setGenerationStage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -200,6 +208,22 @@ export default function HomePage() {
               </button>
             </div>
             <ProtocolDisplay protocol={protocol} />
+
+            {/* CTA to save protocol */}
+            <div className="border-l-2 border-l-primary pl-4 py-3 mt-6 bg-muted/50 rounded-r-lg">
+              <p className="text-sm font-medium">Save this protocol?</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Sign up to keep it permanently and unlock AI-powered modifications.
+              </p>
+              <div className="flex gap-2">
+                <Link href="/signup" className={buttonVariants({ size: 'sm' })}>
+                  Sign up free
+                </Link>
+                <Link href="/login" className={buttonVariants({ size: 'sm', variant: 'ghost' })}>
+                  Sign in
+                </Link>
+              </div>
+            </div>
           </div>
         )}
       </main>

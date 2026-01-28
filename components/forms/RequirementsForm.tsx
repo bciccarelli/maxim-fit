@@ -40,10 +40,6 @@ export function RequirementsForm({ requirements, onChange }: RequirementsFormPro
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        Add your personal requirements and constraints in natural language.
-        The protocol will be designed to satisfy these requirements.
-      </p>
 
       {/* Current Requirements */}
       <div className="space-y-2">
