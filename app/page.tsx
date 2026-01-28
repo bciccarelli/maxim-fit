@@ -1,25 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { ProtocolWizard } from '@/components/forms/ProtocolWizard';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
+import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
 import { GenerationModal, type GenerationStage } from '@/components/protocol/GenerationModal';
 import type { DailyProtocol } from '@/lib/schemas/protocol';
 import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
 
+const FEATURES = [
+  {
+    title: 'Schedule',
+    description: 'Wake-to-sleep time blocks. Every hour accounted for.',
+  },
+  {
+    title: 'Diet',
+    description: 'Macro targets, meals, hydration. Calorie-precise.',
+  },
+  {
+    title: 'Training',
+    description: 'Programmed workouts with sets, reps, and rest periods.',
+  },
+  {
+    title: 'Supplements',
+    description: 'Evidence-based stack with dosages and timing.',
+  },
+  {
+    title: 'Evaluation',
+    description: 'Goal and viability scores. Requirement adherence.',
+  },
+  {
+    title: 'Modification',
+    description: 'Push back on any decision. AI researches and adapts.',
+  },
+];
+
 export default function HomePage() {
   const [protocol, setProtocol] = useState<DailyProtocol | null>(null);
   const [scores, setScores] = useState<{
-    requirement_scores?: Array<{ requirement_name: string; target: number; achieved: number; adherence_percent: number; suggestions: string }>;
-    goal_scores?: Array<{ goal_name: string; score: number; reasoning: string; suggestions: string }>;
-    critiques?: Array<{ category: string; criticism: string; severity: 'minor' | 'moderate' | 'major'; suggestion: string }>;
     requirements_met?: boolean;
     weighted_goal_score?: number;
     viability_score?: number;
   } | null>(null);
   const [generationStage, setGenerationStage] = useState<GenerationStage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const wizardRef = useRef<HTMLDivElement>(null);
+
+  const scrollToWizard = () => {
+    wizardRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleGenerate = async (config: {
     personal_info: PersonalInfo;
@@ -30,7 +62,6 @@ export default function HomePage() {
     setGenerationStage('searching');
 
     try {
-      // Simulate stage progression while waiting for API
       const stageTimer = setTimeout(() => {
         setGenerationStage('generating');
       }, 2000);
@@ -55,18 +86,18 @@ export default function HomePage() {
       }
 
       setGenerationStage('complete');
-
-      // Brief pause to show completion state
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       setProtocol(data.protocol);
-      setScores(data.evaluation);
+      setScores(data.evaluation ? {
+        requirements_met: data.evaluation.requirements_met,
+        weighted_goal_score: data.evaluation.weighted_goal_score,
+        viability_score: data.evaluation.viability_score,
+      } : null);
       setGenerationStage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setGenerationStage('error');
-
-      // Reset after showing error
       setTimeout(() => {
         setGenerationStage(null);
       }, 3000);
@@ -75,7 +106,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Generation Modal */}
       {generationStage && (
         <GenerationModal stage={generationStage} error={error} />
       )}
@@ -83,64 +113,83 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Protocol App</h1>
+          <Image src="/wordmark.png" alt="oo.coach" width={120} height={30} />
           <AuthButton />
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main>
         {!protocol ? (
           <>
-            {/* Hero Section */}
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold tracking-tight mb-4">
-                Your personalized health protocol
-              </h2>
-              <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-                Generate an evidence-based daily routine tailored to your goals,
-                requirements, and lifestyle. Powered by the latest health research.
+            {/* Hero */}
+            <section className="container mx-auto px-4 pt-4 pb-8 text-center">
+              <h1 className="text-3xl font-bold tracking-tight pt-4 mt-4 mb-2">
+                You have a life.
+              </h1>
+              <h1 className="text-3xl font-bold tracking-tight text-primary mb-4">
+                Get a protocol that fits it.
+              </h1>
+              <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+                Evidence-based daily routines — schedule, diet, supplements,
+                training — tailored to your goals. Scored, verifiable,
+                challengeable.
               </p>
-            </div>
+            </section>
 
-            {/* Feature Comparison */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-12 max-w-4xl mx-auto">
-              <div className="p-6 rounded-lg border bg-muted/50">
-                <h3 className="font-semibold mb-4">Anonymous Access</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>Basic protocol generation</li>
-                  <li>Beginner & Intermediate fitness levels</li>
-                  <li>Protocol expires in 24 hours</li>
-                </ul>
-              </div>
-              <div className="p-6 rounded-lg border bg-primary/5 border-primary/20">
-                <h3 className="font-semibold mb-4">Authenticated Access</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>All fitness levels including Advanced</li>
-                  <li>Protocol optimization (iterations)</li>
-                  <li>Save & view protocol history</li>
-                  <li>Persistent knowledge base</li>
-                </ul>
-              </div>
-            </div>
+            {/* Wizard */}
+            <section ref={wizardRef} className="container mx-auto px-4 py-8">
+              <div className="max-w-xl mx-auto">
+                {error && !generationStage && (
+                  <div className="border-l-2 border-l-destructive pl-4 py-2 mb-6">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
 
-            {/* Error Display (for non-modal errors) */}
-            {error && !generationStage && (
-              <div className="max-w-2xl mx-auto mb-6 p-4 rounded-lg bg-destructive/10 text-destructive">
-                {error}
-              </div>
-            )}
+                <ProtocolWizard
+                  isAuthenticated={false}
+                  onGenerate={handleGenerate}
+                  isLoading={!!generationStage}
+                />
 
-            {/* Protocol Wizard */}
-            <ProtocolWizard
-              isAuthenticated={false}
-              onGenerate={handleGenerate}
-              isLoading={!!generationStage}
-            />
+                <p className="text-center text-xs text-muted-foreground mt-6">
+                  Sign in to save protocols and unlock AI modifications.
+                </p>
+              </div>
+            </section>
+
+            {/* Features */}
+            <section className="container mx-auto px-4 py-8">
+              <div className="max-w-4xl mx-auto">
+                <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-6">
+                  What you get
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {FEATURES.map((feature) => (
+                    <div
+                      key={feature.title}
+                      className="border-l-2 border-l-primary pl-4 py-3"
+                    >
+                      <h3 className="text-sm font-semibold mb-1">{feature.title}</h3>
+                      <p className="text-xs text-muted-foreground">{feature.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
           </>
         ) : (
-          <div className="max-w-4xl mx-auto">
+          <div className="container mx-auto px-4 py-8 max-w-4xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold tracking-tight">Your protocol</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold tracking-tight">Your protocol</h2>
+                {scores && (
+                  <EvaluationSummary
+                    requirementsMet={scores.requirements_met}
+                    goalScore={scores.weighted_goal_score}
+                    viabilityScore={scores.viability_score}
+                  />
+                )}
+              </div>
               <button
                 onClick={() => {
                   setProtocol(null);
@@ -149,18 +198,18 @@ export default function HomePage() {
                 }}
                 className="text-sm text-primary hover:underline"
               >
-                Generate New Protocol
+                Generate new
               </button>
             </div>
-            <ProtocolDisplay protocol={protocol} scores={scores ?? undefined} />
+            <ProtocolDisplay protocol={protocol} />
           </div>
         )}
       </main>
 
       {/* Footer */}
       <footer className="border-t mt-12">
-        <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          <p>Protocol App - Health Optimization</p>
+        <div className="container mx-auto px-4 py-6 text-center text-xs text-muted-foreground">
+          Protocol — Evidence-based health optimization
         </div>
       </footer>
     </div>

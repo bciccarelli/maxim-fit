@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { EditableProtocolName } from '@/components/protocol/EditableProtocolName';
 import { ProtocolDetailClient } from './ProtocolDetailClient';
 
 interface Props {
@@ -36,9 +37,9 @@ export default async function ProtocolPage({ params }: Props) {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Protocol details</h1>
+            <EditableProtocolName protocolId={protocol.id} name={protocol.name} />
             <p className="text-sm text-muted-foreground">
-              Created {new Date(protocol.created_at).toLocaleString()}
+              Created {new Date(protocol.created_at!).toLocaleString()}
               {protocol.version != null && protocol.version > 1 && ` | v${protocol.version}`}
             </p>
           </div>

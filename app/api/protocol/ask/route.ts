@@ -18,8 +18,8 @@ function buildConfig(configData: Record<string, unknown> | null) {
 const fallbackConfig = {
   personal_info: {
     age: 30, weight_lbs: 170, height_in: 70, sex: 'other' as const,
-    genetic_background: 'Unknown', health_conditions: [],
-    fitness_level: 'intermediate' as const, dietary_restrictions: [],
+    lifestyle_considerations: [], fitness_level: 'intermediate' as const,
+    dietary_restrictions: [],
   },
   goals: [{ name: 'General Health', weight: 1.0, description: 'Improve overall health' }],
   requirements: [],

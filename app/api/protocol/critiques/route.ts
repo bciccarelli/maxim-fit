@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         protocol_data: modifiedProtocol,
+        name: protocol.name,
         weighted_goal_score: protocol.weighted_goal_score,
         viability_score: protocol.viability_score,
         requirements_met: protocol.requirements_met,

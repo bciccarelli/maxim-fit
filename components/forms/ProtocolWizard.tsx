@@ -29,7 +29,7 @@ const STEPS = [
 export function ProtocolWizard({ isAuthenticated = false, onGenerate, isLoading = false }: ProtocolWizardProps) {
   const [step, setStep] = useState(0);
   const [personalInfo, setPersonalInfo] = useState<Partial<PersonalInfo>>({
-    health_conditions: [],
+    lifestyle_considerations: [],
     dietary_restrictions: [],
   });
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -48,8 +48,7 @@ export function ProtocolWizard({ isAuthenticated = false, onGenerate, isLoading 
           personalInfo.weight_lbs &&
           personalInfo.height_in &&
           personalInfo.sex &&
-          personalInfo.fitness_level &&
-          personalInfo.genetic_background
+          personalInfo.fitness_level
         );
       default:
         return false;

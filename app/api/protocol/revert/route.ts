@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         config_id: target.config_id,
         protocol_data: target.protocol_data,
+        name: target.name,
         version: newVersion,
         version_chain_id: target.version_chain_id ?? target.id,
         is_current: true,

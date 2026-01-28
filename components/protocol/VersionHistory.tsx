@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { X, RotateCcw, Shield, Loader2 } from 'lucide-react';
+import { X, RotateCcw, Shield, Loader2, AlertCircle } from 'lucide-react';
 import type { ProtocolVersion } from '@/lib/schemas/protocol';
 
 interface VersionHistoryProps {
@@ -19,6 +20,7 @@ const SOURCE_LABELS: Record<string, string> = {
   direct_edit: 'Edited',
   ai_modify: 'AI Modified',
   revert: 'Reverted',
+  critique_apply: 'Applied',
 };
 
 export function VersionHistory({
@@ -30,8 +32,14 @@ export function VersionHistory({
 }: VersionHistoryProps) {
   const [versions, setVersions] = useState<ProtocolVersion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [revertingId, setRevertingId] = useState<string | null>(null);
   const [confirmRevertId, setConfirmRevertId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (open && versionChainId) {
@@ -41,14 +49,18 @@ export function VersionHistory({
 
   const fetchVersions = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/protocol/versions?chainId=${versionChainId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setVersions(data.versions ?? []);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || 'Failed to load versions');
+        return;
       }
+      const data = await response.json();
+      setVersions(data.versions ?? []);
     } catch {
-      // Non-critical
+      setError('Failed to load version history');
     } finally {
       setLoading(false);
     }
@@ -72,9 +84,9 @@ export function VersionHistory({
     }
   };
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  const drawer = (
     <>
       {/* Overlay */}
       <div
@@ -83,7 +95,7 @@ export function VersionHistory({
       />
 
       {/* Drawer */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l bg-background overflow-y-auto">
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l-2 border-l-primary bg-card shadow-lg overflow-y-auto">
         <div className="p-5">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold tracking-tight">Version history</h2>
@@ -97,12 +109,24 @@ export function VersionHistory({
             </Button>
           </div>
 
+          {error && (
+            <div className="border-l-2 border-l-destructive pl-4 py-2 mb-4">
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : versions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">None</p>
+          ) : versions.length === 0 && !error ? (
+            <div className="text-center py-8 space-y-2">
+              <p className="text-sm text-muted-foreground">No version history found.</p>
+              <p className="text-xs text-muted-foreground">This protocol may not have a version chain yet.</p>
+            </div>
           ) : versions.length === 1 ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground text-center py-4">
@@ -256,4 +280,6 @@ export function VersionHistory({
       </div>
     </>
   );
+
+  return createPortal(drawer, document.body);
 }

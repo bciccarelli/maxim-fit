@@ -223,6 +223,7 @@ export type ModifyProposal = {
 
 export type ProtocolVersion = {
   id: string;
+  name: string | null;
   version: number;
   version_chain_id: string;
   is_current: boolean;

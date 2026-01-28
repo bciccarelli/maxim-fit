@@ -168,8 +168,7 @@ function buildGenerationPrompt(config: UserConfig | AnonymousUserConfig): string
 - Weight: ${personal_info.weight_lbs} lbs
 - Height: ${personal_info.height_in} inches
 - Sex: ${personal_info.sex}
-- Genetic Background: ${personal_info.genetic_background}
-- Health Conditions: ${personal_info.health_conditions.length > 0 ? personal_info.health_conditions.join(', ') : 'None reported'}
+- Lifestyle Considerations: ${personal_info.lifestyle_considerations.length > 0 ? personal_info.lifestyle_considerations.join(', ') : 'None specified'}
 - Fitness Level: ${personal_info.fitness_level}
 - Dietary Restrictions: ${personal_info.dietary_restrictions.length > 0 ? personal_info.dietary_restrictions.join(', ') : 'None'}
 
@@ -189,7 +188,9 @@ ${requirementsText}
    - A training program appropriate for their fitness level and goals
 3. Ensure all requirements are satisfied where possible.
 4. Prioritize adherence - the protocol must be realistic and sustainable.
-5. Consider the user's health conditions and restrictions when making recommendations.
+5. Optimize for the user's stated wellness goals and lifestyle preferences.
+
+IMPORTANT: This is a general wellness protocol, not medical advice. Do not diagnose conditions or recommend treatments for diseases.
 
 Generate the protocol now.`;
 }

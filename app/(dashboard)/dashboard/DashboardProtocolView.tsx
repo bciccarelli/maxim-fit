@@ -7,11 +7,15 @@ import { Button } from '@/components/ui/button';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
 import { ProtocolActions } from '@/components/protocol/ProtocolActions';
 import { VersionHistory } from '@/components/protocol/VersionHistory';
+import { EditableProtocolName } from '@/components/protocol/EditableProtocolName';
+import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
+import { CritiquesSection } from '@/components/protocol/CritiquesSection';
 import { Trash2, Loader2, History } from 'lucide-react';
 import type { DailyProtocol, AdherenceScore, GoalScore, Critique } from '@/lib/schemas/protocol';
 
 interface ProtocolListItem {
   id: string;
+  name: string | null;
   created_at: string;
   version: number | null;
   weighted_goal_score: number | null;
@@ -20,6 +24,7 @@ interface ProtocolListItem {
 
 interface SelectedProtocol {
   id: string;
+  name: string | null;
   protocol_data: DailyProtocol;
   requirement_scores: AdherenceScore[] | null;
   goal_scores: GoalScore[] | null;
@@ -48,11 +53,9 @@ function formatDate(dateString: string): string {
 }
 
 function formatLabel(p: ProtocolListItem): string {
-  const name = p.version != null && p.version > 1 ? `v${p.version}` : 'Protocol';
+  const displayName = p.name || (p.version != null && p.version > 1 ? `v${p.version}` : 'Protocol');
   const date = formatDate(p.created_at);
-  const goal = p.weighted_goal_score != null ? p.weighted_goal_score.toFixed(1) : '\u2014';
-  const viability = p.viability_score != null ? p.viability_score.toFixed(1) : '\u2014';
-  return `${name} \u2014 ${date}  \u00b7  Goal ${goal}  \u00b7  Viability ${viability}`;
+  return `${displayName} \u2014 ${date}`;
 }
 
 export function DashboardProtocolView({
@@ -172,55 +175,21 @@ export function DashboardProtocolView({
 
   return (
     <div className="space-y-6">
+      {/* Row 1: Name + Evaluation + Actions */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-1 max-w-md">
-          <Select
-            options={options}
-            value={selectedProtocol.id}
-            onChange={(e) => {
-              setConfirmDelete(false);
-              router.push(`?protocol=${e.target.value}`, { scroll: false });
-            }}
-            className="font-mono text-sm"
+        <div className="flex items-center gap-4 min-w-0">
+          <EditableProtocolName
+            protocolId={selectedProtocol.id}
+            name={selectedProtocol.name}
           />
-          {confirmDelete ? (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                aria-label="Confirm delete"
-              >
-                {deleting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmDelete(false)}
-                className="text-xs text-muted-foreground"
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDelete}
-              className="text-muted-foreground hover:text-destructive"
-              aria-label="Delete protocol"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
+          <EvaluationSummary
+            requirementsMet={selectedProtocol.requirements_met ?? undefined}
+            goalScore={selectedProtocol.weighted_goal_score ?? undefined}
+            viabilityScore={selectedProtocol.viability_score ?? undefined}
+            verified={isVerified}
+          />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ProtocolActions
             protocolId={selectedProtocol.id}
             protocol={selectedProtocol.protocol_data}
@@ -236,22 +205,71 @@ export function DashboardProtocolView({
         </div>
       </div>
 
+      {/* Row 2: Version selector + Delete */}
+      <div className="flex items-center gap-2 max-w-md">
+        <Select
+          options={options}
+          value={selectedProtocol.id}
+          onChange={(e) => {
+            setConfirmDelete(false);
+            router.push(`?protocol=${e.target.value}`, { scroll: false });
+          }}
+          className="font-mono text-sm"
+        />
+        {confirmDelete ? (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              aria-label="Confirm delete"
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmDelete(false)}
+              className="text-xs text-muted-foreground"
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleDelete}
+            className="text-muted-foreground hover:text-destructive"
+            aria-label="Delete protocol"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
       <ProtocolDisplay
         protocol={selectedProtocol.protocol_data}
         protocolId={selectedProtocol.id}
-        scores={{
-          requirement_scores: selectedProtocol.requirement_scores ?? undefined,
-          goal_scores: selectedProtocol.goal_scores ?? undefined,
-          critiques: selectedProtocol.critiques ?? undefined,
-          requirements_met: selectedProtocol.requirements_met ?? undefined,
-          weighted_goal_score: selectedProtocol.weighted_goal_score ?? undefined,
-          viability_score: selectedProtocol.viability_score ?? undefined,
-        }}
         editable
         verified={isVerified}
         onProtocolChange={handleProtocolChange}
         onVerify={handleVerify}
       />
+
+      {selectedProtocol.critiques && selectedProtocol.critiques.length > 0 && (
+        <CritiquesSection
+          critiques={selectedProtocol.critiques}
+          protocolId={selectedProtocol.id}
+          verified={isVerified}
+        />
+      )}
 
       <VersionHistory
         open={historyOpen}

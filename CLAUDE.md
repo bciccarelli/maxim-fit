@@ -12,7 +12,7 @@ Generate a personalized, evidence-based daily health protocol. The protocol must
 
 - `app/` - Next.js App Router pages and API routes
   - `(dashboard)/` - Dashboard layout group (dashboard, create, protocols/[id])
-  - `api/protocol/` - API routes (generate, parse, verify, edit, modify, ask, revert, versions, delete, critiques)
+  - `api/protocol/` - API routes (generate, parse, verify, edit, modify, ask, revert, versions, delete, critiques, name)
 - `components/protocol/` - Protocol display and editing components
 - `components/forms/` - Wizard and form components
 - `components/ui/` - Shared UI primitives (shadcn)
@@ -26,7 +26,7 @@ Generate a personalized, evidence-based daily health protocol. The protocol must
 
 ### Protocol Lifecycle
 
-Protocols follow a **version chain** model. Every change creates a new row in the `protocols` table linked by `version_chain_id`. The `is_current` flag marks the latest version.
+Protocols follow a **version chain** model. Every change creates a new row in the `protocols` table linked by `version_chain_id`. The `is_current` flag marks the latest version. Each protocol has an optional `name` (auto-generated from goals, editable without versioning).
 
 Five user-facing actions replace the old optimize/feedback loop:
 
@@ -66,7 +66,7 @@ AI-powered features (Generate, Modify, Ask) support real-time streaming via Serv
 
 ### Critique Interaction
 
-Evaluation critiques support multi-select via checkboxes in `ProtocolDisplay`. Two actions:
+Evaluation critiques are displayed in a standalone `CritiquesSection` component (below protocol tabs), supporting multi-select via checkboxes. Two actions:
 - **Dismiss** — removes selected critiques from the display (persisted via `POST /api/protocol/critiques` with `action: 'dismiss'`).
 - **Apply Recommendations** — calls `applyCritiqueSuggestions()` in `lib/gemini/generation.ts`, which performs a lightweight AI modification applying only the selected suggestions. Creates a new protocol version with `change_source: 'critique_apply'`. No full re-evaluation is triggered.
 
@@ -77,6 +77,21 @@ The Ask modal uses streaming (`useSSEStream`) for progressive answer display. Th
 An "Export to Modify" button appears when there's Q&A history. It builds a context string from the last 3 Q&A pairs and passes it to the Modify modal via `ProtocolActions`, which manages the flow: closes Ask modal → sets prefilled message → opens Modify modal.
 
 The Modify modal accepts an `initialMessage` prop for pre-population and uses streaming to show AI reasoning in real-time before presenting the score comparison and accept/reject options.
+
+### Protocol Naming
+
+Protocols have an optional `name` column (nullable text, max 100 chars). On creation, the name is auto-generated from the user's top two weighted goals (e.g., "Muscle Gain + Longevity Protocol"). The `generateProtocolName()` helper in the generate route sorts goals by weight descending, takes the top two names, and joins them.
+
+Names are editable in-place via the `EditableProtocolName` component (inline text + pencil icon). Editing a name calls `POST /api/protocol/name`, which updates ALL versions in the chain (`version_chain_id`). Name edits do **not** create a new version and do **not** change verification status. When a new version is created (edit, modify, revert, critique apply), the `name` field is propagated from the parent version.
+
+### Evaluation Summary
+
+Scores display uses two separate components instead of a full-width evaluation Card inside `ProtocolDisplay`:
+
+- **`EvaluationSummary`** — compact inline row showing requirements-met icon, goal score, viability score, and unverified badge. Rendered in the action bar alongside the protocol name and action buttons. Uses `font-mono text-sm` for scores.
+- **`CritiquesSection`** — standalone collapsible component rendered below protocol tabs. Collapsed by default, showing a count badge with severity breakdown. Expandable to show full critique list with checkboxes and dismiss/apply actions. Self-contained state management.
+
+`ProtocolDisplay` itself only contains the `VerifyBanner` and the four-tab protocol content (Schedule, Diet, Supplements, Training). It no longer renders scores or critiques.
 
 ### Inline Editing Pattern
 
@@ -92,7 +107,7 @@ All editable sections (Schedule, Diet, Supplements, Training) separate **expand*
 
 The interface is a **coach, not a classroom**. It doesn't teach you exercise science or explain why vitamin D matters — it tells you exactly what to do today, with enough underlying rigor that a biohacking enthusiast can interrogate every decision and a beginner can just follow it.
 
-The visual identity should feel like receiving a program from someone who clearly did the homework. Not academic (no one needs to see the papers), not consumer-wellness (no pastel illustrations or "your journey" copy). The aesthetic is **confident, dense, and precise** — a daily briefing you scan in 30 seconds and trust enough to execute.
+The visual identity should feel like receiving a program from someone who clearly did the homework. Not academic (no one needs to see the papers), not consumer-wellness (no pastel illustrations or "your journey" copy). The aesthetic is **confident, digital, and precise** — a daily briefing you scan in 30 seconds and trust enough to execute.
 
 The target user takes health seriously, or wants to start. The density and precision signal credibility to both ends: a beginner sees authority and follows the plan; an enthusiast sees the numbers, knows the protocol is substantive, and challenges what they disagree with. The modification loop — where users push back, ask questions, and the AI researches and proposes changes — is a first-class interaction, not a settings page buried in a menu.
 

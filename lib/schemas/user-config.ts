@@ -9,8 +9,7 @@ export const personalInfoSchema = z.object({
   weight_lbs: z.number().positive(),
   height_in: z.number().positive(),
   sex: z.enum(['male', 'female', 'other']),
-  genetic_background: z.string(),
-  health_conditions: z.array(z.string()),
+  lifestyle_considerations: z.array(z.string()),
   fitness_level: z.enum(['beginner', 'intermediate', 'advanced']),
   dietary_restrictions: z.array(z.string()),
 });

@@ -13,8 +13,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Protocol App - Personalized Health Protocols',
-  description: 'Generate evidence-based, personalized daily health protocols',
+  title: 'Protocol — Evidence-Based Health Protocols',
+  description: 'Stop guessing. Get a precise, evidence-based daily protocol — schedule, diet, supplements, training — tailored to your goals.',
 };
 
 export default function RootLayout({

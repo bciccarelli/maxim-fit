@@ -12,7 +12,7 @@ interface RequirementsFormProps {
 }
 
 const EXAMPLE_REQUIREMENTS = [
-  'I need at least 8 hours of sleep per night',
+  'I go to work from 9 AM to 5 PM',
   'I can only work out 4 days per week',
   'I need to be done with all activities by 9 PM',
   'I have 30 minutes for lunch at work',

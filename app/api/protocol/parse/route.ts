@@ -51,8 +51,7 @@ export async function POST(request: NextRequest) {
         weight_lbs: 170,
         height_in: 70,
         sex: 'other' as const,
-        genetic_background: 'Unknown',
-        health_conditions: [] as string[],
+        lifestyle_considerations: [] as string[],
         fitness_level: 'intermediate' as const,
         dietary_restrictions: [] as string[],
       },
@@ -76,6 +75,9 @@ export async function POST(request: NextRequest) {
       iterations: 1,
     });
 
+    // Generate name from inferred goals
+    const protocolName = goals.slice(0, 2).map((g: { name: string }) => g.name).join(' + ') + ' Protocol';
+
     // Save protocol to database with versioning columns
     const { data: savedProtocol, error: saveError } = await supabase
       .from('protocols')
@@ -83,6 +85,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         protocol_data: protocol,
         config_id: config?.id ?? null,
+        name: protocolName,
         weighted_goal_score: verification.weighted_goal_score,
         viability_score: verification.viability_score,
         requirements_met: verification.requirements_met,

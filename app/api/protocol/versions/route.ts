@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { data: versions, error } = await supabase
       .from('protocols')
-      .select('id, version, version_chain_id, is_current, change_note, change_source, verified, verified_at, weighted_goal_score, viability_score, created_at')
+      .select('id, name, version, version_chain_id, is_current, change_note, change_source, verified, verified_at, weighted_goal_score, viability_score, created_at')
       .eq('version_chain_id', versionChainId)
       .eq('user_id', user.id)
       .order('version', { ascending: false });

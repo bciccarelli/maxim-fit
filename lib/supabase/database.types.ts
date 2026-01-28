@@ -183,6 +183,7 @@ export type Database = {
           is_anonymous: boolean | null
           is_current: boolean | null
           iteration: number | null
+          name: string | null
           parent_version_id: string | null
           protocol_data: Json
           requirement_scores: Json | null
@@ -207,6 +208,7 @@ export type Database = {
           is_anonymous?: boolean | null
           is_current?: boolean | null
           iteration?: number | null
+          name?: string | null
           parent_version_id?: string | null
           protocol_data: Json
           requirement_scores?: Json | null
@@ -231,6 +233,7 @@ export type Database = {
           is_anonymous?: boolean | null
           is_current?: boolean | null
           iteration?: number | null
+          name?: string | null
           parent_version_id?: string | null
           protocol_data?: Json
           requirement_scores?: Json | null

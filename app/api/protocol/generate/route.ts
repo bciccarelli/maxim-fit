@@ -5,6 +5,11 @@ import { userConfigSchema, anonymousUserConfigSchema, type UserConfig, type Anon
 import { SSE_HEADERS } from '@/lib/streaming';
 import type { DailyProtocol } from '@/lib/schemas/protocol';
 
+function generateProtocolName(goals: { name: string; weight: number }[]): string {
+  const topGoals = [...goals].sort((a, b) => b.weight - a.weight).slice(0, 2).map(g => g.name);
+  return topGoals.join(' + ') + ' Protocol';
+}
+
 // Simple placeholder verification for anonymous users - no AI call, instant response
 function getPlaceholderVerification(config: UserConfig | AnonymousUserConfig) {
   return {
@@ -33,11 +38,13 @@ async function saveProtocol(
   userId: string | null | undefined,
   isAuthenticated: boolean,
   protocol: DailyProtocol,
-  verification: ReturnType<typeof getPlaceholderVerification> | Awaited<ReturnType<typeof verifyProtocol>>
+  verification: ReturnType<typeof getPlaceholderVerification> | Awaited<ReturnType<typeof verifyProtocol>>,
+  name: string | null,
 ) {
   const protocolData = {
     user_id: userId ?? null,
     protocol_data: protocol,
+    name,
     weighted_goal_score: verification.weighted_goal_score,
     viability_score: verification.viability_score,
     requirements_met: verification.requirements_met,
@@ -132,7 +139,8 @@ export async function POST(request: NextRequest) {
               : getPlaceholderVerification(config);
 
             // Stage 3: Save
-            const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification);
+            const protocolName = generateProtocolName(config.goals);
+            const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName);
 
             // Stage 4: Complete
             controller.enqueue(
@@ -174,7 +182,8 @@ export async function POST(request: NextRequest) {
       ? await verifyProtocol(protocol, config)
       : getPlaceholderVerification(config);
 
-    const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification);
+    const protocolName = generateProtocolName(config.goals);
+    const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName);
 
     return NextResponse.json({
       id: savedProtocol?.id,

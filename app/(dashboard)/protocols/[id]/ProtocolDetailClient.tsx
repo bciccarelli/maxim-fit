@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
 import { ProtocolActions } from '@/components/protocol/ProtocolActions';
 import { VersionHistory } from '@/components/protocol/VersionHistory';
+import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
+import { CritiquesSection } from '@/components/protocol/CritiquesSection';
 import { Button } from '@/components/ui/button';
 import { History } from 'lucide-react';
 import type { DailyProtocol, AdherenceScore, GoalScore, Critique } from '@/lib/schemas/protocol';
 
 interface ProtocolData {
   id: string;
+  name: string | null;
   protocol_data: DailyProtocol;
   requirement_scores: AdherenceScore[] | null;
   goal_scores: GoalScore[] | null;
@@ -106,36 +109,45 @@ export function ProtocolDetailClient({ protocol }: ProtocolDetailClientProps) {
 
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
-          <History className="h-4 w-4 mr-2" />
-          History
-        </Button>
-        <ProtocolActions
-          protocolId={protocol.id}
-          protocol={protocol.protocol_data}
+      <div className="flex items-center justify-between gap-4">
+        <EvaluationSummary
+          requirementsMet={protocol.requirements_met ?? undefined}
+          goalScore={protocol.weighted_goal_score ?? undefined}
+          viabilityScore={protocol.viability_score ?? undefined}
           verified={isVerified}
-          versionChainId={versionChainId}
-          onVerify={handleVerify}
-          onModificationAccepted={handleModificationAccepted}
         />
+        <div className="flex items-center gap-2">
+          <ProtocolActions
+            protocolId={protocol.id}
+            protocol={protocol.protocol_data}
+            verified={isVerified}
+            versionChainId={versionChainId}
+            onVerify={handleVerify}
+            onModificationAccepted={handleModificationAccepted}
+          />
+          <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
+            <History className="h-4 w-4 mr-2" />
+            History
+          </Button>
+        </div>
       </div>
 
       <ProtocolDisplay
         protocol={protocol.protocol_data}
-        scores={{
-          requirement_scores: protocol.requirement_scores ?? undefined,
-          goal_scores: protocol.goal_scores ?? undefined,
-          critiques: protocol.critiques ?? undefined,
-          requirements_met: protocol.requirements_met ?? undefined,
-          weighted_goal_score: protocol.weighted_goal_score ?? undefined,
-          viability_score: protocol.viability_score ?? undefined,
-        }}
+        protocolId={protocol.id}
         editable
         verified={isVerified}
         onProtocolChange={handleProtocolChange}
         onVerify={handleVerify}
       />
+
+      {protocol.critiques && protocol.critiques.length > 0 && (
+        <CritiquesSection
+          critiques={protocol.critiques}
+          protocolId={protocol.id}
+          verified={isVerified}
+        />
+      )}
 
       <VersionHistory
         open={historyOpen}

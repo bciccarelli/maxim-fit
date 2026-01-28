@@ -76,17 +76,15 @@ export function GoalsForm({ goals, onChange }: GoalsFormProps) {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        Add your health goals in natural language. Weights are distributed evenly by default.
-        Adjust manually if you want to prioritize certain goals.
-      </p>
-
       {/* Weight Status */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">
-            Total weight: {(totalWeight * 100).toFixed(0)}% / 100%
-          </p>
+            {goals.length > 0 && (
+            <p className="text-sm text-muted-foreground italic p-3">
+              Total weight: {(totalWeight * 100).toFixed(0)}% / 100%
+            </p>
+          )}
+        
           {Math.abs(totalWeight - 1) > 0.01 && goals.length > 0 && (
             <p className="text-sm text-destructive">
               Weights must sum to 100%
@@ -130,11 +128,7 @@ export function GoalsForm({ goals, onChange }: GoalsFormProps) {
             </Button>
           </div>
         ))}
-        {goals.length === 0 && (
-          <p className="text-sm text-muted-foreground italic p-3">
-            No goals added yet. Add your own or use the examples below.
-          </p>
-        )}
+        
       </div>
 
       {/* Add New Goal */}

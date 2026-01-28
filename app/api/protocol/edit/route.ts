@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         config_id: current.config_id,
         protocol_data: parseResult.data,
+        name: current.name,
         version: (current.version ?? 1) + 1,
         version_chain_id: current.version_chain_id ?? current.id,
         is_current: true,
