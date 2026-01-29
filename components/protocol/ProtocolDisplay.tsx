@@ -6,7 +6,7 @@ import { DietPlanView } from './DietPlanView';
 import { SupplementView } from './SupplementView';
 import { TrainingView } from './TrainingView';
 import { VerifyBanner } from './VerifyBanner';
-import type { DailyProtocol, DailySchedule, DietPlan, SupplementationPlan, TrainingProgram } from '@/lib/schemas/protocol';
+import type { DailyProtocol, ScheduleVariant, DietPlan, SupplementationPlan, TrainingProgram } from '@/lib/schemas/protocol';
 
 interface ProtocolDisplayProps {
   protocol: DailyProtocol;
@@ -15,11 +15,12 @@ interface ProtocolDisplayProps {
   verified?: boolean;
   onProtocolChange?: (protocol: DailyProtocol) => void;
   onVerify?: () => Promise<void>;
+  onMealsGenerated?: (newId: string) => void;
 }
 
-export function ProtocolDisplay({ protocol, editable = false, verified = true, onProtocolChange, onVerify }: ProtocolDisplayProps) {
-  const handleScheduleChange = (schedule: DailySchedule) => {
-    onProtocolChange?.({ ...protocol, schedule });
+export function ProtocolDisplay({ protocol, protocolId, editable = false, verified = true, onProtocolChange, onVerify, onMealsGenerated }: ProtocolDisplayProps) {
+  const handleSchedulesChange = (schedules: ScheduleVariant[]) => {
+    onProtocolChange?.({ ...protocol, schedules });
   };
 
   const handleDietChange = (diet: DietPlan) => {
@@ -55,10 +56,16 @@ export function ProtocolDisplay({ protocol, editable = false, verified = true, o
           <TabsTrigger value="training">Training</TabsTrigger>
         </TabsList>
         <TabsContent value="schedule">
-          <ScheduleView schedule={protocol.schedule} editable={editable} onChange={handleScheduleChange} />
+          <ScheduleView schedules={protocol.schedules} editable={editable} onChange={handleSchedulesChange} />
         </TabsContent>
         <TabsContent value="diet">
-          <DietPlanView diet={protocol.diet} editable={editable} onChange={handleDietChange} />
+          <DietPlanView
+            diet={protocol.diet}
+            editable={editable}
+            onChange={handleDietChange}
+            protocolId={protocolId}
+            onMealsGenerated={onMealsGenerated}
+          />
         </TabsContent>
         <TabsContent value="supplements">
           <SupplementView supplementation={protocol.supplementation} editable={editable} onChange={handleSupplementChange} />

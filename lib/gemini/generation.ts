@@ -1,5 +1,5 @@
 import { getGeminiClient, MODEL_GROUNDED, MODEL_FAST } from './client';
-import { dailyProtocolSchema, type DailyProtocol, type VerificationResult } from '../schemas/protocol';
+import { dailyProtocolSchema, normalizeProtocol, type DailyProtocol, type VerificationResult } from '../schemas/protocol';
 import type { UserConfig, AnonymousUserConfig } from '../schemas/user-config';
 import { goalSchema, type Goal } from '../schemas/user-config';
 
@@ -27,26 +27,39 @@ function validateExerciseData(parsed: Record<string, unknown>): void {
 export const dailyProtocolGeminiSchema = {
   type: 'object',
   properties: {
-    schedule: {
-      type: 'object',
-      properties: {
-        wake_time: { type: 'string', description: 'Wake time in HH:MM 24-hour format, e.g. "07:00"' },
-        sleep_time: { type: 'string', description: 'Sleep time in HH:MM 24-hour format, e.g. "22:00"' },
-        schedule: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              start_time: { type: 'string', description: 'Start time in HH:MM 24-hour format, e.g. "07:00"' },
-              end_time: { type: 'string', description: 'End time in HH:MM 24-hour format, e.g. "08:00"' },
-              activity: { type: 'string' },
-              requirement_satisfied: { type: 'string' },
+    schedules: {
+      type: 'array',
+      description: 'Schedule variants for different days. Each day of the week must appear in exactly one variant. Use multiple variants when user requirements differ by day (e.g., weekdays vs weekends, work days vs off days).',
+      items: {
+        type: 'object',
+        properties: {
+          label: { type: 'string', description: 'Human-readable name for this schedule variant, e.g. "Weekday Schedule", "Weekend Schedule"' },
+          days: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
             },
-            required: ['start_time', 'end_time', 'activity'],
+            description: 'Days this schedule applies to. All 7 days must be covered exactly once across all variants.',
+          },
+          wake_time: { type: 'string', description: 'Wake time in HH:MM 24-hour format, e.g. "07:00"' },
+          sleep_time: { type: 'string', description: 'Sleep time in HH:MM 24-hour format, e.g. "22:00"' },
+          schedule: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                start_time: { type: 'string', description: 'Start time in HH:MM 24-hour format, e.g. "07:00"' },
+                end_time: { type: 'string', description: 'End time in HH:MM 24-hour format, e.g. "08:00"' },
+                activity: { type: 'string' },
+                requirement_satisfied: { type: 'string' },
+              },
+              required: ['start_time', 'end_time', 'activity'],
+            },
           },
         },
+        required: ['days', 'wake_time', 'sleep_time', 'schedule'],
       },
-      required: ['wake_time', 'sleep_time', 'schedule'],
     },
     diet: {
       type: 'object',
@@ -139,7 +152,7 @@ export const dailyProtocolGeminiSchema = {
       required: ['program_name', 'days_per_week', 'workouts', 'rest_days', 'progression_notes', 'general_notes'],
     },
   },
-  required: ['schedule', 'diet', 'supplementation', 'training'],
+  required: ['schedules', 'diet', 'supplementation', 'training'],
 } as const;
 
 export async function generateProtocol(
@@ -225,13 +238,23 @@ ${requirementsText}${notesText}
 
 1. Use Google Search to find the latest evidence-based recommendations for this user's specific goals and conditions.
 2. Design a complete daily protocol including:
-   - A detailed schedule from wake to sleep
+   - Schedule variant(s) from wake to sleep
    - A comprehensive diet plan with macros and specific meals
    - A supplementation plan tailored to their goals
    - A training program appropriate for their fitness level and goals
 3. Ensure all requirements are satisfied where possible.
 4. Prioritize adherence - the protocol must be realistic and sustainable.
 5. Optimize for the user's stated wellness goals and lifestyle preferences.
+
+## Schedule Generation Rules
+
+Analyze the user's requirements to determine if different schedules are needed for different days:
+- If requirements mention work schedule, office hours, weekdays, or weekends, create separate schedule variants (e.g., "Weekday Schedule" for Mon-Fri and "Weekend Schedule" for Sat-Sun)
+- Common patterns: "I work 9-5" or "I work Monday to Friday" → weekday schedule differs from weekend
+- "I only workout on Mon/Wed/Fri" → schedule might vary on workout vs non-workout days
+- If no day-specific requirements exist, create a single schedule with all 7 days
+
+Each schedule variant must specify which days it applies to via the "days" array. All 7 days (monday through sunday) must be covered exactly once across all variants.
 
 IMPORTANT: This is a general wellness protocol, not medical advice. Do not diagnose conditions or recommend treatments for diseases.
 
@@ -725,6 +748,166 @@ export async function* askAboutProtocolStream(
   }
 
   return JSON.parse(fullText);
+}
+
+// ---------------------------------------------------------------------------
+// Meal Generation
+// ---------------------------------------------------------------------------
+
+const mealsGenerationSchema = {
+  type: 'object',
+  properties: {
+    meals: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          time: { type: 'string', description: 'Meal time in HH:MM 24-hour format' },
+          foods: { type: 'array', items: { type: 'string' }, description: 'List of foods with portions (e.g., "200g grilled chicken breast")' },
+          calories: { type: 'integer', minimum: 1 },
+          protein_g: { type: 'number', minimum: 0 },
+          carbs_g: { type: 'number', minimum: 0 },
+          fat_g: { type: 'number', minimum: 0 },
+          notes: { type: 'string', description: 'Optional preparation tips or notes' },
+        },
+        required: ['name', 'time', 'foods', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
+      },
+    },
+    reasoning: { type: 'string', description: 'Brief explanation of the meal plan design and how it meets the macro targets' },
+  },
+  required: ['meals', 'reasoning'],
+} as const;
+
+export interface MealGenerationInput {
+  dailyCalories: number;
+  proteinTargetG: number;
+  carbsTargetG: number;
+  fatTargetG: number;
+  mealCount: number;
+  preferences?: string;
+  exclusions?: string;
+  dietaryRestrictions?: string[];
+  schedule: { wakeTime: string; sleepTime: string };
+  workoutTimes?: string[];
+}
+
+function buildMealGenerationPrompt(input: MealGenerationInput): string {
+  const {
+    dailyCalories,
+    proteinTargetG,
+    carbsTargetG,
+    fatTargetG,
+    mealCount,
+    preferences,
+    exclusions,
+    dietaryRestrictions,
+    schedule,
+    workoutTimes,
+  } = input;
+
+  const restrictionsText = dietaryRestrictions && dietaryRestrictions.length > 0
+    ? dietaryRestrictions.join(', ')
+    : 'None';
+
+  const workoutText = workoutTimes && workoutTimes.length > 0
+    ? `Workout times: ${workoutTimes.join(', ')}`
+    : 'No specific workout times';
+
+  return `You are an expert nutritionist creating a meal plan. Generate exactly ${mealCount} meals that hit the following macro targets.
+
+## Macro Targets
+- Calories: ${dailyCalories}
+- Protein: ${proteinTargetG}g
+- Carbs: ${carbsTargetG}g
+- Fat: ${fatTargetG}g
+
+## Schedule Context
+- Wake time: ${schedule.wakeTime}
+- Sleep time: ${schedule.sleepTime}
+- ${workoutText}
+
+## Dietary Restrictions
+${restrictionsText}
+
+## User Preferences
+${preferences || 'No specific preferences'}
+
+## Exclusions
+${exclusions || 'None'}
+
+## Instructions
+1. Use Google Search to verify accurate nutritional information for foods.
+2. Space meals evenly between wake time (${schedule.wakeTime}) and sleep time (${schedule.sleepTime}).
+3. Apply nutrient timing principles:
+   - If workout times are provided, place higher-carb meals around those times
+   - Distribute protein evenly across meals (roughly ${Math.round(proteinTargetG / mealCount)}g per meal)
+   - Don't front-load all calories at breakfast
+4. Make meals practical and realistic with common ingredients.
+5. Each meal must include:
+   - name (e.g., "Breakfast", "Post-workout", "Dinner")
+   - time in HH:MM 24-hour format
+   - foods array with specific portions (e.g., "200g grilled chicken breast", "150g brown rice")
+   - accurate calories, protein_g, carbs_g, fat_g for the meal
+   - optional notes for preparation tips
+6. CRITICAL: Total macros across all meals must sum to within 5% of targets:
+   - Total calories: ${Math.round(dailyCalories * 0.95)} - ${Math.round(dailyCalories * 1.05)}
+   - Total protein: ${Math.round(proteinTargetG * 0.95)}g - ${Math.round(proteinTargetG * 1.05)}g
+   - Total carbs: ${Math.round(carbsTargetG * 0.95)}g - ${Math.round(carbsTargetG * 1.05)}g
+   - Total fat: ${Math.round(fatTargetG * 0.95)}g - ${Math.round(fatTargetG * 1.05)}g
+7. Provide brief reasoning explaining the meal plan design.
+
+Generate the meal plan now.`;
+}
+
+import type { Meal } from '../schemas/protocol';
+
+/**
+ * Stream meal plan generation. Yields text chunks, returns generated meals + reasoning.
+ */
+export async function* generateMealsStream(
+  input: MealGenerationInput
+): AsyncGenerator<string, { meals: Meal[]; reasoning: string }, unknown> {
+  const client = getGeminiClient();
+  const prompt = buildMealGenerationPrompt(input);
+
+  const stream = await client.models.generateContentStream({
+    model: MODEL_GROUNDED,
+    contents: prompt,
+    config: {
+      tools: [{ googleSearch: {} }],
+      responseMimeType: 'application/json',
+      responseSchema: mealsGenerationSchema as any,
+    },
+  });
+
+  let fullText = '';
+  for await (const chunk of stream) {
+    const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    if (text) {
+      fullText += text;
+      yield text;
+    }
+  }
+
+  const parsed = JSON.parse(fullText);
+
+  // Validate each meal has required fields
+  const meals: Meal[] = (parsed.meals || []).map((m: Record<string, unknown>) => ({
+    name: String(m.name || 'Meal'),
+    time: String(m.time || '12:00'),
+    foods: Array.isArray(m.foods) ? m.foods.map(String) : [],
+    calories: Math.max(1, Math.round(Number(m.calories) || 0)),
+    protein_g: Math.max(0, Number(m.protein_g) || 0),
+    carbs_g: Math.max(0, Number(m.carbs_g) || 0),
+    fat_g: Math.max(0, Number(m.fat_g) || 0),
+    notes: m.notes ? String(m.notes) : null,
+  }));
+
+  return {
+    meals,
+    reasoning: parsed.reasoning || 'Meal plan generated based on your macro targets.',
+  };
 }
 
 // ---------------------------------------------------------------------------

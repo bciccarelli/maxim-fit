@@ -142,6 +142,7 @@ export function ProtocolDetailClient({ protocol, tier = 'free' }: ProtocolDetail
         verified={isVerified}
         onProtocolChange={handleProtocolChange}
         onVerify={handleVerify}
+        onMealsGenerated={handleModificationAccepted}
       />
 
       {protocol.critiques && protocol.critiques.length > 0 && (

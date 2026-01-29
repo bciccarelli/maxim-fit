@@ -4,21 +4,25 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Utensils, Droplets, Plus, Trash2, Save, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { Utensils, Droplets, Plus, Trash2, Save, ChevronDown, ChevronRight, Pencil, Sparkles } from 'lucide-react';
 import { InlineEditField } from './InlineEditField';
+import { GenerateMealsModal } from './GenerateMealsModal';
 import type { DietPlan, Meal } from '@/lib/schemas/protocol';
 
 interface DietPlanViewProps {
   diet: DietPlan;
   editable?: boolean;
   onChange?: (diet: DietPlan) => void;
+  protocolId?: string;
+  onMealsGenerated?: (newId: string) => void;
 }
 
-export function DietPlanView({ diet, editable = false, onChange }: DietPlanViewProps) {
+export function DietPlanView({ diet, editable = false, onChange, protocolId, onMealsGenerated }: DietPlanViewProps) {
   const [draft, setDraft] = useState<DietPlan>(diet);
   const [dirty, setDirty] = useState(false);
   const [expandedMeal, setExpandedMeal] = useState<number | null>(null);
   const [editingMealIndex, setEditingMealIndex] = useState<number | null>(null);
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
 
   const display = dirty ? draft : diet;
 
@@ -197,9 +201,31 @@ export function DietPlanView({ diet, editable = false, onChange }: DietPlanViewP
 
         {editable && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t">
-            <Button variant="outline" size="sm" onClick={handleAddMeal}><Plus className="h-4 w-4 mr-1" />Add meal</Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleAddMeal}><Plus className="h-4 w-4 mr-1" />Add meal</Button>
+              {protocolId && onMealsGenerated && (
+                <Button variant="outline" size="sm" onClick={() => setGenerateModalOpen(true)}>
+                  <Sparkles className="h-4 w-4 mr-1" />Generate meals
+                </Button>
+              )}
+            </div>
             {dirty && <Button size="sm" onClick={handleSave}><Save className="h-4 w-4 mr-1" />Save changes</Button>}
           </div>
+        )}
+
+        {protocolId && onMealsGenerated && (
+          <GenerateMealsModal
+            open={generateModalOpen}
+            onOpenChange={setGenerateModalOpen}
+            protocolId={protocolId}
+            onAccepted={onMealsGenerated}
+            currentMacros={{
+              calories: display.daily_calories,
+              protein_g: display.protein_target_g,
+              carbs_g: display.carbs_target_g,
+              fat_g: display.fat_target_g,
+            }}
+          />
         )}
       </CardContent>
     </Card>

@@ -6,12 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Clock, Sun, Moon, Plus, Trash2, Save, Check } from 'lucide-react';
 import { InlineEditField } from './InlineEditField';
-import type { DailySchedule, TimeBlock } from '@/lib/schemas/protocol';
+import { cn } from '@/lib/utils';
+import type { ScheduleVariant, TimeBlock, DayOfWeek } from '@/lib/schemas/protocol';
+
+const DAYS: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const DAY_ABBR: Record<DayOfWeek, string> = {
+  monday: 'Mon',
+  tuesday: 'Tue',
+  wednesday: 'Wed',
+  thursday: 'Thu',
+  friday: 'Fri',
+  saturday: 'Sat',
+  sunday: 'Sun',
+};
 
 interface ScheduleViewProps {
-  schedule: DailySchedule;
+  schedules: ScheduleVariant[];
   editable?: boolean;
-  onChange?: (schedule: DailySchedule) => void;
+  onChange?: (schedules: ScheduleVariant[]) => void;
 }
 
 /** Convert "HH:MM" to total minutes from midnight. */
@@ -95,17 +107,74 @@ function computeBlockLayout(
   }));
 }
 
-export function ScheduleView({ schedule, editable = false, onChange }: ScheduleViewProps) {
-  const [draft, setDraft] = useState<DailySchedule>(schedule);
+/** Format days array into human-readable label */
+function formatDaysLabel(days: DayOfWeek[]): string {
+  if (days.length === 7) return 'Every day';
+  if (days.length === 5 && days.every(d => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].includes(d))) {
+    return 'Weekdays';
+  }
+  if (days.length === 2 && days.includes('saturday') && days.includes('sunday')) {
+    return 'Weekends';
+  }
+  return days.map(d => DAY_ABBR[d]).join(', ');
+}
+
+/** Day selector component for switching between schedule variants */
+function DaySelector({
+  schedules,
+  selectedIndex,
+  onSelectVariant,
+}: {
+  schedules: ScheduleVariant[];
+  selectedIndex: number;
+  onSelectVariant: (index: number) => void;
+}) {
+  const getDayVariantIndex = (day: DayOfWeek) =>
+    schedules.findIndex((v) => v.days.includes(day));
+
+  return (
+    <div className="flex gap-1 mb-4">
+      {DAYS.map((day) => {
+        const variantIndex = getDayVariantIndex(day);
+        const isSelected = variantIndex === selectedIndex;
+        return (
+          <button
+            key={day}
+            onClick={() => onSelectVariant(variantIndex)}
+            className={cn(
+              'px-2 py-1 rounded text-xs font-mono transition-colors',
+              isSelected
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/70 text-muted-foreground'
+            )}
+          >
+            {DAY_ABBR[day]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ScheduleView({ schedules, editable = false, onChange }: ScheduleViewProps) {
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  const [draft, setDraft] = useState<ScheduleVariant[]>(schedules);
   const [dirty, setDirty] = useState(false);
   const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
 
-  const display = dirty ? draft : schedule;
-  const blocks = display.schedule;
+  const displaySchedules = dirty ? draft : schedules;
+  const selectedVariant = displaySchedules[selectedVariantIndex] || displaySchedules[0];
+  const blocks = selectedVariant?.schedule || [];
 
-  const updateDraft = (updated: DailySchedule) => {
+  const updateDraft = (updated: ScheduleVariant[]) => {
     setDraft(updated);
     setDirty(true);
+  };
+
+  const updateCurrentVariant = (updated: ScheduleVariant) => {
+    const newDraft = [...draft];
+    newDraft[selectedVariantIndex] = updated;
+    updateDraft(newDraft);
   };
 
   const handleSave = () => {
@@ -115,27 +184,30 @@ export function ScheduleView({ schedule, editable = false, onChange }: ScheduleV
   };
 
   const handleAddBlock = () => {
-    const newSchedule = [...draft.schedule, { start_time: '12:00', end_time: '13:00', activity: 'New activity', requirement_satisfied: null }];
-    updateDraft({ ...draft, schedule: newSchedule });
+    const currentVariant = draft[selectedVariantIndex];
+    const newSchedule = [...currentVariant.schedule, { start_time: '12:00', end_time: '13:00', activity: 'New activity', requirement_satisfied: null }];
+    updateCurrentVariant({ ...currentVariant, schedule: newSchedule });
     setEditingBlockIndex(newSchedule.length - 1);
   };
 
   const handleRemoveBlock = (index: number) => {
-    updateDraft({ ...draft, schedule: draft.schedule.filter((_, i) => i !== index) });
+    const currentVariant = draft[selectedVariantIndex];
+    updateCurrentVariant({ ...currentVariant, schedule: currentVariant.schedule.filter((_: TimeBlock, i: number) => i !== index) });
     setEditingBlockIndex(null);
   };
 
   const handleUpdateBlock = (index: number, field: keyof TimeBlock, value: string) => {
-    const updated = [...draft.schedule];
+    const currentVariant = draft[selectedVariantIndex];
+    const updated = [...currentVariant.schedule];
     updated[index] = { ...updated[index], [field]: value };
-    updateDraft({ ...draft, schedule: updated });
+    updateCurrentVariant({ ...currentVariant, schedule: updated });
   };
 
-  if (blocks.length === 0 && !editable) return null;
+  if (!selectedVariant || (blocks.length === 0 && !editable)) return null;
 
   const displayBlocks = blocks.length > 0 ? blocks : [];
-  const allStarts = displayBlocks.map((b) => toMinutes(b.start_time));
-  const allEnds = displayBlocks.map((b) => toMinutes(b.end_time));
+  const allStarts = displayBlocks.map((b: TimeBlock) => toMinutes(b.start_time));
+  const allEnds = displayBlocks.map((b: TimeBlock) => toMinutes(b.end_time));
   const firstHour = displayBlocks.length > 0 ? Math.floor(Math.min(...allStarts) / 60) : 6;
   const lastHour = displayBlocks.length > 0 ? Math.ceil(Math.max(...allEnds) / 60) : 22;
   const rangeStartMin = firstHour * 60;
@@ -155,23 +227,39 @@ export function ScheduleView({ schedule, editable = false, onChange }: ScheduleV
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Day selector - only show if multiple variants */}
+        {displaySchedules.length > 1 && (
+          <DaySelector
+            schedules={displaySchedules}
+            selectedIndex={selectedVariantIndex}
+            onSelectVariant={setSelectedVariantIndex}
+          />
+        )}
+
+        {/* Variant label */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            {selectedVariant.label || formatDaysLabel(selectedVariant.days)}
+          </span>
+        </div>
+
         <div className="flex items-center gap-4 mb-6 text-sm">
           <div className="flex items-center gap-2">
             <Sun className="h-4 w-4 text-warning" />
             <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Wake</span>
             {editable ? (
-              <InlineEditField value={display.wake_time} onChange={(v) => updateDraft({ ...draft, wake_time: v })} type="time" mono className="text-sm" />
+              <InlineEditField value={selectedVariant.wake_time} onChange={(v) => updateCurrentVariant({ ...draft[selectedVariantIndex], wake_time: v })} type="time" mono className="text-sm" />
             ) : (
-              <span className="font-mono text-sm">{display.wake_time}</span>
+              <span className="font-mono text-sm">{selectedVariant.wake_time}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <Moon className="h-4 w-4 text-info" />
             <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Sleep</span>
             {editable ? (
-              <InlineEditField value={display.sleep_time} onChange={(v) => updateDraft({ ...draft, sleep_time: v })} type="time" mono className="text-sm" />
+              <InlineEditField value={selectedVariant.sleep_time} onChange={(v) => updateCurrentVariant({ ...draft[selectedVariantIndex], sleep_time: v })} type="time" mono className="text-sm" />
             ) : (
-              <span className="font-mono text-sm">{display.sleep_time}</span>
+              <span className="font-mono text-sm">{selectedVariant.sleep_time}</span>
             )}
           </div>
         </div>
@@ -189,7 +277,7 @@ export function ScheduleView({ schedule, editable = false, onChange }: ScheduleV
               {hours.map((h) => (
                 <div key={h} className="absolute left-0 right-0 border-t border-border" style={{ top: (h - firstHour) * HOUR_HEIGHT }} />
               ))}
-              {displayBlocks.map((block, index) => {
+              {displayBlocks.map((block: TimeBlock, index: number) => {
                 const startMin = toMinutes(block.start_time);
                 const endMin = toMinutes(block.end_time);
                 const durationMin = endMin - startMin;

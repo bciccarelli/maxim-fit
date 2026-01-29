@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { EditableProtocolName } from '@/components/protocol/EditableProtocolName';
 import { ProtocolDetailClient } from './ProtocolDetailClient';
 import { getUserTier } from '@/lib/stripe/subscription';
+import { normalizeProtocol } from '@/lib/schemas/protocol';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -27,6 +28,13 @@ export default async function ProtocolPage({ params }: Props) {
   if (error || !protocol) {
     notFound();
   }
+
+  // Normalize protocol_data to handle legacy single-schedule format
+  const normalizedProtocolData = normalizeProtocol(protocol.protocol_data);
+  const normalizedProtocol = {
+    ...protocol,
+    protocol_data: normalizedProtocolData,
+  };
 
   // Get user's subscription tier
   const tier = user ? await getUserTier(user.id) : 'free';
@@ -50,7 +58,7 @@ export default async function ProtocolPage({ params }: Props) {
         </div>
       </div>
 
-      <ProtocolDetailClient protocol={protocol} tier={tier} />
+      <ProtocolDetailClient protocol={normalizedProtocol} tier={tier} />
     </div>
   );
 }

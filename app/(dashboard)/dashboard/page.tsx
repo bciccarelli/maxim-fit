@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NewProtocolButton } from '@/components/protocol/NewProtocolButton';
 import { DashboardProtocolView } from './DashboardProtocolView';
 import { getUserTier } from '@/lib/stripe/subscription';
+import { normalizeProtocol } from '@/lib/schemas/protocol';
 
 interface Props {
   searchParams: Promise<{ protocol?: string }>;
@@ -33,7 +34,14 @@ export default async function DashboardPage({ searchParams }: Props) {
       .eq('id', targetId)
       .eq('user_id', user?.id)
       .single();
-    selectedProtocol = data;
+
+    // Normalize protocol_data to handle legacy single-schedule format
+    if (data) {
+      selectedProtocol = {
+        ...data,
+        protocol_data: normalizeProtocol(data.protocol_data),
+      };
+    }
   }
 
   // Get user's subscription tier

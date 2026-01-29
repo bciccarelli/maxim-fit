@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { modifyProtocol, modifyProtocolStream, verifyProtocol, extractPreferenceNotes } from '@/lib/gemini/generation';
-import { dailyProtocolSchema, type DailyProtocol } from '@/lib/schemas/protocol';
+import { normalizeProtocol, type DailyProtocol } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Protocol not found' }, { status: 404 });
     }
 
-    const protocolData = dailyProtocolSchema.parse(protocol.protocol_data);
+    const protocolData = normalizeProtocol(protocol.protocol_data);
     const config = buildConfig(protocol.user_configs);
     const modifyConfig = config?.success ? config.data : fallbackConfig;
 

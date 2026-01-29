@@ -13,6 +13,31 @@ export const timeBlockSchema = z.object({
 
 export type TimeBlock = z.infer<typeof timeBlockSchema>;
 
+export const dayOfWeekSchema = z.enum([
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
+]);
+
+export type DayOfWeek = z.infer<typeof dayOfWeekSchema>;
+
+export const ALL_DAYS: DayOfWeek[] = [
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
+];
+
+export const WEEKDAYS: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+export const WEEKENDS: DayOfWeek[] = ['saturday', 'sunday'];
+
+// Schedule variant with day assignments (new multi-day format)
+export const scheduleVariantSchema = z.object({
+  label: z.string().optional(),
+  days: z.array(dayOfWeekSchema).min(1),
+  wake_time: z.string(),
+  sleep_time: z.string(),
+  schedule: z.array(timeBlockSchema),
+});
+
+export type ScheduleVariant = z.infer<typeof scheduleVariantSchema>;
+
+// Legacy single-schedule format (for backward compatibility)
 export const dailyScheduleSchema = z.object({
   wake_time: z.string(),
   sleep_time: z.string(),
@@ -113,13 +138,23 @@ export type TrainingProgram = z.infer<typeof trainingProgramSchema>;
 // =============================================================================
 
 export const dailyProtocolSchema = z.object({
-  schedule: dailyScheduleSchema,
+  schedules: z.array(scheduleVariantSchema).min(1),
   diet: dietPlanSchema,
   supplementation: supplementationPlanSchema,
   training: trainingProgramSchema,
 });
 
 export type DailyProtocol = z.infer<typeof dailyProtocolSchema>;
+
+// Legacy protocol schema (for parsing old data)
+export const legacyDailyProtocolSchema = z.object({
+  schedule: dailyScheduleSchema,
+  diet: dietPlanSchema,
+  supplementation: supplementationPlanSchema,
+  training: trainingProgramSchema,
+});
+
+export type LegacyDailyProtocol = z.infer<typeof legacyDailyProtocolSchema>;
 
 // =============================================================================
 // Evaluation Schemas
@@ -242,3 +277,48 @@ export type ProtocolQuestion = {
   answer: string;
   created_at: string;
 };
+
+// =============================================================================
+// Protocol Normalization (backward compatibility)
+// =============================================================================
+
+/**
+ * Normalizes protocol data to the current schema format.
+ * Converts legacy single-schedule format to the new multi-schedule format.
+ */
+export function normalizeProtocol(data: unknown): DailyProtocol {
+  const obj = data as Record<string, unknown>;
+
+  // Already in new format with schedules array
+  if (Array.isArray(obj.schedules)) {
+    return dailyProtocolSchema.parse(data);
+  }
+
+  // Legacy format with singular schedule - convert to schedules array
+  if (obj.schedule && typeof obj.schedule === 'object') {
+    const legacySchedule = obj.schedule as DailySchedule;
+    const converted = {
+      ...obj,
+      schedules: [{
+        label: 'Daily Schedule',
+        days: ALL_DAYS,
+        wake_time: legacySchedule.wake_time,
+        sleep_time: legacySchedule.sleep_time,
+        schedule: legacySchedule.schedule,
+      }],
+    };
+    // Remove the old schedule field
+    delete (converted as Record<string, unknown>).schedule;
+    return dailyProtocolSchema.parse(converted);
+  }
+
+  throw new Error('Invalid protocol format: missing schedule or schedules');
+}
+
+/**
+ * Checks if protocol data is in legacy format (singular schedule).
+ */
+export function isLegacyProtocol(data: unknown): boolean {
+  const obj = data as Record<string, unknown>;
+  return !Array.isArray(obj.schedules) && obj.schedule !== undefined;
+}

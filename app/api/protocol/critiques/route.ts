@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { applyCritiqueSuggestions } from '@/lib/gemini/generation';
-import { dailyProtocolSchema } from '@/lib/schemas/protocol';
+import { normalizeProtocol } from '@/lib/schemas/protocol';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
 
 export async function POST(request: NextRequest) {
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       }, { status: 402 });
     }
 
-    const protocolData = dailyProtocolSchema.parse(protocol.protocol_data);
+    const protocolData = normalizeProtocol(protocol.protocol_data);
     const suggestionsToApply = validIndices.map((i: number) => currentCritiques[i].suggestion);
 
     // Apply critique suggestions via AI
