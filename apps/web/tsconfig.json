@@ -22,9 +22,9 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@protocol/shared": ["../../packages/shared"],
+      "@protocol/shared/*": ["../../packages/shared/*"]
     },
     "target": "ES2017"
   },

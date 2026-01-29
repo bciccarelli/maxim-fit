@@ -1,0 +1,24 @@
+{
+  "name": "@protocol/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./schemas": "./schemas/index.ts",
+    "./schemas/*": "./schemas/*.ts",
+    "./gemini": "./gemini/index.ts",
+    "./gemini/*": "./gemini/*.ts",
+    "./stripe": "./stripe/index.ts",
+    "./stripe/*": "./stripe/*.ts",
+    "./types": "./types/index.ts",
+    "./types/*": "./types/*.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

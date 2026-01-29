@@ -1,0 +1,431 @@
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
+import { LogOut, User, Target, CheckSquare, CreditCard } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiUrl, getAuthHeaders } from '@/lib/api';
+
+type PersonalInfo = {
+  age: number;
+  weight_lbs: number;
+  height_in: number;
+  sex: string;
+  fitness_level: string;
+  dietary_restrictions: string[];
+  lifestyle_considerations: string[];
+};
+
+type Goal = {
+  name: string;
+  weight: number;
+  description?: string;
+};
+
+type UserConfig = {
+  personal_info: PersonalInfo;
+  goals: Goal[];
+  requirements: string[];
+};
+
+type Subscription = {
+  tier: 'free' | 'pro';
+  renewalDate: string | null;
+};
+
+export default function SettingsScreen() {
+  const { user, signOut } = useAuth();
+  const [config, setConfig] = useState<UserConfig | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBillingLoading, setIsBillingLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!user) return;
+
+      // Fetch user config
+      const { data: configData } = await supabase
+        .from('user_configs')
+        .select('personal_info, goals, requirements')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .single();
+
+      if (configData) {
+        setConfig(configData as UserConfig);
+      }
+
+      // Fetch subscription
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(apiUrl('/api/subscription'), { headers });
+        if (response.ok) {
+          const data = await response.json();
+          setSubscription({
+            tier: data.tier || 'free',
+            renewalDate: data.renewalDate || null,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching subscription:', err);
+      }
+
+      setIsLoading(false);
+    }
+
+    fetchData();
+  }, [user]);
+
+  const handleManageBilling = async () => {
+    setIsBillingLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(apiUrl('/api/stripe/portal'), {
+        method: 'POST',
+        headers,
+      });
+
+      if (response.ok) {
+        const { url } = await response.json();
+        await WebBrowser.openBrowserAsync(url);
+      }
+    } catch (err) {
+      console.error('Error opening billing portal:', err);
+    } finally {
+      setIsBillingLoading(false);
+    }
+  };
+
+  const formatHeight = (inches: number) => {
+    const feet = Math.floor(inches / 12);
+    const remainingInches = inches % 12;
+    return `${feet}'${remainingInches}"`;
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2d5a2d" />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Subscription Status */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <CreditCard size={20} color="#2d5a2d" />
+          <Text style={styles.cardTitle}>Subscription</Text>
+        </View>
+        <View style={styles.subscriptionRow}>
+          <View style={[styles.tierBadge, subscription?.tier === 'pro' && styles.tierBadgePro]}>
+            <Text style={[styles.tierText, subscription?.tier === 'pro' && styles.tierTextPro]}>
+              {subscription?.tier === 'pro' ? 'Pro' : 'Free'}
+            </Text>
+          </View>
+          {subscription?.renewalDate && (
+            <Text style={styles.renewalText}>
+              Renews {new Date(subscription.renewalDate).toLocaleDateString()}
+            </Text>
+          )}
+        </View>
+        {subscription?.tier === 'pro' && (
+          <Pressable
+            style={styles.billingButton}
+            onPress={handleManageBilling}
+            disabled={isBillingLoading}
+          >
+            {isBillingLoading ? (
+              <ActivityIndicator size="small" color="#2d5a2d" />
+            ) : (
+              <Text style={styles.billingButtonText}>Manage Billing</Text>
+            )}
+          </Pressable>
+        )}
+      </View>
+
+      {/* Personal Info */}
+      {config?.personal_info && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <User size={20} color="#2d5a2d" />
+            <Text style={styles.cardTitle}>Personal Info</Text>
+          </View>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Age</Text>
+              <Text style={styles.infoValue}>{config.personal_info.age}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Sex</Text>
+              <Text style={styles.infoValue}>{config.personal_info.sex}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Weight</Text>
+              <Text style={styles.infoValue}>{config.personal_info.weight_lbs} lbs</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Height</Text>
+              <Text style={styles.infoValue}>{formatHeight(config.personal_info.height_in)}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Fitness Level</Text>
+              <Text style={styles.infoValue}>{config.personal_info.fitness_level}</Text>
+            </View>
+          </View>
+          {config.personal_info.dietary_restrictions.length > 0 && (
+            <View style={styles.listSection}>
+              <Text style={styles.listLabel}>Dietary Restrictions</Text>
+              <Text style={styles.listValue}>
+                {config.personal_info.dietary_restrictions.join(', ')}
+              </Text>
+            </View>
+          )}
+          {config.personal_info.lifestyle_considerations.length > 0 && (
+            <View style={styles.listSection}>
+              <Text style={styles.listLabel}>Lifestyle</Text>
+              <Text style={styles.listValue}>
+                {config.personal_info.lifestyle_considerations.join(', ')}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Goals */}
+      {config?.goals && config.goals.length > 0 && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Target size={20} color="#2d5a2d" />
+            <Text style={styles.cardTitle}>Goals</Text>
+          </View>
+          {config.goals.map((goal, index) => (
+            <View key={index} style={styles.goalItem}>
+              <View style={styles.goalHeader}>
+                <Text style={styles.goalName}>{goal.name}</Text>
+                <Text style={styles.goalWeight}>{Math.round(goal.weight * 100)}%</Text>
+              </View>
+              <View style={styles.goalBar}>
+                <View style={[styles.goalBarFill, { width: `${goal.weight * 100}%` }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Requirements */}
+      {config?.requirements && config.requirements.length > 0 && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <CheckSquare size={20} color="#2d5a2d" />
+            <Text style={styles.cardTitle}>Requirements</Text>
+          </View>
+          {config.requirements.map((req, index) => (
+            <View key={index} style={styles.requirementItem}>
+              <View style={styles.bullet} />
+              <Text style={styles.requirementText}>{req}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Sign Out */}
+      <Pressable style={styles.signOutButton} onPress={signOut}>
+        <LogOut size={20} color="#c62828" />
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </Pressable>
+
+      {/* Account Info */}
+      <Text style={styles.emailText}>{user?.email}</Text>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f0',
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f0',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2d5a2d',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a2e1a',
+    marginLeft: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  subscriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  tierBadge: {
+    backgroundColor: '#f5f5f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  tierBadgePro: {
+    backgroundColor: '#e8f5e9',
+  },
+  tierText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tierTextPro: {
+    color: '#2d5a2d',
+  },
+  renewalText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 12,
+  },
+  billingButton: {
+    backgroundColor: '#f5f5f0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  billingButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2d5a2d',
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  infoItem: {
+    width: '50%',
+    marginBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#1a2e1a',
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  listSection: {
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  listLabel: {
+    fontSize: 11,
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  listValue: {
+    fontSize: 14,
+    color: '#1a2e1a',
+    lineHeight: 20,
+  },
+  goalItem: {
+    marginBottom: 12,
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  goalName: {
+    fontSize: 14,
+    color: '#1a2e1a',
+    fontWeight: '500',
+  },
+  goalWeight: {
+    fontSize: 14,
+    color: '#2d5a2d',
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  goalBar: {
+    height: 6,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  goalBarFill: {
+    height: '100%',
+    backgroundColor: '#2d5a2d',
+    borderRadius: 3,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  bullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2d5a2d',
+    marginTop: 6,
+    marginRight: 10,
+  },
+  requirementText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  signOutText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#c62828',
+    marginLeft: 8,
+  },
+  emailText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+});

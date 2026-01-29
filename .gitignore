@@ -1,19 +1,19 @@
-node_modules
-
 # dependencies
+node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
 
 # testing
-/coverage
+coverage
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # production
-/build
+build
+dist
 
 # misc
 .DS_Store
@@ -26,6 +26,7 @@ yarn-error.log*
 
 # local env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -41,3 +42,16 @@ __pycache__/
 .Python
 venv/
 .venv/
+
+# Turborepo
+.turbo
+
+# Expo / React Native (for mobile app)
+apps/mobile/.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
