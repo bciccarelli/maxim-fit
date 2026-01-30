@@ -31,6 +31,7 @@ export default function ChatScreen() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [history, setHistory] = useState<QuestionAnswer[]>([]);
   const [question, setQuestion] = useState('');
+  const [pendingQuestion, setPendingQuestion] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -96,6 +97,7 @@ export default function ChatScreen() {
     if (!question.trim() || !selectedProtocol || isStreaming) return;
 
     const currentQuestion = question.trim();
+    setPendingQuestion(currentQuestion);
     setQuestion('');
     reset();
 
@@ -124,6 +126,7 @@ export default function ChatScreen() {
           created_at: new Date().toISOString(),
         },
       ]);
+      setPendingQuestion('');
       reset();
     }
   }, [question, selectedProtocol, isStreaming, startStream, reset]);
@@ -219,7 +222,7 @@ export default function ChatScreen() {
             {isStreaming && (
               <View style={styles.qaContainer}>
                 <View style={styles.questionBubble}>
-                  <Text style={styles.questionText}>{question || 'Your question'}</Text>
+                  <Text style={styles.questionText}>{pendingQuestion}</Text>
                 </View>
                 <View style={styles.answerBubble}>
                   {streamedText ? (
