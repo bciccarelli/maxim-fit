@@ -1,7 +1,22 @@
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { useState } from 'react';
 import { Stack, Link } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
+import { SocialSignInButtons } from '@/components/auth/SocialSignInButtons';
+import { Divider } from '@/components/auth/Divider';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -26,118 +41,194 @@ export default function LoginScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Sign In' }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>Welcome Back</Text>
-
-        <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="your@email.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!isLoading}
-          />
-
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            secureTextEntry
-            editable={!isLoading}
-          />
-
-          <Pressable
-            style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
-            )}
-          </Pressable>
-
-          <Link href="/(auth)/signup" asChild>
-            <Pressable style={styles.linkButton}>
-              <Text style={styles.linkText}>
-                Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
+            {/* Header / Branding Area */}
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <Text style={styles.logoText}>P</Text>
+              </View>
+              <Text style={styles.title}>Welcome back</Text>
+              <Text style={styles.subtitle}>
+                Sign in to access your health protocol
               </Text>
-            </Pressable>
-          </Link>
-        </View>
-      </View>
+            </View>
+
+            {/* Auth Form Card */}
+            <View style={styles.card}>
+              {/* Social Sign-In (Primary) */}
+              <SocialSignInButtons />
+
+              {/* Divider */}
+              <Divider />
+
+              {/* Email Form */}
+              <View style={styles.form}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="your@email.com"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isLoading}
+                />
+
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter your password"
+                  placeholderTextColor={colors.textMuted}
+                  secureTextEntry
+                  editable={!isLoading}
+                />
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.button,
+                    isLoading && styles.buttonDisabled,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Sign in</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Footer Link */}
+            <View style={styles.footer}>
+              <Link href="/(auth)/signup" asChild>
+                <Pressable>
+                  <Text style={styles.footerText}>
+                    Don't have an account?{' '}
+                    <Text style={styles.footerLink}>Sign up</Text>
+                  </Text>
+                </Pressable>
+              </Link>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
-    padding: 20,
+    backgroundColor: colors.background,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: spacing.lg,
+    justifyContent: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  logoContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primaryDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  logoText: {
+    color: '#fff',
+    fontSize: fontSize['2xl'],
+    fontWeight: '700',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a2e1a',
-    marginBottom: 32,
-    marginTop: 20,
+    fontSize: fontSize['3xl'],
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
-  form: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+  subtitle: {
+    fontSize: fontSize.base,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  form: {},
   label: {
-    fontSize: 12,
+    fontSize: fontSize.xs,
     fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
     padding: 14,
-    fontSize: 16,
-    marginBottom: 16,
+    fontSize: fontSize.base,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
+    color: colors.text,
+    marginBottom: spacing.md,
   },
   button: {
-    backgroundColor: '#2d5a2d',
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
+  buttonPressed: {
+    opacity: 0.9,
+  },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '600',
   },
-  linkButton: {
-    marginTop: 16,
+  footer: {
+    marginTop: spacing.lg,
     alignItems: 'center',
   },
-  linkText: {
-    color: '#666',
-    fontSize: 14,
+  footerText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
   },
-  linkTextBold: {
-    color: '#2d5a2d',
+  footerLink: {
+    color: colors.primary,
     fontWeight: '600',
   },
 });

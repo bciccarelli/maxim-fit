@@ -8,6 +8,7 @@ import type { DailyProtocol } from '@protocol/shared/schemas';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
 import { AskSheet } from '@/components/protocol/AskSheet';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
+import { ExportPdfButton } from '@/components/protocol/ExportPdfButton';
 
 type ProtocolRow = {
   id: string;
@@ -92,15 +93,28 @@ export default function ProtocolDetailScreen() {
         options={{
           title: protocol.name || 'Protocol',
           headerRight: () => (
-            <Pressable
-              style={styles.headerButton}
-              onPress={() => {
-                setModifyInitialMessage('');
-                setShowModifySheet(true);
-              }}
-            >
-              <Wand2 size={22} color="#fff" />
-            </Pressable>
+            <View style={styles.headerButtons}>
+              {parsedData && (
+                <ExportPdfButton
+                  protocol={parsedData}
+                  name={protocol.name}
+                  scores={{
+                    weighted_goal_score: protocol.weighted_goal_score,
+                    viability_score: protocol.viability_score,
+                  }}
+                  verified={protocol.verified}
+                />
+              )}
+              <Pressable
+                style={styles.headerButton}
+                onPress={() => {
+                  setModifyInitialMessage('');
+                  setShowModifySheet(true);
+                }}
+              >
+                <Wand2 size={22} color="#fff" />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -187,6 +201,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#c62828',
     textAlign: 'center',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   headerButton: {
     padding: 8,

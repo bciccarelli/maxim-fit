@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Protocol",
-    "slug": "protocol-mobile",
+    "name": "Maxim",
+    "slug": "maxim-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "protocol",
+    "scheme": "maxim",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,14 +15,18 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.protocol.app"
+      "bundleIdentifier": "com.seatsignal.maximfit",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a2e1a"
       },
-      "package": "com.protocol.app"
+      "package": "com.seatsignal.maximfit"
     },
     "web": {
       "bundler": "metro",
@@ -31,10 +35,21 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-apple-authentication",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "91c1148c-c5eb-4b0d-90b5-d5062476be66"
+      }
+    },
+    "owner": "bciccarelli"
   }
 }

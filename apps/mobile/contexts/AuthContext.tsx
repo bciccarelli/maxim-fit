@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import {
+  configureGoogleSignIn,
+  signInWithGoogle as googleSignIn,
+  signOutFromGoogle,
+} from '@/lib/auth/google';
+import { signInWithApple as appleSignIn } from '@/lib/auth/apple';
 
 type AuthContextType = {
   session: Session | null;
@@ -8,6 +14,8 @@ type AuthContextType = {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithApple: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -19,6 +27,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Configure Google Sign-In
+    configureGoogleSignIn();
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -27,12 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -53,7 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const signInWithGoogle = async () => {
+    return googleSignIn();
+  };
+
+  const signInWithApple = async () => {
+    return appleSignIn();
+  };
+
   const signOut = async () => {
+    // Sign out from social providers first
+    await signOutFromGoogle();
+    // Then sign out from Supabase
     await supabase.auth.signOut();
   };
 
@@ -65,6 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         signIn,
         signUp,
+        signInWithGoogle,
+        signInWithApple,
         signOut,
       }}
     >
