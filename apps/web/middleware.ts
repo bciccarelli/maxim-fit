@@ -1,7 +1,19 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// CORS headers for mobile app access
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, x-requested-with',
+};
+
 export async function middleware(request: NextRequest) {
+  // Handle CORS preflight requests for API routes
+  if (request.method === 'OPTIONS' && request.nextUrl.pathname.startsWith('/api/')) {
+    return new NextResponse(null, { status: 204, headers: corsHeaders });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -57,6 +69,13 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
+  }
+
+  // Add CORS headers to API responses (must be done after all supabaseResponse reassignments)
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      supabaseResponse.headers.set(key, value);
+    });
   }
 
   return supabaseResponse;

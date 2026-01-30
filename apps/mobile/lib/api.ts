@@ -8,7 +8,10 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost
  * Build a full API URL from a path
  */
 export function apiUrl(path: string): string {
-  return `${API_BASE_URL}${path}`;
+  // Remove trailing slash from base and leading slash from path to avoid double slashes
+  const base = API_BASE_URL.replace(/\/$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${cleanPath}`;
 }
 
 /**
