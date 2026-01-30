@@ -31,8 +31,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
-      "expo-insights"
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
