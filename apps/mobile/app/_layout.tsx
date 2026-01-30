@@ -19,7 +19,7 @@ function RootLayoutNav() {
       router.replace('/login');
     } else if (session && inAuthGroup) {
       // Redirect to app if authenticated
-      router.replace('/(app)/dashboard');
+      router.replace('/(app)/(tabs)/protocols');
     }
   }, [session, isLoading, segments]);
 
