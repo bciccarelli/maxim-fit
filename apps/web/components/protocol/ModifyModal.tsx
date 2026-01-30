@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Loader2, Wand2, Check, X } from 'lucide-react';
+import { Loader2, Wand2, Check, X, CheckCircle2 } from 'lucide-react';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import { getStreamingStatus } from '@/lib/utils';
 
@@ -59,6 +59,8 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
   const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<string[]>([]);
+  const lastStatusRef = useRef<string>('');
 
   const {
     streamedText,
@@ -68,6 +70,18 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
     startStream,
     reset: resetStream,
   } = useSSEStream<StreamResult>();
+
+  // Track status changes and build history
+  const currentStatus = getStreamingStatus(streamedText);
+  useEffect(() => {
+    if (state === 'streaming' && currentStatus !== lastStatusRef.current) {
+      lastStatusRef.current = currentStatus;
+      setStatusHistory(prev => {
+        if (prev.includes(currentStatus)) return prev;
+        return [...prev, currentStatus];
+      });
+    }
+  }, [currentStatus, state]);
 
   // Pre-fill message when initialMessage changes
   useEffect(() => {
@@ -106,6 +120,8 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
 
     setState('streaming');
     setError(null);
+    setStatusHistory([]);
+    lastStatusRef.current = '';
 
     await startStream('/api/protocol/modify?stream=true', {
       method: 'POST',
@@ -161,6 +177,8 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
     setMessage('');
     setProposal(null);
     setError(null);
+    setStatusHistory([]);
+    lastStatusRef.current = '';
     resetStream();
     onOpenChange(false);
   };
@@ -199,11 +217,24 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
         )}
 
         {state === 'streaming' && (
-          <div className="flex flex-col items-center justify-center py-8 space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">
-              {getStreamingStatus(streamedText)}
-            </p>
+          <div className="py-6 space-y-3">
+            {statusHistory.map((status, index) => {
+              const isCurrentStep = index === statusHistory.length - 1;
+              return (
+                <div key={status} className="flex items-center gap-3">
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    {isCurrentStep ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    )}
+                  </div>
+                  <span className={`font-mono text-sm ${isCurrentStep ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                    {status.replace('...', '')}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 

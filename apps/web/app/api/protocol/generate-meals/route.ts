@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { generateMealsStream } from '@/lib/gemini/generation';
+import { generateMealsStream, type MealSlotResult } from '@/lib/gemini/generation';
 import { normalizeProtocol } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
@@ -108,9 +108,9 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            // Stream meal generation
+            // Stream meal slot generation
             const generator = generateMealsStream(input);
-            let genResult: IteratorResult<string, { meals: typeof protocolData.diet.meals; reasoning: string }>;
+            let genResult: IteratorResult<string, MealSlotResult>;
             do {
               genResult = await generator.next();
               if (!genResult.done && genResult.value) {
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
               }
             } while (!genResult.done);
 
-            const { meals, reasoning } = genResult.value;
+            const { meals, reasoning, timingStrategy } = genResult.value;
 
             // Calculate proposed macro totals
             const proposedMacros = {
@@ -163,6 +163,7 @@ export async function POST(request: NextRequest) {
                   proposalId: proposal?.id,
                   meals,
                   reasoning,
+                  timingStrategy,
                   macroComparison: {
                     current: currentMacros,
                     proposed: proposedMacros,
@@ -193,12 +194,12 @@ export async function POST(request: NextRequest) {
 
     // Non-streaming path
     const generator = generateMealsStream(input);
-    let genResult: IteratorResult<string, { meals: typeof protocolData.diet.meals; reasoning: string }>;
+    let genResult: IteratorResult<string, MealSlotResult>;
     do {
       genResult = await generator.next();
     } while (!genResult.done);
 
-    const { meals, reasoning } = genResult.value;
+    const { meals, reasoning, timingStrategy } = genResult.value;
 
     const proposedMacros = {
       calories: meals.reduce((sum, m) => sum + m.calories, 0),
@@ -236,6 +237,7 @@ export async function POST(request: NextRequest) {
       proposalId: proposal?.id,
       meals,
       reasoning,
+      timingStrategy,
       macroComparison: {
         current: currentMacros,
         proposed: proposedMacros,

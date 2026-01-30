@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
+import { NotificationSettingsCard } from '@/components/settings/NotificationSettingsCard';
 
 type PersonalInfo = {
   age: number;
@@ -145,6 +146,9 @@ export default function SettingsScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Notifications */}
+      <NotificationSettingsCard />
 
       {/* Personal Info */}
       {config?.personal_info && (

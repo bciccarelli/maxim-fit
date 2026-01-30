@@ -59,6 +59,13 @@ export const mealSchema = z.object({
   carbs_g: z.number().nonnegative(),
   fat_g: z.number().nonnegative(),
   notes: z.string().optional().nullable(),
+
+  // Slot-based fields for macro targets + timing (optional for backward compat)
+  timing_context: z.string().optional().nullable(),  // e.g., "Pre-workout fuel", "Recovery window"
+  target_calories: z.number().int().positive().optional(),
+  target_protein_g: z.number().nonnegative().optional(),
+  target_carbs_g: z.number().nonnegative().optional(),
+  target_fat_g: z.number().nonnegative().optional(),
 });
 
 export type Meal = z.infer<typeof mealSchema>;

@@ -4,10 +4,15 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Utensils, Droplets, Plus, Trash2, Save, ChevronDown, ChevronRight, Pencil, Sparkles } from 'lucide-react';
+import { Utensils, Droplets, Plus, Trash2, Save, ChevronDown, ChevronRight, Pencil, Sparkles, Clock, Target } from 'lucide-react';
 import { InlineEditField } from './InlineEditField';
 import { GenerateMealsModal } from './GenerateMealsModal';
 import type { DietPlan, Meal } from '@/lib/schemas/protocol';
+
+// Detect if a meal is a slot-based meal (has target macros set)
+function isSlotBasedMeal(meal: Meal): boolean {
+  return meal.target_calories !== undefined && meal.target_calories > 0;
+}
 
 interface DietPlanViewProps {
   diet: DietPlan;
@@ -124,6 +129,8 @@ export function DietPlanView({ diet, editable = false, onChange, protocolId, onM
             {display.meals.map((meal, index) => {
               const expanded = isItemExpanded(index);
               const isEditing = editingMealIndex === index;
+              const isSlot = isSlotBasedMeal(meal);
+
               return (
                 <div key={index} className="py-3">
                   <div className="flex items-start justify-between mb-1">
@@ -133,8 +140,19 @@ export function DietPlanView({ diet, editable = false, onChange, protocolId, onM
                     >
                       {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                       <div>
-                        <p className="font-medium text-sm">{meal.name}</p>
-                        <p className="font-mono text-xs text-muted-foreground">{meal.time}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{meal.name}</p>
+                          {isSlot && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                              <Target className="h-3 w-3" />
+                              Slot
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span className="font-mono text-xs">{meal.time}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -150,8 +168,21 @@ export function DietPlanView({ diet, editable = false, onChange, protocolId, onM
                         </Button>
                       )}
                       <div className="text-right">
-                        <p className="font-mono text-sm font-medium tabular-nums">{meal.calories}<span className="text-xs text-muted-foreground ml-0.5">cal</span></p>
-                        <p className="font-mono text-xs text-muted-foreground tabular-nums">P {meal.protein_g}g · C {meal.carbs_g}g · F {meal.fat_g}g</p>
+                        {isSlot ? (
+                          <>
+                            <p className="font-mono text-sm font-semibold tabular-nums text-primary">
+                              {meal.target_calories}<span className="text-xs text-primary/70 ml-0.5">cal target</span>
+                            </p>
+                            <p className="font-mono text-xs text-primary/80 tabular-nums">
+                              P {Math.round(meal.target_protein_g || 0)}g · C {Math.round(meal.target_carbs_g || 0)}g · F {Math.round(meal.target_fat_g || 0)}g
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-mono text-sm font-medium tabular-nums">{meal.calories}<span className="text-xs text-muted-foreground ml-0.5">cal</span></p>
+                            <p className="font-mono text-xs text-muted-foreground tabular-nums">P {meal.protein_g}g · C {meal.carbs_g}g · F {meal.fat_g}g</p>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -176,11 +207,42 @@ export function DietPlanView({ diet, editable = false, onChange, protocolId, onM
                         </div>
                       </div>
                     ) : (
-                      <div className="ml-6">
-                        <ul className="list-disc list-inside text-sm text-muted-foreground">
-                          {meal.foods.map((food, i) => (<li key={i}>{food}</li>))}
-                        </ul>
-                        {meal.notes && <p className="mt-1 text-sm text-muted-foreground italic">{meal.notes}</p>}
+                      <div className="ml-6 mt-2 space-y-2">
+                        {/* Timing context for slot-based meals */}
+                        {isSlot && meal.timing_context && (
+                          <div className="border-l-2 border-l-info pl-3 py-1">
+                            <p className="text-xs text-muted-foreground">{meal.timing_context}</p>
+                          </div>
+                        )}
+
+                        {/* Notes/guidance */}
+                        {meal.notes && (
+                          <p className="text-sm text-muted-foreground">{meal.notes}</p>
+                        )}
+
+                        {/* Foods list */}
+                        {meal.foods.length > 0 ? (
+                          <ul className="list-disc list-inside text-sm text-muted-foreground">
+                            {meal.foods.map((food, i) => (<li key={i}>{food}</li>))}
+                          </ul>
+                        ) : isSlot ? (
+                          <div className="p-3 rounded-lg bg-muted/50 border border-dashed border-muted-foreground/30">
+                            <p className="text-xs text-muted-foreground italic">
+                              Choose your own foods to hit the macro targets above
+                            </p>
+                            {editable && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="mt-2 h-7 text-xs"
+                                onClick={() => handleStartEditing(index)}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add foods
+                              </Button>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                     )
                   )}
@@ -205,7 +267,7 @@ export function DietPlanView({ diet, editable = false, onChange, protocolId, onM
               <Button variant="outline" size="sm" onClick={handleAddMeal}><Plus className="h-4 w-4 mr-1" />Add meal</Button>
               {protocolId && onMealsGenerated && (
                 <Button variant="outline" size="sm" onClick={() => setGenerateModalOpen(true)}>
-                  <Sparkles className="h-4 w-4 mr-1" />Generate meals
+                  <Sparkles className="h-4 w-4 mr-1" />Generate timing
                 </Button>
               )}
             </div>

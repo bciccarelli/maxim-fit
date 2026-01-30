@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -13,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Loader2, Sparkles, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, Sparkles, Check, X, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import type { Meal } from '@/lib/schemas/protocol';
 
@@ -29,6 +28,7 @@ interface StreamResult {
   proposalId: string;
   meals: Meal[];
   reasoning: string;
+  timingStrategy?: string;
   macroComparison: MacroComparison;
 }
 
@@ -36,6 +36,7 @@ interface ProposalData {
   proposalId: string;
   meals: Meal[];
   reasoning: string;
+  timingStrategy?: string;
   macroComparison: MacroComparison;
 }
 
@@ -56,8 +57,6 @@ export function GenerateMealsModal({
 }: GenerateMealsModalProps) {
   const [state, setState] = useState<GenerateState>('input');
   const [mealCount, setMealCount] = useState(4);
-  const [preferences, setPreferences] = useState('');
-  const [exclusions, setExclusions] = useState('');
   const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
@@ -85,6 +84,7 @@ export function GenerateMealsModal({
         proposalId: streamResult.proposalId,
         meals: streamResult.meals,
         reasoning: streamResult.reasoning,
+        timingStrategy: streamResult.timingStrategy,
         macroComparison: streamResult.macroComparison,
       });
       setState('proposal');
@@ -110,8 +110,6 @@ export function GenerateMealsModal({
       body: JSON.stringify({
         protocolId,
         mealCount,
-        preferences: preferences.trim() || undefined,
-        exclusions: exclusions.trim() || undefined,
       }),
     });
   };
@@ -161,8 +159,6 @@ export function GenerateMealsModal({
   const handleClose = () => {
     setState('input');
     setMealCount(4);
-    setPreferences('');
-    setExclusions('');
     setProposal(null);
     setError(null);
     setExpandedMeal(null);
@@ -177,37 +173,40 @@ export function GenerateMealsModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate meal plan</DialogTitle>
+          <DialogTitle>Generate meal timing</DialogTitle>
           <DialogDescription>
-            AI will create meals that fit your macro targets using evidence-based nutrition.
+            AI will create meal slots with macro targets and timing guidance. You choose your own foods.
           </DialogDescription>
         </DialogHeader>
 
         {state === 'input' && (
           <div className="space-y-4">
             {/* Current targets display */}
-            <div className="grid grid-cols-4 gap-2 p-3 rounded-lg bg-muted">
-              <div className="text-center">
-                <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.calories)}</p>
-                <p className="text-xs text-muted-foreground">cal</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.protein_g)}g</p>
-                <p className="text-xs text-muted-foreground">protein</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.carbs_g)}g</p>
-                <p className="text-xs text-muted-foreground">carbs</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.fat_g)}g</p>
-                <p className="text-xs text-muted-foreground">fat</p>
+            <div className="p-3 rounded-lg bg-muted">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Daily targets</p>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="text-center">
+                  <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.calories)}</p>
+                  <p className="text-xs text-muted-foreground">cal</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.protein_g)}g</p>
+                  <p className="text-xs text-muted-foreground">protein</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.carbs_g)}g</p>
+                  <p className="text-xs text-muted-foreground">carbs</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-sm font-semibold tabular-nums">{formatMacro(currentMacros.fat_g)}g</p>
+                  <p className="text-xs text-muted-foreground">fat</p>
+                </div>
               </div>
             </div>
 
             <div>
               <Label htmlFor="mealCount" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Number of meals
+                Number of meal slots
               </Label>
               <Input
                 id="mealCount"
@@ -218,34 +217,9 @@ export function GenerateMealsModal({
                 onChange={(e) => setMealCount(Math.min(6, Math.max(2, parseInt(e.target.value) || 4)))}
                 className="font-mono mt-1"
               />
-            </div>
-
-            <div>
-              <Label htmlFor="preferences" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Preferences (optional)
-              </Label>
-              <Textarea
-                id="preferences"
-                placeholder="e.g., Mediterranean style, high protein breakfast, quick prep meals..."
-                value={preferences}
-                onChange={(e) => setPreferences(e.target.value)}
-                rows={2}
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="exclusions" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Exclusions (optional)
-              </Label>
-              <Textarea
-                id="exclusions"
-                placeholder="e.g., no dairy, avoid red meat, no shellfish..."
-                value={exclusions}
-                onChange={(e) => setExclusions(e.target.value)}
-                rows={2}
-                className="mt-1"
-              />
+              <p className="text-xs text-muted-foreground mt-1">
+                AI will distribute your daily macros across {mealCount} optimally-timed meals
+              </p>
             </div>
 
             <DialogFooter>
@@ -254,7 +228,7 @@ export function GenerateMealsModal({
               </Button>
               <Button onClick={handleGenerate}>
                 <Sparkles className="h-4 w-4 mr-2" />
-                Generate meals
+                Generate timing
               </Button>
             </DialogFooter>
           </div>
@@ -263,85 +237,70 @@ export function GenerateMealsModal({
         {state === 'streaming' && (
           <div className="space-y-4">
             <div className="border-l-2 border-l-info pl-4 py-2">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">AI reasoning</p>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Analyzing schedule</p>
               <div className="max-h-[300px] overflow-y-auto">
                 {streamedText ? (
                   <p className="text-sm whitespace-pre-wrap">{streamedText}</p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Researching nutritional data...</p>
+                  <p className="text-sm text-muted-foreground">Researching optimal nutrient timing...</p>
                 )}
                 <div ref={reasoningEndRef} />
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
-              {streamedText ? 'Generating meal plan...' : 'Looking up nutritional information...'}
+              {streamedText ? 'Generating meal slots...' : 'Analyzing your schedule and goals...'}
             </div>
           </div>
         )}
 
         {state === 'proposal' && proposal && (
           <div className="space-y-4">
+            {/* Timing strategy */}
+            {proposal.timingStrategy && (
+              <div className="border-l-2 border-l-primary pl-4 py-2">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Timing strategy</p>
+                <p className="text-sm">{proposal.timingStrategy}</p>
+              </div>
+            )}
+
             {/* Reasoning */}
             <div className="border-l-2 border-l-info pl-4 py-2">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">AI reasoning</p>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Reasoning</p>
               <p className="text-sm">{proposal.reasoning}</p>
             </div>
 
-            {/* Macro comparison */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-muted">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Current totals</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.current.calories)}</span>
-                    <span className="text-xs text-muted-foreground ml-1">cal</span>
-                  </div>
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.current.protein_g)}g</span>
-                    <span className="text-xs text-muted-foreground ml-1">P</span>
-                  </div>
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.current.carbs_g)}g</span>
-                    <span className="text-xs text-muted-foreground ml-1">C</span>
-                  </div>
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.current.fat_g)}g</span>
-                    <span className="text-xs text-muted-foreground ml-1">F</span>
-                  </div>
+            {/* Macro totals */}
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Total macro distribution</p>
+              <div className="grid grid-cols-4 gap-2 text-sm">
+                <div className="text-center">
+                  <span className="font-mono tabular-nums font-semibold">{formatMacro(proposal.macroComparison.proposed.calories)}</span>
+                  <p className="text-xs text-muted-foreground">cal</p>
                 </div>
-              </div>
-              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Proposed totals</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.proposed.calories)}</span>
-                    <span className="text-xs text-muted-foreground ml-1">cal</span>
-                  </div>
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.proposed.protein_g)}g</span>
-                    <span className="text-xs text-muted-foreground ml-1">P</span>
-                  </div>
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.proposed.carbs_g)}g</span>
-                    <span className="text-xs text-muted-foreground ml-1">C</span>
-                  </div>
-                  <div>
-                    <span className="font-mono tabular-nums">{formatMacro(proposal.macroComparison.proposed.fat_g)}g</span>
-                    <span className="text-xs text-muted-foreground ml-1">F</span>
-                  </div>
+                <div className="text-center">
+                  <span className="font-mono tabular-nums font-semibold">{formatMacro(proposal.macroComparison.proposed.protein_g)}g</span>
+                  <p className="text-xs text-muted-foreground">protein</p>
+                </div>
+                <div className="text-center">
+                  <span className="font-mono tabular-nums font-semibold">{formatMacro(proposal.macroComparison.proposed.carbs_g)}g</span>
+                  <p className="text-xs text-muted-foreground">carbs</p>
+                </div>
+                <div className="text-center">
+                  <span className="font-mono tabular-nums font-semibold">{formatMacro(proposal.macroComparison.proposed.fat_g)}g</span>
+                  <p className="text-xs text-muted-foreground">fat</p>
                 </div>
               </div>
             </div>
 
-            {/* Proposed meals */}
+            {/* Proposed meal slots */}
             <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Proposed meals</p>
-              <div className="divide-y divide-border max-h-[200px] overflow-y-auto rounded-lg border">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Meal slots</p>
+              <div className="divide-y divide-border max-h-[250px] overflow-y-auto rounded-lg border">
                 {proposal.meals.map((meal, index) => {
                   const isExpanded = expandedMeal === index;
                   return (
-                    <div key={index} className="p-2">
+                    <div key={index} className="p-3">
                       <div
                         className="flex items-center justify-between cursor-pointer"
                         onClick={() => setExpandedMeal(isExpanded ? null : index)}
@@ -354,28 +313,37 @@ export function GenerateMealsModal({
                           )}
                           <div>
                             <p className="text-sm font-medium">{meal.name}</p>
-                            <p className="font-mono text-xs text-muted-foreground">{meal.time}</p>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span className="font-mono text-xs">{meal.time}</span>
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-mono text-xs tabular-nums">
-                            {meal.calories}<span className="text-muted-foreground">cal</span>
+                          <p className="font-mono text-sm font-semibold tabular-nums">
+                            {meal.target_calories || meal.calories}<span className="text-xs text-muted-foreground ml-0.5">cal</span>
                           </p>
                           <p className="font-mono text-xs text-muted-foreground tabular-nums">
-                            P {Math.round(meal.protein_g)}g · C {Math.round(meal.carbs_g)}g · F {Math.round(meal.fat_g)}g
+                            P {Math.round(meal.target_protein_g || meal.protein_g)}g · C {Math.round(meal.target_carbs_g || meal.carbs_g)}g · F {Math.round(meal.target_fat_g || meal.fat_g)}g
                           </p>
                         </div>
                       </div>
                       {isExpanded && (
-                        <div className="ml-6 mt-2">
-                          <ul className="list-disc list-inside text-sm text-muted-foreground">
-                            {meal.foods.map((food, i) => (
-                              <li key={i}>{food}</li>
-                            ))}
-                          </ul>
-                          {meal.notes && (
-                            <p className="mt-1 text-sm text-muted-foreground italic">{meal.notes}</p>
+                        <div className="ml-6 mt-3 space-y-2">
+                          {/* Timing context */}
+                          {meal.timing_context && (
+                            <div className="border-l-2 border-l-info pl-3 py-1">
+                              <p className="text-xs text-muted-foreground">{meal.timing_context}</p>
+                            </div>
                           )}
+                          {/* Notes/guidance */}
+                          {meal.notes && (
+                            <p className="text-sm text-muted-foreground">{meal.notes}</p>
+                          )}
+                          {/* Empty foods note */}
+                          <p className="text-xs text-muted-foreground italic">
+                            You&apos;ll choose your own foods to hit these targets
+                          </p>
                         </div>
                       )}
                     </div>
@@ -402,7 +370,7 @@ export function GenerateMealsModal({
                 ) : (
                   <>
                     <Check className="h-4 w-4 mr-2" />
-                    Accept meals
+                    Accept timing
                   </>
                 )}
               </Button>

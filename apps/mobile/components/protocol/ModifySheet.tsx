@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState, useCallback } from 'react';
-import { X, Wand2, Check, XCircle } from 'lucide-react-native';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { X, Wand2, Check, XCircle, CheckCircle2 } from 'lucide-react-native';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { getStreamingStatus } from '@/lib/utils';
@@ -49,13 +49,30 @@ export function ModifySheet({
   const [proposal, setProposal] = useState<ModifyProposal | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<string[]>([]);
+  const lastStatusRef = useRef<string>('');
 
   const { streamedText, error, isStreaming, startStream, reset } = useSSEStream<ModifyProposal>();
+
+  // Track status changes and build history
+  const currentStatus = getStreamingStatus(streamedText);
+  useEffect(() => {
+    if (state === 'streaming' && currentStatus !== lastStatusRef.current) {
+      lastStatusRef.current = currentStatus;
+      setStatusHistory(prev => {
+        // Don't add duplicates
+        if (prev.includes(currentStatus)) return prev;
+        return [...prev, currentStatus];
+      });
+    }
+  }, [currentStatus, state]);
 
   const handleSubmit = useCallback(async () => {
     if (!message.trim()) return;
 
     setState('streaming');
+    setStatusHistory([]);
+    lastStatusRef.current = '';
     reset();
 
     const headers = await getAuthHeaders();
@@ -139,6 +156,8 @@ export function ModifySheet({
     setState('input');
     setMessage('');
     setProposal(null);
+    setStatusHistory([]);
+    lastStatusRef.current = '';
     reset();
     onClose();
   }, [onClose, reset]);
@@ -194,10 +213,29 @@ export function ModifySheet({
 
           {state === 'streaming' && (
             <View style={styles.streamingContainer}>
-              <ActivityIndicator size="large" color="#2d5a2d" />
-              <Text style={styles.streamingStatus}>
-                {getStreamingStatus(streamedText)}
-              </Text>
+              <View style={styles.progressList}>
+                {statusHistory.map((status, index) => {
+                  const isCurrentStep = index === statusHistory.length - 1;
+                  return (
+                    <View key={status} style={styles.progressItem}>
+                      <View style={styles.progressIconContainer}>
+                        {isCurrentStep ? (
+                          <ActivityIndicator size="small" color="#2d5a2d" />
+                        ) : (
+                          <CheckCircle2 size={18} color="#2d5a2d" />
+                        )}
+                      </View>
+                      <Text style={[
+                        styles.progressText,
+                        isCurrentStep && styles.progressTextActive,
+                        !isCurrentStep && styles.progressTextComplete,
+                      ]}>
+                        {status.replace('...', '')}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           )}
 
@@ -338,16 +376,33 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   streamingContainer: {
+    paddingVertical: 24,
+  },
+  progressList: {
+    gap: 12,
+  },
+  progressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  progressIconContainer: {
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 16,
   },
-  streamingStatus: {
-    fontSize: 15,
-    fontWeight: '500',
+  progressText: {
+    fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    flex: 1,
+  },
+  progressTextActive: {
+    color: '#2d5a2d',
+    fontWeight: '600',
+  },
+  progressTextComplete: {
     color: '#666',
-    textAlign: 'center',
   },
   reasoningCard: {
     backgroundColor: '#fff',

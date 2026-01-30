@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
-import { MessageCircle, Wand2 } from 'lucide-react-native';
+import { Wand2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { normalizeProtocol } from '@protocol/shared/schemas';
 import type { DailyProtocol } from '@protocol/shared/schemas';
@@ -92,23 +92,15 @@ export default function ProtocolDetailScreen() {
         options={{
           title: protocol.name || 'Protocol',
           headerRight: () => (
-            <View style={styles.headerActions}>
-              <Pressable
-                style={styles.headerButton}
-                onPress={() => setShowAskSheet(true)}
-              >
-                <MessageCircle size={22} color="#fff" />
-              </Pressable>
-              <Pressable
-                style={styles.headerButton}
-                onPress={() => {
-                  setModifyInitialMessage('');
-                  setShowModifySheet(true);
-                }}
-              >
-                <Wand2 size={22} color="#fff" />
-              </Pressable>
-            </View>
+            <Pressable
+              style={styles.headerButton}
+              onPress={() => {
+                setModifyInitialMessage('');
+                setShowModifySheet(true);
+              }}
+            >
+              <Wand2 size={22} color="#fff" />
+            </Pressable>
           ),
         }}
       />
@@ -195,10 +187,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#c62828',
     textAlign: 'center',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
   },
   headerButton: {
     padding: 8,

@@ -782,32 +782,33 @@ export async function* askAboutProtocolStream(
 }
 
 // ---------------------------------------------------------------------------
-// Meal Generation
+// Meal Slot Generation (Macro Targets + Timing)
 // ---------------------------------------------------------------------------
 
-const mealsGenerationSchema = {
+const mealSlotsSchema = {
   type: 'object',
   properties: {
-    meals: {
+    meal_slots: {
       type: 'array',
       items: {
         type: 'object',
         properties: {
-          name: { type: 'string' },
-          time: { type: 'string', description: 'Meal time in HH:MM 24-hour format' },
-          foods: { type: 'array', items: { type: 'string' }, description: 'List of foods with portions (e.g., "200g grilled chicken breast")' },
-          calories: { type: 'integer', minimum: 1 },
-          protein_g: { type: 'number', minimum: 0 },
-          carbs_g: { type: 'number', minimum: 0 },
-          fat_g: { type: 'number', minimum: 0 },
-          notes: { type: 'string', description: 'Optional preparation tips or notes' },
+          name: { type: 'string', description: 'Meal name with context (e.g., "Pre-Workout Breakfast", "Post-Workout Recovery")' },
+          time: { type: 'string', description: 'Optimal time in HH:MM 24-hour format' },
+          timing_context: { type: 'string', description: 'Why this timing matters (e.g., "45-60 min before training for steady energy")' },
+          target_calories: { type: 'integer', minimum: 1 },
+          target_protein_g: { type: 'number', minimum: 0 },
+          target_carbs_g: { type: 'number', minimum: 0 },
+          target_fat_g: { type: 'number', minimum: 0 },
+          notes: { type: 'string', description: 'Nutritional guidance for this meal slot (e.g., "Higher carbs for workout fuel, low fat for fast digestion")' },
         },
-        required: ['name', 'time', 'foods', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
+        required: ['name', 'time', 'target_calories', 'target_protein_g', 'target_carbs_g', 'target_fat_g'],
       },
     },
-    reasoning: { type: 'string', description: 'Brief explanation of the meal plan design and how it meets the macro targets' },
+    reasoning: { type: 'string', description: 'Brief explanation of the overall meal timing strategy' },
+    timing_strategy: { type: 'string', description: 'Summary of nutrient timing principles applied' },
   },
-  required: ['meals', 'reasoning'],
+  required: ['meal_slots', 'reasoning', 'timing_strategy'],
 } as const;
 
 export interface MealGenerationInput {
@@ -821,20 +822,20 @@ export interface MealGenerationInput {
   dietaryRestrictions?: string[];
   schedule: { wakeTime: string; sleepTime: string };
   workoutTimes?: string[];
+  goals?: string;
 }
 
-function buildMealGenerationPrompt(input: MealGenerationInput): string {
+function buildMealSlotPrompt(input: MealGenerationInput): string {
   const {
     dailyCalories,
     proteinTargetG,
     carbsTargetG,
     fatTargetG,
     mealCount,
-    preferences,
-    exclusions,
     dietaryRestrictions,
     schedule,
     workoutTimes,
+    goals,
   } = input;
 
   const restrictionsText = dietaryRestrictions && dietaryRestrictions.length > 0
@@ -842,65 +843,79 @@ function buildMealGenerationPrompt(input: MealGenerationInput): string {
     : 'None';
 
   const workoutText = workoutTimes && workoutTimes.length > 0
-    ? `Workout times: ${workoutTimes.join(', ')}`
-    : 'No specific workout times';
+    ? workoutTimes.join(', ')
+    : 'Flexible / not specified';
 
-  return `You are an expert nutritionist creating a meal plan. Generate exactly ${mealCount} meals that hit the following macro targets.
+  return `You are an expert sports nutritionist creating a MEAL TIMING AND MACRO FRAMEWORK.
 
-## Macro Targets
-- Calories: ${dailyCalories}
-- Protein: ${proteinTargetG}g
-- Carbs: ${carbsTargetG}g
-- Fat: ${fatTargetG}g
+IMPORTANT: Do NOT prescribe specific foods. The user will choose their own foods within the macro targets.
+
+## Daily Macro Targets
+- Total Calories: ${dailyCalories}
+- Total Protein: ${proteinTargetG}g
+- Total Carbs: ${carbsTargetG}g
+- Total Fat: ${fatTargetG}g
 
 ## Schedule Context
 - Wake time: ${schedule.wakeTime}
 - Sleep time: ${schedule.sleepTime}
-- ${workoutText}
+- Workout times: ${workoutText}
+
+## User Goals
+${goals || 'General health and fitness'}
 
 ## Dietary Restrictions
 ${restrictionsText}
 
-## User Preferences
-${preferences || 'No specific preferences'}
-
-## Exclusions
-${exclusions || 'None'}
-
 ## Instructions
-1. Use Google Search to verify accurate nutritional information for foods.
-2. Space meals evenly between wake time (${schedule.wakeTime}) and sleep time (${schedule.sleepTime}).
-3. Apply nutrient timing principles:
-   - If workout times are provided, place higher-carb meals around those times
-   - Distribute protein evenly across meals (roughly ${Math.round(proteinTargetG / mealCount)}g per meal)
-   - Don't front-load all calories at breakfast
-4. Make meals practical and realistic with common ingredients.
-5. Each meal must include:
-   - name (e.g., "Breakfast", "Post-workout", "Dinner")
-   - time in HH:MM 24-hour format
-   - foods array with specific portions (e.g., "200g grilled chicken breast", "150g brown rice")
-   - accurate calories, protein_g, carbs_g, fat_g for the meal
-   - optional notes for preparation tips
-6. CRITICAL: Total macros across all meals must sum to within 5% of targets:
-   - Total calories: ${Math.round(dailyCalories * 0.95)} - ${Math.round(dailyCalories * 1.05)}
-   - Total protein: ${Math.round(proteinTargetG * 0.95)}g - ${Math.round(proteinTargetG * 1.05)}g
-   - Total carbs: ${Math.round(carbsTargetG * 0.95)}g - ${Math.round(carbsTargetG * 1.05)}g
-   - Total fat: ${Math.round(fatTargetG * 0.95)}g - ${Math.round(fatTargetG * 1.05)}g
-7. Provide brief reasoning explaining the meal plan design.
 
-Generate the meal plan now.`;
+Create exactly ${mealCount} MEAL SLOTS with macro targets distributed strategically:
+
+1. **Optimal Timing**: Space meals between wake (${schedule.wakeTime}) and sleep (${schedule.sleepTime}) based on:
+   - Circadian rhythm and digestion patterns
+   - Workout schedule (if provided)
+   - Protein distribution research (~${Math.round(proteinTargetG / mealCount)}g per meal for muscle protein synthesis)
+
+2. **Macro Distribution**: Distribute daily macros across slots:
+   - Protein: Even distribution for optimal MPS
+   - Carbs: Higher around workouts, lower in evening
+   - Fat: Moderate throughout, can be higher when carbs are lower
+
+3. **For Each Slot, Provide**:
+   - name: Descriptive name (e.g., "Pre-Workout Breakfast", "Post-Workout Recovery", "Evening Meal")
+   - time: Optimal time in HH:MM format
+   - timing_context: WHY this timing (e.g., "45-60 min before training for steady energy without GI distress")
+   - target_calories, target_protein_g, target_carbs_g, target_fat_g: Macro targets for this slot
+   - notes: Nutritional guidance (e.g., "Higher carbs, moderate protein, low fat for fast digestion")
+
+4. **Macro Totals Must Equal**:
+   - Total calories: ${dailyCalories} (within 2%)
+   - Total protein: ${proteinTargetG}g (within 2%)
+   - Total carbs: ${carbsTargetG}g (within 2%)
+   - Total fat: ${fatTargetG}g (within 2%)
+
+DO NOT include specific food recommendations. Only provide timing, macro targets, and nutritional guidance.
+
+Generate the meal slot framework now.`;
 }
 
 import type { Meal } from '../schemas/protocol';
 
+export interface MealSlotResult {
+  meals: Meal[];
+  reasoning: string;
+  timingStrategy: string;
+}
+
 /**
- * Stream meal plan generation. Yields text chunks, returns generated meals + reasoning.
+ * Stream meal slot generation. Outputs macro targets + timing, NOT specific foods.
+ * Yields text chunks, returns meal slots converted to Meal[] format.
  */
 export async function* generateMealsStream(
   input: MealGenerationInput
-): AsyncGenerator<string, { meals: Meal[]; reasoning: string }, unknown> {
+): AsyncGenerator<string, MealSlotResult, unknown> {
   const client = getGeminiClient();
-  const prompt = buildMealGenerationPrompt(input);
+  const prompt = buildMealSlotPrompt(input);
 
   const stream = await client.models.generateContentStream({
     model: MODEL_GROUNDED,
@@ -908,7 +923,7 @@ export async function* generateMealsStream(
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: 'application/json',
-      responseSchema: mealsGenerationSchema as any,
+      responseSchema: mealSlotsSchema as any,
     },
   });
 
@@ -923,21 +938,28 @@ export async function* generateMealsStream(
 
   const parsed = JSON.parse(fullText);
 
-  // Validate each meal has required fields
-  const meals: Meal[] = (parsed.meals || []).map((m: Record<string, unknown>) => ({
-    name: String(m.name || 'Meal'),
-    time: String(m.time || '12:00'),
-    foods: Array.isArray(m.foods) ? m.foods.map(String) : [],
-    calories: Math.max(1, Math.round(Number(m.calories) || 0)),
-    protein_g: Math.max(0, Number(m.protein_g) || 0),
-    carbs_g: Math.max(0, Number(m.carbs_g) || 0),
-    fat_g: Math.max(0, Number(m.fat_g) || 0),
-    notes: m.notes ? String(m.notes) : null,
+  // Convert meal slots to Meal[] format with target fields populated
+  const meals: Meal[] = (parsed.meal_slots || []).map((slot: Record<string, unknown>) => ({
+    name: String(slot.name || 'Meal'),
+    time: String(slot.time || '12:00'),
+    foods: [], // Empty - user fills in their own foods
+    calories: Math.max(1, Math.round(Number(slot.target_calories) || 0)),
+    protein_g: Math.max(0, Number(slot.target_protein_g) || 0),
+    carbs_g: Math.max(0, Number(slot.target_carbs_g) || 0),
+    fat_g: Math.max(0, Number(slot.target_fat_g) || 0),
+    notes: slot.notes ? String(slot.notes) : null,
+    // Slot-specific fields
+    timing_context: slot.timing_context ? String(slot.timing_context) : null,
+    target_calories: Math.max(1, Math.round(Number(slot.target_calories) || 0)),
+    target_protein_g: Math.max(0, Number(slot.target_protein_g) || 0),
+    target_carbs_g: Math.max(0, Number(slot.target_carbs_g) || 0),
+    target_fat_g: Math.max(0, Number(slot.target_fat_g) || 0),
   }));
 
   return {
     meals,
-    reasoning: parsed.reasoning || 'Meal plan generated based on your macro targets.',
+    reasoning: parsed.reasoning || 'Meal slots generated based on your macro targets and schedule.',
+    timingStrategy: parsed.timing_strategy || '',
   };
 }
 
