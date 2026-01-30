@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,24 @@ interface ProtocolListItem {
   name: string | null;
   created_at: string;
   version: number | null;
+  version_chain_id: string;
   weighted_goal_score: number | null;
   viability_score: number | null;
+}
+
+interface ProtocolVersion {
+  id: string;
+  name: string | null;
+  version: number;
+  version_chain_id: string;
+  is_current: boolean;
+  change_note: string | null;
+  change_source: string | null;
+  verified: boolean;
+  verified_at: string | null;
+  weighted_goal_score: number | null;
+  viability_score: number | null;
+  created_at: string;
 }
 
 interface SelectedProtocol {
@@ -54,10 +70,20 @@ function formatDate(dateString: string): string {
   });
 }
 
-function formatLabel(p: ProtocolListItem): string {
-  const displayName = p.name || (p.version != null && p.version > 1 ? `v${p.version}` : 'Protocol');
-  const date = formatDate(p.created_at);
-  return `${displayName} \u2014 ${date}`;
+const changeSourceLabels: Record<string, string> = {
+  generated: 'Generated',
+  imported: 'Imported',
+  direct_edit: 'Edited',
+  ai_modify: 'AI Modified',
+  critique_apply: 'Critique Applied',
+  revert: 'Reverted',
+};
+
+function getVersionLabel(version: ProtocolVersion): string {
+  const source = version.change_source
+    ? changeSourceLabels[version.change_source] || version.change_source
+    : '';
+  return `v${version.version}${source ? ` – ${source}` : ''}`;
 }
 
 export function DashboardProtocolView({
@@ -70,13 +96,52 @@ export function DashboardProtocolView({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const options = protocols.map((p) => ({
-    value: p.id,
-    label: formatLabel(p),
-  }));
+  // Version dropdown state
+  const [versions, setVersions] = useState<ProtocolVersion[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
 
   const isVerified = selectedProtocol.verified ?? false;
   const versionChainId = selectedProtocol.version_chain_id ?? selectedProtocol.id;
+
+  // Find current protocol chain from the list
+  const currentChain = protocols.find(
+    (p) => p.version_chain_id === versionChainId
+  );
+
+  // Protocol dropdown options (unique chains)
+  const protocolOptions = protocols.map((p) => ({
+    value: p.version_chain_id,
+    label: p.name || 'Untitled Protocol',
+  }));
+
+  // Version dropdown options
+  const versionOptions = versions.map((v) => ({
+    value: v.id,
+    label: getVersionLabel(v),
+  }));
+
+  // Fetch versions when chain changes
+  const fetchVersions = useCallback(async (chainId: string) => {
+    setIsLoadingVersions(true);
+    try {
+      const response = await fetch(`/api/protocol/versions?chainId=${chainId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setVersions(data.versions || []);
+      }
+    } catch (error) {
+      console.error('Error fetching versions:', error);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  }, []);
+
+  // Fetch versions on mount and when chain changes
+  useEffect(() => {
+    if (versionChainId) {
+      fetchVersions(versionChainId);
+    }
+  }, [versionChainId, fetchVersions]);
 
   const handleDelete = async () => {
     if (!confirmDelete) {
@@ -209,53 +274,89 @@ export function DashboardProtocolView({
         </div>
       </div>
 
-      {/* Row 2: Version selector + Delete */}
-      <div className="flex items-center gap-2 max-w-md">
-        <Select
-          options={options}
-          value={selectedProtocol.id}
-          onChange={(e) => {
-            setConfirmDelete(false);
-            router.push(`?protocol=${e.target.value}`, { scroll: false });
-          }}
-          className="font-mono text-sm"
-        />
-        {confirmDelete ? (
-          <div className="flex items-center gap-1">
+      {/* Row 2: Protocol + Version selectors + Delete */}
+      <div className="flex items-end gap-3">
+        {/* Protocol Selector */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Protocol
+          </label>
+          <Select
+            options={protocolOptions}
+            value={versionChainId}
+            onChange={(e) => {
+              setConfirmDelete(false);
+              // Find the current version for this chain and navigate to it
+              const chain = protocols.find((p) => p.version_chain_id === e.target.value);
+              if (chain) {
+                router.push(`?protocol=${chain.id}`, { scroll: false });
+              }
+            }}
+            className="min-w-[200px]"
+          />
+        </div>
+
+        {/* Version Selector */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Version
+          </label>
+          {isLoadingVersions ? (
+            <div className="h-10 min-w-[140px] flex items-center justify-center rounded-md border border-input bg-background">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <Select
+              options={versionOptions}
+              value={selectedProtocol.id}
+              onChange={(e) => {
+                setConfirmDelete(false);
+                router.push(`?protocol=${e.target.value}`, { scroll: false });
+              }}
+              className="min-w-[140px] font-mono text-sm"
+            />
+          )}
+        </div>
+
+        {/* Delete Button */}
+        <div className="flex items-center h-10">
+          {confirmDelete ? (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                aria-label="Confirm delete"
+              >
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(false)}
+                className="text-xs text-muted-foreground"
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
             <Button
               variant="ghost"
               size="icon"
               onClick={handleDelete}
-              disabled={deleting}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              aria-label="Confirm delete"
+              className="text-muted-foreground hover:text-destructive"
+              aria-label="Delete protocol"
             >
-              {deleting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
+              <Trash2 className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setConfirmDelete(false)}
-              className="text-xs text-muted-foreground"
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDelete}
-            className="text-muted-foreground hover:text-destructive"
-            aria-label="Delete protocol"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+          )}
+        </div>
       </div>
 
       <ProtocolDisplay

@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "ddc32224-ae1e-43d9-ba16-611484b20661"
+      }
+    },
+    "owner": "seatsignal",
+    "slug": "maximfit",
+    "android": {
+      "package": "com.seatsignal.maximfit"
+    },
+    "ios": {
+      "bundleIdentifier": "com.seatsignal.maximfit",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

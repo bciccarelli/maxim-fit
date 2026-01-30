@@ -17,7 +17,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Fetch lightweight protocol list for dropdown (current versions only)
   const { data: protocols } = await supabase
     .from('protocols')
-    .select('id, name, created_at, version, weighted_goal_score, viability_score')
+    .select('id, name, created_at, version, version_chain_id, weighted_goal_score, viability_score')
     .eq('user_id', user?.id)
     .eq('is_current', true)
     .order('created_at', { ascending: false });
