@@ -116,7 +116,7 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Image src="/wordmark.png" alt="oo.coach" width={80} height={30} />
+          <Image src="/logo.png" alt="Protocol" width={32} height={32} />
           <AuthButton />
         </div>
       </header>

@@ -27,7 +27,6 @@ export default async function PricingPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/logo.png" alt="Protocol" width={32} height={32} />
-            <Image src="/wordmark.png" alt="Protocol" width={80} height={20} className="hidden sm:block" />
           </Link>
           <AuthButton />
         </div>

@@ -16,7 +16,7 @@ export default function DashboardGroupLayout({
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link href="/dashboard">
-              <Image src="/wordmark.png" alt="oo.coach" width={100} height={25} />
+              <Image src="/logo.png" alt="Protocol" width={32} height={32} />
             </Link>
           </div>
           <div className="flex items-center gap-4">
