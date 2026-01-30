@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, Wand2, Check, X } from 'lucide-react';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
+import { getStreamingStatus } from '@/lib/utils';
 
 type ModifyState = 'input' | 'streaming' | 'proposal' | 'error';
 
@@ -58,7 +59,6 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
   const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
-  const reasoningEndRef = useRef<HTMLDivElement>(null);
 
   const {
     streamedText,
@@ -75,11 +75,6 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
       setMessage(initialMessage);
     }
   }, [initialMessage, open]);
-
-  // Auto-scroll reasoning as it streams
-  useEffect(() => {
-    reasoningEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [streamedText]);
 
   // Handle stream completion
   useEffect(() => {
@@ -204,22 +199,11 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
         )}
 
         {state === 'streaming' && (
-          <div className="space-y-4">
-            <div className="border-l-2 border-l-info pl-4 py-2">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">AI reasoning</p>
-              <div className="max-h-[300px] overflow-y-auto">
-                {streamedText ? (
-                  <p className="text-sm whitespace-pre-wrap">{streamedText}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Thinking...</p>
-                )}
-                <div ref={reasoningEndRef} />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {streamedText ? 'Generating modified protocol...' : 'Researching your suggestions...'}
-            </div>
+          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">
+              {getStreamingStatus(streamedText)}
+            </p>
           </div>
         )}
 

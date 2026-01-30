@@ -312,6 +312,20 @@ const verificationSchema = {
 } as const;
 
 /**
+ * Format training data as human-readable summary to reduce Gemini misreading JSON.
+ */
+function formatTrainingSummary(protocol: DailyProtocol): string {
+  if (!protocol.training?.workouts?.length) return 'No training workouts defined.';
+
+  return protocol.training.workouts.map(w => {
+    const exercises = w.exercises.map(e =>
+      `  - ${e.name}: ${e.sets} sets × ${e.reps} reps`
+    ).join('\n');
+    return `${w.name}:\n${exercises}`;
+  }).join('\n\n');
+}
+
+/**
  * Verify a protocol's evidence base using Google Search grounding.
  */
 export async function verifyProtocol(
@@ -327,6 +341,11 @@ ${JSON.stringify(config, null, 2)}
 
 ## Protocol to Verify
 ${JSON.stringify(protocol, null, 2)}
+
+## Training Data Reference
+The following is a human-readable summary of the training section for clarity:
+
+${formatTrainingSummary(protocol)}
 
 ## Verification Tasks
 
@@ -429,11 +448,21 @@ const askResultSchema = {
   required: ['answer', 'suggestsModification'],
 } as const;
 
+export type QAHistoryItem = { question: string; answer: string };
+
 function buildAskPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
-  question: string
+  question: string,
+  history: QAHistoryItem[] = []
 ): string {
+  const historySection = history.length > 0
+    ? `## Previous Conversation
+${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n')}
+
+`
+    : '';
+
   return `You are a knowledgeable health coach having a quick chat with the user about their protocol. Answer in 2-4 sentences. Be direct and conversational — no bullet points or formal structure unless specifically asked. If the question suggests a protocol change, briefly note the trade-off and suggest they use the Modify feature to make changes.
 
 ## User Configuration
@@ -442,7 +471,7 @@ ${JSON.stringify(config, null, 2)}
 ## Current Protocol
 ${JSON.stringify(protocol, null, 2)}
 
-## User's Question
+${historySection}## User's Question
 ${question}
 
 Answer concisely now.`;
@@ -454,11 +483,12 @@ Answer concisely now.`;
 export async function askAboutProtocol(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
-  question: string
+  question: string,
+  history: QAHistoryItem[] = []
 ): Promise<{ answer: string; suggestsModification: boolean }> {
   const client = getGeminiClient();
 
-  const prompt = buildAskPrompt(protocol, config, question);
+  const prompt = buildAskPrompt(protocol, config, question, history);
 
   const response = await client.models.generateContent({
     model: MODEL_GROUNDED,
@@ -723,10 +753,11 @@ Generate the modified protocol with reasoning now.`;
 export async function* askAboutProtocolStream(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
-  question: string
+  question: string,
+  history: QAHistoryItem[] = []
 ): AsyncGenerator<string, { answer: string; suggestsModification: boolean }, unknown> {
   const client = getGeminiClient();
-  const prompt = buildAskPrompt(protocol, config, question);
+  const prompt = buildAskPrompt(protocol, config, question, history);
 
   const stream = await client.models.generateContentStream({
     model: MODEL_GROUNDED,

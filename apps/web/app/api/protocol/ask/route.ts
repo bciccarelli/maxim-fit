@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { askAboutProtocol, askAboutProtocolStream } from '@/lib/gemini/generation';
+import { askAboutProtocol, askAboutProtocolStream, type QAHistoryItem } from '@/lib/gemini/generation';
 import { normalizeProtocol } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       }, { status: 402 });
     }
 
-    const { protocolId, question } = await request.json();
+    const { protocolId, question, sessionStart } = await request.json();
 
     if (!protocolId || typeof protocolId !== 'string') {
       return NextResponse.json({ error: 'Protocol ID is required' }, { status: 400 });
@@ -100,6 +100,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Protocol not found' }, { status: 404 });
     }
 
+    const versionChainId = protocol.version_chain_id ?? protocol.id;
+
+    // Fetch conversation history (limit to last 10 for context window)
+    let historyQuery = supabase
+      .from('protocol_questions')
+      .select('question, answer')
+      .eq('version_chain_id', versionChainId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(10);
+
+    // If sessionStart provided, only include history after that timestamp
+    if (sessionStart && typeof sessionStart === 'string') {
+      historyQuery = historyQuery.gt('created_at', sessionStart);
+    }
+
+    const { data: historyData } = await historyQuery;
+    const history: QAHistoryItem[] = historyData ?? [];
+
     const protocolData = normalizeProtocol(protocol.protocol_data);
     const config = buildConfig(protocol.user_configs);
     const askConfig = config?.success ? config.data : fallbackConfig;
@@ -109,7 +128,7 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            const generator = askAboutProtocolStream(protocolData, askConfig, question);
+            const generator = askAboutProtocolStream(protocolData, askConfig, question, history);
             let genResult: IteratorResult<string, { answer: string; suggestsModification: boolean }>;
             do {
               genResult = await generator.next();
@@ -155,7 +174,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming path
-    const { answer, suggestsModification } = await askAboutProtocol(protocolData, askConfig, question);
+    const { answer, suggestsModification } = await askAboutProtocol(protocolData, askConfig, question, history);
 
     // Save Q&A
     const { error: saveError } = await supabase

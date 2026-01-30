@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Loader2, Send, ArrowRight } from 'lucide-react';
+import { Loader2, Send, ArrowRight, MessageSquarePlus } from 'lucide-react';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import type { ProtocolQuestion } from '@/lib/schemas/protocol';
 
@@ -27,6 +27,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
   const [history, setHistory] = useState<ProtocolQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
+  const [sessionStart, setSessionStart] = useState<string | null>(null);
 
   const { streamedText, result, isStreaming, startStream, reset } = useSSEStream<{
     answer: string;
@@ -84,7 +85,11 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
     const finalResult = await startStream('/api/protocol/ask?stream=true', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ protocolId, question: q }),
+      body: JSON.stringify({
+        protocolId,
+        question: q,
+        sessionStart: sessionStart ?? undefined,
+      }),
     });
 
     if (!finalResult) {
@@ -93,8 +98,22 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
     }
   };
 
+  const handleNewChat = () => {
+    const now = new Date().toISOString();
+    setSessionStart(now);
+    setHistory([]);
+    setQuestion('');
+    setError(null);
+    reset();
+  };
+
+  // Filter history based on session start
+  const displayedHistory = sessionStart
+    ? history.filter((qa) => qa.created_at && qa.created_at > sessionStart)
+    : history;
+
   const handleExportToModify = () => {
-    const recent = history.slice(-3);
+    const recent = displayedHistory.slice(-3);
     const contextParts = recent.map((qa) => `Q: ${qa.question}\nA: ${qa.answer}`);
     const context = `Based on our discussion:\n${contextParts.join('\n\n')}\n\nPlease modify the protocol accordingly.`;
     onExportToModify?.(context);
@@ -112,7 +131,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
 
         {/* Q&A History */}
         <div className="flex-1 overflow-y-auto space-y-3 max-h-[400px]">
-          {history.length > 0 && history.map((qa) => (
+          {displayedHistory.length > 0 && displayedHistory.map((qa) => (
             <div key={qa.id} className="space-y-2">
               <div className="border-l-2 border-l-primary pl-4 py-1">
                 <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Question</p>
@@ -149,13 +168,19 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
           <div ref={historyEndRef} />
         </div>
 
-        {/* Export to Modify button */}
-        {onExportToModify && history.length > 0 && !isStreaming && (
-          <div className="pt-2">
-            <Button variant="outline" size="sm" onClick={handleExportToModify} className="w-full">
-              <ArrowRight className="h-4 w-4 mr-2" />
-              Export to modify
+        {/* Action buttons */}
+        {!isStreaming && (
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={handleNewChat}>
+              <MessageSquarePlus className="h-4 w-4 mr-2" />
+              New chat
             </Button>
+            {onExportToModify && displayedHistory.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleExportToModify} className="flex-1">
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Export to modify
+              </Button>
+            )}
           </div>
         )}
 
