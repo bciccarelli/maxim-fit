@@ -27,6 +27,10 @@ export interface UseSSEStreamReturn<T> {
  * - `data: {"error":"..."}` - Stream error
  */
 export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
+  // Use a ref for accumulated text to avoid closure issues
+  const accumulatedRef = useRef('');
+  // Use a counter to force re-renders since React Native may batch rapid state updates
+  const [, forceUpdate] = useState(0);
   const [streamedText, setStreamedText] = useState('');
   const [result, setResult] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +43,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
+    accumulatedRef.current = '';
     setStreamedText('');
     setResult(null);
     setError(null);
@@ -47,13 +52,13 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
 
   const startStream = useCallback(async (url: string, options?: RequestInit): Promise<T | null> => {
     // Reset state
+    accumulatedRef.current = '';
     setStreamedText('');
     setResult(null);
     setError(null);
     setIsStreaming(true);
 
     return new Promise((resolve) => {
-      let accumulated = '';
       let finalResult: T | null = null;
 
       // Create EventSource with POST support
@@ -68,17 +73,26 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
 
       // Handle messages
       es.addEventListener('message', (event) => {
-        if (!event.data) return;
+        console.log('[SSE] Message received:', typeof event.data, event.data?.substring?.(0, 100));
+        if (!event.data) {
+          console.log('[SSE] No event.data');
+          return;
+        }
 
         try {
           const message = JSON.parse(event.data);
+          console.log('[SSE] Parsed message keys:', Object.keys(message));
 
           if ('chunk' in message && typeof message.chunk === 'string') {
-            // Text chunk - accumulate
-            accumulated += message.chunk;
-            setStreamedText(accumulated);
+            // Text chunk - accumulate using ref to avoid closure issues
+            accumulatedRef.current += message.chunk;
+            console.log('[SSE] Chunk received, total length:', accumulatedRef.current.length);
+            // Update state and force re-render
+            setStreamedText(accumulatedRef.current);
+            forceUpdate(c => c + 1);
           } else if ('done' in message && message.done === true) {
             // Stream complete - extract result
+            console.log('[SSE] Done received');
             finalResult = message.result as T;
             setResult(finalResult);
             setIsStreaming(false);
@@ -87,21 +101,25 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
             resolve(finalResult);
           } else if ('error' in message) {
             // Stream error
+            console.log('[SSE] Error received:', message.error);
             setError(message.error);
             setIsStreaming(false);
             es.close();
             eventSourceRef.current = null;
             resolve(null);
+          } else if ('stage' in message) {
+            // Stage update (e.g., 'verifying') - ignore for now
+            console.log('[SSE] Stage:', message.stage);
           }
         } catch (parseError) {
           // Skip JSON parse errors
-          console.warn('SSE parse error:', parseError);
+          console.warn('[SSE] Parse error:', parseError, 'Data:', event.data?.substring?.(0, 50));
         }
       });
 
       // Handle errors
       es.addEventListener('error', (event) => {
-        console.error('SSE error:', event);
+        console.error('[SSE] Error event:', event);
 
         // Check if it's an HTTP error
         const errorEvent = event as unknown as { message?: string; status?: number };
@@ -122,7 +140,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
 
       // Handle connection open
       es.addEventListener('open', () => {
-        console.log('SSE connection opened');
+        console.log('[SSE] Connection opened to:', url);
       });
     });
   }, []);

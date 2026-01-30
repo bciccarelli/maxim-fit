@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { X, Wand2, Check, XCircle } from 'lucide-react-native';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
+import { getStreamingStatus } from '@/lib/utils';
 import { ScoreComparison } from './ScoreComparison';
 import type { DailyProtocol } from '@protocol/shared/schemas';
 
@@ -192,21 +193,12 @@ export function ModifySheet({
           )}
 
           {state === 'streaming' && (
-            <>
-              <View style={styles.streamingHeader}>
-                <ActivityIndicator size="small" color="#2d5a2d" />
-                <Text style={styles.streamingTitle}>Researching changes...</Text>
-              </View>
-
-              {streamedText ? (
-                <View style={styles.reasoningCard}>
-                  <Text style={styles.reasoningLabel}>AI Reasoning</Text>
-                  <Text style={styles.reasoningText}>{streamedText}</Text>
-                </View>
-              ) : (
-                <Text style={styles.thinkingText}>Analyzing your request...</Text>
-              )}
-            </>
+            <View style={styles.streamingContainer}>
+              <ActivityIndicator size="large" color="#2d5a2d" />
+              <Text style={styles.streamingStatus}>
+                {getStreamingStatus(streamedText)}
+              </Text>
+            </View>
           )}
 
           {state === 'proposal' && proposal && (
@@ -345,21 +337,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  streamingHeader: {
-    flexDirection: 'row',
+  streamingContainer: {
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 16,
   },
-  streamingTitle: {
+  streamingStatus: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#2d5a2d',
-  },
-  thinkingText: {
-    fontSize: 14,
-    color: '#999',
-    fontStyle: 'italic',
+    color: '#666',
+    textAlign: 'center',
   },
   reasoningCard: {
     backgroundColor: '#fff',
