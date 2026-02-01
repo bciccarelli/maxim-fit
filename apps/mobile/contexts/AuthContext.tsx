@@ -2,9 +2,9 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import {
-  configureGoogleSignIn,
   signInWithGoogle as googleSignIn,
   signOutFromGoogle,
+  configureGoogleSignIn,
 } from '@/lib/auth/google';
 import { signInWithApple as appleSignIn } from '@/lib/auth/apple';
 

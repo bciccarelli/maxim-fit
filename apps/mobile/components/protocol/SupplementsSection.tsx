@@ -1,35 +1,167 @@
-import { View, Text, StyleSheet } from 'react-native';
-import type { SupplementationPlan } from '@protocol/shared/schemas';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useState, useCallback } from 'react';
+import { Plus, Trash2, X } from 'lucide-react-native';
+import type { SupplementationPlan, Supplement } from '@protocol/shared/schemas';
+import { EditableField } from './EditableField';
+import { DosageInput } from './DosageInput';
 
 type Props = {
   supplementation: SupplementationPlan;
+  editable?: boolean;
+  onChange?: (supplementation: SupplementationPlan) => void;
 };
 
-export function SupplementsSection({ supplementation }: Props) {
+const EMPTY_SUPPLEMENT: Supplement = {
+  name: 'New Supplement',
+  dosage: '',
+  timing: '',
+  purpose: '',
+  notes: null,
+};
+
+export function SupplementsSection({
+  supplementation,
+  editable = false,
+  onChange,
+}: Props) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  const updateSupplement = useCallback(
+    (index: number, updates: Partial<Supplement>) => {
+      const newSupplements = [...supplementation.supplements];
+      newSupplements[index] = { ...newSupplements[index], ...updates };
+      onChange?.({ ...supplementation, supplements: newSupplements });
+    },
+    [supplementation, onChange]
+  );
+
+  const addSupplement = useCallback(() => {
+    const newSupplements = [...supplementation.supplements, { ...EMPTY_SUPPLEMENT }];
+    onChange?.({ ...supplementation, supplements: newSupplements });
+    setEditingIndex(newSupplements.length - 1);
+  }, [supplementation, onChange]);
+
+  const removeSupplement = useCallback(
+    (index: number) => {
+      const newSupplements = supplementation.supplements.filter((_, i) => i !== index);
+      onChange?.({ ...supplementation, supplements: newSupplements });
+      setEditingIndex(null);
+    },
+    [supplementation, onChange]
+  );
+
+  const renderSupplement = (supplement: Supplement, index: number) => {
+    const isEditing = editingIndex === index;
+    const isLast = index === supplementation.supplements.length - 1;
+
+    if (isEditing && editable) {
+      return (
+        <View
+          key={index}
+          style={[styles.supplementItem, !isLast && styles.supplementItemBorder]}
+        >
+          <View style={styles.editHeader}>
+            <Text style={styles.editLabel}>Edit Supplement</Text>
+            <View style={styles.editActions}>
+              <Pressable
+                style={styles.iconButton}
+                onPress={() => removeSupplement(index)}
+              >
+                <Trash2 size={18} color="#c62828" />
+              </Pressable>
+              <Pressable
+                style={styles.iconButton}
+                onPress={() => setEditingIndex(null)}
+              >
+                <X size={18} color="#666" />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.fieldLabel}>Name</Text>
+            <EditableField
+              value={supplement.name}
+              onChange={(name) => updateSupplement(index, { name })}
+              editable
+              style={styles.fieldValue}
+            />
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.fieldLabel}>Dosage</Text>
+            <DosageInput
+              value={supplement.dosage}
+              onChange={(dosage) => updateSupplement(index, { dosage })}
+            />
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.fieldLabel}>Timing</Text>
+            <EditableField
+              value={supplement.timing}
+              onChange={(timing) => updateSupplement(index, { timing })}
+              editable
+              style={styles.fieldValue}
+            />
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.fieldLabel}>Purpose</Text>
+            <EditableField
+              value={supplement.purpose}
+              onChange={(purpose) => updateSupplement(index, { purpose })}
+              editable
+              style={styles.fieldValue}
+            />
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.fieldLabel}>Notes</Text>
+            <EditableField
+              value={supplement.notes || ''}
+              onChange={(notes) => updateSupplement(index, { notes: notes || null })}
+              editable
+              style={styles.fieldValue}
+              placeholder="Optional"
+            />
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <Pressable
+        key={index}
+        style={[styles.supplementItem, !isLast && styles.supplementItemBorder]}
+        onPress={() => editable && setEditingIndex(index)}
+      >
+        <View style={styles.supplementHeader}>
+          <Text style={styles.supplementName}>{supplement.name}</Text>
+          <Text style={styles.supplementDosage}>{supplement.dosage}</Text>
+        </View>
+        <Text style={styles.supplementTiming}>{supplement.timing}</Text>
+        <Text style={styles.supplementPurpose}>{supplement.purpose}</Text>
+        {supplement.notes && (
+          <Text style={styles.supplementNotes}>Note: {supplement.notes}</Text>
+        )}
+      </Pressable>
+    );
+  };
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Supplements</Text>
 
       <View style={styles.card}>
-        {supplementation.supplements.map((supplement, index) => (
-          <View
-            key={index}
-            style={[
-              styles.supplementItem,
-              index < supplementation.supplements.length - 1 && styles.supplementItemBorder,
-            ]}
-          >
-            <View style={styles.supplementHeader}>
-              <Text style={styles.supplementName}>{supplement.name}</Text>
-              <Text style={styles.supplementDosage}>{supplement.dosage}</Text>
-            </View>
-            <Text style={styles.supplementTiming}>{supplement.timing}</Text>
-            <Text style={styles.supplementPurpose}>{supplement.purpose}</Text>
-            {supplement.notes && (
-              <Text style={styles.supplementNotes}>Note: {supplement.notes}</Text>
-            )}
-          </View>
-        ))}
+        {supplementation.supplements.map(renderSupplement)}
+
+        {editable && (
+          <Pressable style={styles.addButton} onPress={addSupplement}>
+            <Plus size={16} color="#2d5a2d" />
+            <Text style={styles.addButtonText}>Add supplement</Text>
+          </Pressable>
+        )}
 
         {supplementation.general_notes.length > 0 && (
           <View style={styles.notes}>
@@ -84,6 +216,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#1a2e1a',
+    flex: 1,
   },
   supplementDosage: {
     fontSize: 14,
@@ -123,5 +256,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 20,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  editLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2d5a2d',
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconButton: {
+    padding: 6,
+  },
+  editField: {
+    marginBottom: 12,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  fieldValue: {
+    fontSize: 14,
+    color: '#1a2e1a',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    gap: 6,
+  },
+  addButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2d5a2d',
   },
 });

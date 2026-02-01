@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+// SecureStore options for iOS - AFTER_FIRST_UNLOCK allows access when device
+// is locked (but has been unlocked at least once since boot), preventing
+// "User interaction is not allowed" errors during background token refresh
+const secureStoreOptions: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
 // SecureStore adapter for Supabase auth persistence (native only)
 const ExpoSecureStoreAdapter = {
   getItem: async (key: string) => {
@@ -13,7 +20,13 @@ const ExpoSecureStoreAdapter = {
       }
       return null;
     }
-    return await SecureStore.getItemAsync(key);
+    try {
+      return await SecureStore.getItemAsync(key, secureStoreOptions);
+    } catch (error) {
+      // Handle Keychain access errors gracefully (e.g., device locked)
+      console.warn('SecureStore getItem failed:', error);
+      return null;
+    }
   },
   setItem: async (key: string, value: string) => {
     if (Platform.OS === 'web') {
@@ -22,7 +35,11 @@ const ExpoSecureStoreAdapter = {
       }
       return;
     }
-    await SecureStore.setItemAsync(key, value);
+    try {
+      await SecureStore.setItemAsync(key, value, secureStoreOptions);
+    } catch (error) {
+      console.warn('SecureStore setItem failed:', error);
+    }
   },
   removeItem: async (key: string) => {
     if (Platform.OS === 'web') {
@@ -31,7 +48,11 @@ const ExpoSecureStoreAdapter = {
       }
       return;
     }
-    await SecureStore.deleteItemAsync(key);
+    try {
+      await SecureStore.deleteItemAsync(key, secureStoreOptions);
+    } catch (error) {
+      console.warn('SecureStore removeItem failed:', error);
+    }
   },
 };
 

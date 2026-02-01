@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import { Wand2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { normalizeProtocol } from '@protocol/shared/schemas';
 import type { DailyProtocol } from '@protocol/shared/schemas';
+import { fetchApi } from '@/lib/api';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
 import { AskSheet } from '@/components/protocol/AskSheet';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
@@ -70,6 +71,25 @@ export default function ProtocolDetailScreen() {
     // Navigate to the new protocol version
     router.replace(`/(app)/protocol/${newProtocolId}`);
   }, [router]);
+
+  const handleProtocolChange = useCallback(async (updatedProtocol: DailyProtocol) => {
+    if (!protocol) return;
+    try {
+      const result = await fetchApi<{ id: string }>('/api/protocol/edit', {
+        method: 'POST',
+        body: JSON.stringify({
+          protocolId: protocol.id,
+          protocolData: updatedProtocol,
+          changeNote: 'Direct edit (mobile)',
+        }),
+      });
+      // Navigate to the new version
+      router.replace(`/(app)/protocol/${result.id}`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+      throw error; // Re-throw so ProtocolTabs knows the save failed
+    }
+  }, [protocol, router]);
 
   if (isLoading) {
     return (
@@ -150,7 +170,11 @@ export default function ProtocolDetailScreen() {
       </View>
 
       {/* Protocol Tabs */}
-      <ProtocolTabs protocol={parsedData} />
+      <ProtocolTabs
+        protocol={parsedData}
+        editable={true}
+        onProtocolChange={handleProtocolChange}
+      />
 
       {/* Ask Sheet */}
       <AskSheet

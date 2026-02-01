@@ -1,10 +1,17 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { useState } from 'react';
-import type { DailyProtocol } from '@protocol/shared/schemas';
+import { useState, useCallback } from 'react';
+import type {
+  DailyProtocol,
+  ScheduleVariant,
+  DietPlan,
+  SupplementationPlan,
+  TrainingProgram,
+} from '@protocol/shared/schemas';
 import { ScheduleSection } from './ScheduleSection';
 import { DietSection } from './DietSection';
 import { SupplementsSection } from './SupplementsSection';
 import { TrainingSection } from './TrainingSection';
+import { SaveChangesButton } from './SaveChangesButton';
 
 type TabId = 'schedule' | 'diet' | 'supplements' | 'training';
 
@@ -22,21 +29,87 @@ const TABS: Tab[] = [
 
 interface ProtocolTabsProps {
   protocol: DailyProtocol;
+  editable?: boolean;
+  onProtocolChange?: (protocol: DailyProtocol) => Promise<void>;
 }
 
-export function ProtocolTabs({ protocol }: ProtocolTabsProps) {
+export function ProtocolTabs({
+  protocol,
+  editable = false,
+  onProtocolChange,
+}: ProtocolTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('schedule');
+  const [draft, setDraft] = useState<DailyProtocol>(protocol);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleScheduleChange = useCallback((schedules: ScheduleVariant[]) => {
+    setDraft((prev) => ({ ...prev, schedules }));
+    setDirty(true);
+  }, []);
+
+  const handleDietChange = useCallback((diet: DietPlan) => {
+    setDraft((prev) => ({ ...prev, diet }));
+    setDirty(true);
+  }, []);
+
+  const handleSupplementsChange = useCallback((supplementation: SupplementationPlan) => {
+    setDraft((prev) => ({ ...prev, supplementation }));
+    setDirty(true);
+  }, []);
+
+  const handleTrainingChange = useCallback((training: TrainingProgram) => {
+    setDraft((prev) => ({ ...prev, training }));
+    setDirty(true);
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!onProtocolChange || !dirty) return;
+    setSaving(true);
+    try {
+      await onProtocolChange(draft);
+      setDirty(false);
+    } finally {
+      setSaving(false);
+    }
+  }, [onProtocolChange, dirty, draft]);
+
+  const display = dirty ? draft : protocol;
 
   const renderContent = () => {
     switch (activeTab) {
       case 'schedule':
-        return <ScheduleSection schedules={protocol.schedules} />;
+        return (
+          <ScheduleSection
+            schedules={display.schedules}
+            editable={editable}
+            onChange={handleScheduleChange}
+          />
+        );
       case 'diet':
-        return <DietSection diet={protocol.diet} />;
+        return (
+          <DietSection
+            diet={display.diet}
+            editable={editable}
+            onChange={handleDietChange}
+          />
+        );
       case 'supplements':
-        return <SupplementsSection supplementation={protocol.supplementation} />;
+        return (
+          <SupplementsSection
+            supplementation={display.supplementation}
+            editable={editable}
+            onChange={handleSupplementsChange}
+          />
+        );
       case 'training':
-        return <TrainingSection training={protocol.training} />;
+        return (
+          <TrainingSection
+            training={display.training}
+            editable={editable}
+            onChange={handleTrainingChange}
+          />
+        );
       default:
         return null;
     }
@@ -64,11 +137,22 @@ export function ProtocolTabs({ protocol }: ProtocolTabsProps) {
       {/* Tab Content */}
       <ScrollView
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[
+          styles.contentContainer,
+          dirty && styles.contentContainerWithButton,
+        ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {renderContent()}
       </ScrollView>
+
+      {/* Save Button */}
+      {dirty && (
+        <View style={styles.saveButtonContainer}>
+          <SaveChangesButton onPress={handleSave} loading={saving} />
+        </View>
+      )}
     </View>
   );
 }
@@ -109,5 +193,18 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 32,
+  },
+  contentContainerWithButton: {
+    paddingBottom: 100,
+  },
+  saveButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: '#f5f5f0',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
   },
 });

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Linking, Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import {
   Bell,
   Clock,
@@ -9,9 +10,26 @@ import {
   Droplets,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
 } from 'lucide-react-native';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { NotificationToggleRow } from './NotificationToggleRow';
+
+async function requestNotificationPermissions(): Promise<boolean> {
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+
+  if (existingStatus === 'granted') {
+    return true;
+  }
+
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === 'granted';
+}
+
+async function checkNotificationPermissions(): Promise<boolean> {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status === 'granted';
+}
 
 const HYDRATION_INTERVALS = [30, 60, 90, 120];
 
@@ -20,6 +38,40 @@ export function NotificationSettingsCard() {
     useNotificationPreferences();
   const [scheduleExpanded, setScheduleExpanded] = useState(false);
   const [hydrationExpanded, setHydrationExpanded] = useState(false);
+  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    checkNotificationPermissions().then(setPermissionGranted);
+  }, []);
+
+  const handleEnableNotifications = async (enabled: boolean) => {
+    if (enabled) {
+      const granted = await requestNotificationPermissions();
+      setPermissionGranted(granted);
+
+      if (!granted) {
+        Alert.alert(
+          'Notifications Disabled',
+          'Please enable notifications in your device settings to receive protocol reminders.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                if (Platform.OS === 'ios') {
+                  Linking.openURL('app-settings:');
+                } else {
+                  Linking.openSettings();
+                }
+              },
+            },
+          ]
+        );
+        return;
+      }
+    }
+    updatePreferences({ enabled });
+  };
 
   if (isLoading || !preferences) {
     return (
@@ -46,8 +98,27 @@ export function NotificationSettingsCard() {
       <NotificationToggleRow
         label="Enable Notifications"
         value={preferences.enabled}
-        onChange={(enabled) => updatePreferences({ enabled })}
+        onChange={handleEnableNotifications}
       />
+
+      {/* Permission Warning */}
+      {preferences.enabled && permissionGranted === false && (
+        <Pressable
+          style={styles.permissionWarning}
+          onPress={() => {
+            if (Platform.OS === 'ios') {
+              Linking.openURL('app-settings:');
+            } else {
+              Linking.openSettings();
+            }
+          }}
+        >
+          <AlertCircle size={16} color="#c62828" />
+          <Text style={styles.permissionWarningText}>
+            Notifications are blocked. Tap to open settings.
+          </Text>
+        </Pressable>
+      )}
 
       <View style={styles.divider} />
 
@@ -423,5 +494,19 @@ const styles = StyleSheet.create({
   },
   intervalOptionTextDisabled: {
     color: '#999',
+  },
+  permissionWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  permissionWarningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#c62828',
   },
 });
