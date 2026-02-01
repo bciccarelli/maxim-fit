@@ -39,7 +39,7 @@ export function SupplementView({ supplementation, editable = false, onChange }: 
 
   const handleAddSupplement = () => {
     const newIndex = draft.supplements.length;
-    updateDraft({ ...draft, supplements: [...draft.supplements, { name: 'New supplement', dosage: '', timing: '', purpose: '', notes: null }] });
+    updateDraft({ ...draft, supplements: [...draft.supplements, { name: 'New supplement', dosage_amount: '', dosage_unit: 'mg', dosage_notes: null, timing: '', purpose: '', notes: null }] });
     setExpandedIndex(newIndex);
     setEditingIndex(newIndex);
   };
@@ -84,7 +84,10 @@ export function SupplementView({ supplementation, editable = false, onChange }: 
                       {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                       <div>
                         <p className="font-medium text-sm">{supplement.name}</p>
-                        <p className="font-mono text-sm text-primary">{supplement.dosage}</p>
+                        <p className="font-mono text-sm text-primary">
+                          {supplement.dosage_amount} {supplement.dosage_unit}
+                          {supplement.dosage_notes && <span className="text-muted-foreground"> ({supplement.dosage_notes})</span>}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -108,8 +111,12 @@ export function SupplementView({ supplementation, editable = false, onChange }: 
                       <div className="ml-6 mt-2 space-y-2">
                         <div className="grid grid-cols-2 gap-2">
                           <Input value={supplement.name} onChange={(e) => handleUpdateSupplement(index, 'name', e.target.value)} placeholder="Name" className="text-sm" />
-                          <Input value={supplement.dosage} onChange={(e) => handleUpdateSupplement(index, 'dosage', e.target.value)} placeholder="Dosage" className="font-mono text-sm" />
+                          <div className="flex gap-1">
+                            <Input value={supplement.dosage_amount} onChange={(e) => handleUpdateSupplement(index, 'dosage_amount', e.target.value)} placeholder="Amount" className="font-mono text-sm w-20" />
+                            <Input value={supplement.dosage_unit} onChange={(e) => handleUpdateSupplement(index, 'dosage_unit', e.target.value)} placeholder="Unit" className="text-sm w-20" />
+                          </div>
                         </div>
+                        <Input value={supplement.dosage_notes || ''} onChange={(e) => handleUpdateSupplement(index, 'dosage_notes', e.target.value)} placeholder="Dosage notes (e.g., standardized to 3%)" className="text-sm" />
                         <div className="grid grid-cols-2 gap-2">
                           <Input value={supplement.timing} onChange={(e) => handleUpdateSupplement(index, 'timing', e.target.value)} placeholder="Timing" className="text-sm" />
                           <Input value={supplement.purpose} onChange={(e) => handleUpdateSupplement(index, 'purpose', e.target.value)} placeholder="Purpose" className="text-sm" />

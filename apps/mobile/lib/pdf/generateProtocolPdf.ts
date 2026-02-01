@@ -144,11 +144,13 @@ function buildSupplementsHtml(supplementation: SupplementationPlan): string {
       <div class="supplements-list">
         ${supplementation.supplements
           .map(
-            (supp) => `
+            (supp) => {
+              const dosageDisplay = `${supp.dosage_amount} ${supp.dosage_unit}${supp.dosage_notes ? ` (${supp.dosage_notes})` : ''}`;
+              return `
           <div class="supplement-item">
             <div class="supp-header">
               <span class="supp-name">${escapeHtml(supp.name)}</span>
-              <span class="supp-dosage mono">${escapeHtml(supp.dosage)}</span>
+              <span class="supp-dosage mono">${escapeHtml(dosageDisplay)}</span>
             </div>
             <div class="supp-details">
               <span class="supp-timing">${escapeHtml(supp.timing)}</span>
@@ -156,7 +158,8 @@ function buildSupplementsHtml(supplementation: SupplementationPlan): string {
             </div>
             ${supp.notes ? `<div class="supp-notes">${escapeHtml(supp.notes)}</div>` : ''}
           </div>
-        `
+        `;
+            }
           )
           .join('')}
       </div>

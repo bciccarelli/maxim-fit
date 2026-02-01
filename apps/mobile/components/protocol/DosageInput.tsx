@@ -5,54 +5,53 @@ import { ChevronDown } from 'lucide-react-native';
 const DOSAGE_UNITS = ['mg', 'g', 'mcg', 'IU', 'ml', 'drops', 'capsules', 'tablets'];
 
 interface DosageInputProps {
-  value: string;
-  onChange: (value: string) => void;
+  amount: string;
+  unit: string;
+  notes: string | null | undefined;
+  onAmountChange: (amount: string) => void;
+  onUnitChange: (unit: string) => void;
+  onNotesChange: (notes: string | null) => void;
 }
 
-function parseDosage(value: string): { amount: string; unit: string } {
-  const match = value.match(/^([\d.]+)\s*(.*)$/);
-  if (match) {
-    return { amount: match[1], unit: match[2] || 'mg' };
-  }
-  return { amount: '', unit: 'mg' };
-}
-
-function formatDosage(amount: string, unit: string): string {
-  if (!amount) return '';
-  return `${amount} ${unit}`;
-}
-
-export function DosageInput({ value, onChange }: DosageInputProps) {
-  const parsed = parseDosage(value);
-  const [amount, setAmount] = useState(parsed.amount);
-  const [unit, setUnit] = useState(parsed.unit || 'mg');
+export function DosageInput({
+  amount,
+  unit,
+  notes,
+  onAmountChange,
+  onUnitChange,
+  onNotesChange,
+}: DosageInputProps) {
   const [showUnitPicker, setShowUnitPicker] = useState(false);
 
-  const handleAmountChange = (newAmount: string) => {
-    setAmount(newAmount);
-    onChange(formatDosage(newAmount, unit));
-  };
-
   const handleUnitSelect = (newUnit: string) => {
-    setUnit(newUnit);
     setShowUnitPicker(false);
-    onChange(formatDosage(amount, newUnit));
+    onUnitChange(newUnit);
   };
 
   return (
     <View style={styles.container}>
+      <View style={styles.topRow}>
+        <TextInput
+          style={styles.amountInput}
+          value={amount}
+          onChangeText={onAmountChange}
+          keyboardType="numeric"
+          placeholder="0"
+          placeholderTextColor="#999"
+        />
+        <Pressable style={styles.unitButton} onPress={() => setShowUnitPicker(true)}>
+          <Text style={styles.unitText}>{unit || 'mg'}</Text>
+          <ChevronDown size={16} color="#666" />
+        </Pressable>
+      </View>
+
       <TextInput
-        style={styles.amountInput}
-        value={amount}
-        onChangeText={handleAmountChange}
-        keyboardType="numeric"
-        placeholder="0"
+        style={styles.notesInput}
+        value={notes || ''}
+        onChangeText={(text) => onNotesChange(text || null)}
+        placeholder="Notes (e.g., standardized to 3%)"
         placeholderTextColor="#999"
       />
-      <Pressable style={styles.unitButton} onPress={() => setShowUnitPicker(true)}>
-        <Text style={styles.unitText}>{unit}</Text>
-        <ChevronDown size={16} color="#666" />
-      </Pressable>
 
       <Modal
         visible={showUnitPicker}
@@ -83,6 +82,9 @@ export function DosageInput({ value, onChange }: DosageInputProps) {
 
 const styles = StyleSheet.create({
   container: {
+    gap: 8,
+  },
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -96,6 +98,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 16,
     fontVariant: ['tabular-nums'],
+    color: '#1a2e1a',
+    backgroundColor: '#fff',
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
     color: '#1a2e1a',
     backgroundColor: '#fff',
   },

@@ -13,7 +13,9 @@ type Props = {
 
 const EMPTY_SUPPLEMENT: Supplement = {
   name: 'New Supplement',
-  dosage: '',
+  dosage_amount: '',
+  dosage_unit: 'mg',
+  dosage_notes: null,
   timing: '',
   purpose: '',
   notes: null,
@@ -91,8 +93,12 @@ export function SupplementsSection({
           <View style={styles.editField}>
             <Text style={styles.fieldLabel}>Dosage</Text>
             <DosageInput
-              value={supplement.dosage}
-              onChange={(dosage) => updateSupplement(index, { dosage })}
+              amount={supplement.dosage_amount}
+              unit={supplement.dosage_unit}
+              notes={supplement.dosage_notes}
+              onAmountChange={(dosage_amount) => updateSupplement(index, { dosage_amount })}
+              onUnitChange={(dosage_unit) => updateSupplement(index, { dosage_unit })}
+              onNotesChange={(dosage_notes) => updateSupplement(index, { dosage_notes })}
             />
           </View>
 
@@ -130,6 +136,10 @@ export function SupplementsSection({
       );
     }
 
+    const dosageDisplay = supplement.dosage_amount
+      ? `${supplement.dosage_amount} ${supplement.dosage_unit}${supplement.dosage_notes ? ` (${supplement.dosage_notes})` : ''}`
+      : '';
+
     return (
       <Pressable
         key={index}
@@ -138,7 +148,7 @@ export function SupplementsSection({
       >
         <View style={styles.supplementHeader}>
           <Text style={styles.supplementName}>{supplement.name}</Text>
-          <Text style={styles.supplementDosage}>{supplement.dosage}</Text>
+          <Text style={styles.supplementDosage}>{dosageDisplay}</Text>
         </View>
         <Text style={styles.supplementTiming}>{supplement.timing}</Text>
         <Text style={styles.supplementPurpose}>{supplement.purpose}</Text>

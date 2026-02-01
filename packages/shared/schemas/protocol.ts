@@ -88,7 +88,9 @@ export type DietPlan = z.infer<typeof dietPlanSchema>;
 
 export const supplementSchema = z.object({
   name: z.string(),
-  dosage: z.string(),
+  dosage_amount: z.string(),
+  dosage_unit: z.string(),
+  dosage_notes: z.string().optional().nullable(),
   timing: z.string(),
   purpose: z.string(),
   notes: z.string().optional().nullable(),
@@ -290,22 +292,79 @@ export type ProtocolQuestion = {
 // =============================================================================
 
 /**
+ * Parse legacy dosage string into structured fields.
+ * Examples:
+ * - "500 mg" -> { amount: "500", unit: "mg", notes: null }
+ * - "2000 IU (D3)" -> { amount: "2000", unit: "IU", notes: "D3" }
+ * - "500mg standardized to 3%" -> { amount: "500", unit: "mg", notes: "standardized to 3%" }
+ */
+function parseLegacyDosage(dosage: string): { amount: string; unit: string; notes: string | null } {
+  // Common units to look for
+  const units = ['mg', 'g', 'mcg', 'µg', 'IU', 'ml', 'drops', 'capsules', 'capsule', 'tablets', 'tablet'];
+
+  // Try to extract amount and unit
+  const match = dosage.match(/^([\d.,]+)\s*([a-zA-Zµ]+)/);
+  if (match) {
+    const amount = match[1].replace(',', '');
+    const rawUnit = match[2].toLowerCase();
+    const unit = units.find(u => rawUnit.startsWith(u.toLowerCase())) || rawUnit;
+
+    // Everything after the amount+unit is notes
+    const afterUnit = dosage.slice(match[0].length).trim();
+    // Clean up notes - remove leading parentheses, dashes, etc.
+    const notes = afterUnit.replace(/^[\(\-–—:,\s]+/, '').replace(/[\)]+$/, '').trim() || null;
+
+    return { amount, unit, notes };
+  }
+
+  // Fallback: can't parse, put everything in amount
+  return { amount: dosage, unit: '', notes: null };
+}
+
+/**
+ * Migrate legacy supplement with single dosage field to structured fields.
+ */
+function migrateSupplementDosage(supplement: Record<string, unknown>): Record<string, unknown> {
+  // Already migrated
+  if ('dosage_amount' in supplement && 'dosage_unit' in supplement) {
+    return supplement;
+  }
+
+  // Has legacy dosage field
+  if ('dosage' in supplement && typeof supplement.dosage === 'string') {
+    const parsed = parseLegacyDosage(supplement.dosage);
+    const { dosage, ...rest } = supplement;
+    return {
+      ...rest,
+      dosage_amount: parsed.amount,
+      dosage_unit: parsed.unit,
+      dosage_notes: parsed.notes,
+    };
+  }
+
+  // No dosage field at all - add defaults
+  return {
+    ...supplement,
+    dosage_amount: '',
+    dosage_unit: 'mg',
+    dosage_notes: null,
+  };
+}
+
+/**
  * Normalizes protocol data to the current schema format.
  * Converts legacy single-schedule format to the new multi-schedule format.
+ * Converts legacy supplement dosage strings to structured fields.
  */
 export function normalizeProtocol(data: unknown): DailyProtocol {
   const obj = data as Record<string, unknown>;
+  let converted = { ...obj };
 
-  // Already in new format with schedules array
-  if (Array.isArray(obj.schedules)) {
-    return dailyProtocolSchema.parse(data);
-  }
-
-  // Legacy format with singular schedule - convert to schedules array
-  if (obj.schedule && typeof obj.schedule === 'object') {
+  // Handle legacy schedule format
+  if (!Array.isArray(obj.schedules) && obj.schedule && typeof obj.schedule === 'object') {
     const legacySchedule = obj.schedule as DailySchedule;
-    const converted = {
-      ...obj,
+    converted = {
+      ...converted,
       schedules: [{
         label: 'Daily Schedule',
         days: ALL_DAYS,
@@ -314,12 +373,29 @@ export function normalizeProtocol(data: unknown): DailyProtocol {
         schedule: legacySchedule.schedule,
       }],
     };
-    // Remove the old schedule field
     delete (converted as Record<string, unknown>).schedule;
-    return dailyProtocolSchema.parse(converted);
   }
 
-  throw new Error('Invalid protocol format: missing schedule or schedules');
+  // Handle legacy supplement dosage format
+  if (converted.supplementation && typeof converted.supplementation === 'object') {
+    const supp = converted.supplementation as Record<string, unknown>;
+    if (Array.isArray(supp.supplements)) {
+      const migratedSupplements = supp.supplements.map((s: unknown) =>
+        migrateSupplementDosage(s as Record<string, unknown>)
+      );
+      converted.supplementation = {
+        ...supp,
+        supplements: migratedSupplements,
+      };
+    }
+  }
+
+  // Validate with schedules array
+  if (!Array.isArray(converted.schedules)) {
+    throw new Error('Invalid protocol format: missing schedule or schedules');
+  }
+
+  return dailyProtocolSchema.parse(converted);
 }
 
 /**

@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, MessageCircle, Wand2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { normalizeProtocol } from '@protocol/shared/schemas';
 import type { DailyProtocol } from '@protocol/shared/schemas';
@@ -157,6 +158,25 @@ export default function ProtocolsScreen() {
     // Refresh to get the new version
     await fetchVersions();
   }, [fetchVersions]);
+
+  const handleProtocolChange = useCallback(async (updatedProtocol: DailyProtocol) => {
+    if (!selectedVersion) return;
+    try {
+      await fetchApi<{ id: string }>('/api/protocol/edit', {
+        method: 'POST',
+        body: JSON.stringify({
+          protocolId: selectedVersion.id,
+          protocolData: updatedProtocol,
+          changeNote: 'Direct edit (mobile)',
+        }),
+      });
+      // Refresh versions to get the new version
+      await fetchVersions();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+      throw error;
+    }
+  }, [selectedVersion, fetchVersions]);
 
   const getVersionLabel = (version: ProtocolVersion) => {
     const sourceLabels: Record<string, string> = {
@@ -349,7 +369,11 @@ export default function ProtocolsScreen() {
 
       {/* Protocol Content */}
       {parsedData ? (
-        <ProtocolTabs protocol={parsedData} />
+        <ProtocolTabs
+          protocol={parsedData}
+          editable={true}
+          onProtocolChange={handleProtocolChange}
+        />
       ) : (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2d5a2d" />

@@ -142,7 +142,7 @@ export function ProtocolTabs({
           dirty && styles.contentContainerWithButton,
         ]}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
       >
         {renderContent()}
       </ScrollView>
