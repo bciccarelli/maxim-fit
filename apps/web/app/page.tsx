@@ -127,7 +127,10 @@ export default function HomePage() {
             {/* Hero */}
             <section className="container mx-auto px-4 pt-4 pb-8 text-center">
               <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
-                Optimize your protocol based on your requirements and goals
+                Optimize your protocol
+              </h1>
+              <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
+                Based on your requirements and goals
               </h1>
               <h2 className="text-1xl font-bold tracking-tight text-primary mb-4">
                 No cost to sign up for now
