@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Wand2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { normalizeProtocol } from '@protocol/shared/schemas';
-import type { DailyProtocol } from '@protocol/shared/schemas';
+import type { DailyProtocol, Critique, Citation } from '@protocol/shared/schemas';
 import { fetchApi } from '@/lib/api';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
 import { AskSheet } from '@/components/protocol/AskSheet';
@@ -19,6 +19,8 @@ type ProtocolRow = {
   weighted_goal_score: number | null;
   viability_score: number | null;
   version_chain_id: string;
+  critiques: Critique[] | null;
+  citations: Citation[] | null;
 };
 
 export default function ProtocolDetailScreen() {
@@ -38,7 +40,7 @@ export default function ProtocolDetailScreen() {
 
     const { data, error: fetchError } = await supabase
       .from('protocols')
-      .select('id, name, protocol_data, verified, weighted_goal_score, viability_score, version_chain_id')
+      .select('id, name, protocol_data, verified, weighted_goal_score, viability_score, version_chain_id, critiques, citations')
       .eq('id', protocolId)
       .single();
 
@@ -166,6 +168,10 @@ export default function ProtocolDetailScreen() {
         protocol={parsedData}
         editable={true}
         onProtocolChange={handleProtocolChange}
+        protocolId={protocol.id}
+        critiques={protocol.critiques}
+        citations={protocol.citations}
+        verified={protocol.verified}
       />
 
       {/* Ask Sheet */}

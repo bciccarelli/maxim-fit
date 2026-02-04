@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the imported protocol
-    const verification = await verifyProtocol(protocol, {
+    const { verification, citations } = await verifyProtocol(protocol, {
       ...configPayload,
       iterations: 1,
     });
@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
         requirement_scores: verification.requirement_scores,
         goal_scores: verification.goal_scores,
         critiques: verification.critiques,
+        citations,
         is_anonymous: false,
         expires_at: null,
         version: 1,
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
       protocol,
       goals,
       evaluation: verification,
+      citations,
       message: 'Protocol parsed, verified, and saved successfully',
     });
   } catch (error) {

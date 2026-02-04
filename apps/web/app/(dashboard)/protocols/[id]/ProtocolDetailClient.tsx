@@ -7,9 +7,10 @@ import { ProtocolActions } from '@/components/protocol/ProtocolActions';
 import { VersionHistory } from '@/components/protocol/VersionHistory';
 import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
 import { CritiquesSection } from '@/components/protocol/CritiquesSection';
+import { CitationsSection } from '@/components/protocol/CitationsSection';
 import { Button } from '@/components/ui/button';
 import { History } from 'lucide-react';
-import type { DailyProtocol, AdherenceScore, GoalScore, Critique } from '@/lib/schemas/protocol';
+import type { DailyProtocol, AdherenceScore, GoalScore, Critique, Citation } from '@/lib/schemas/protocol';
 import type { Tier } from '@/lib/stripe/config';
 
 interface ProtocolData {
@@ -19,6 +20,7 @@ interface ProtocolData {
   requirement_scores: AdherenceScore[] | null;
   goal_scores: GoalScore[] | null;
   critiques: Critique[] | null;
+  citations: Citation[] | null;
   requirements_met: boolean | null;
   weighted_goal_score: number | null;
   viability_score: number | null;
@@ -151,6 +153,10 @@ export function ProtocolDetailClient({ protocol, tier = 'free' }: ProtocolDetail
           protocolId={protocol.id}
           verified={isVerified}
         />
+      )}
+
+      {protocol.citations && protocol.citations.length > 0 && (
+        <CitationsSection citations={protocol.citations} />
       )}
 
       <VersionHistory

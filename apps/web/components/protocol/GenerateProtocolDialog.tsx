@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -8,7 +8,14 @@ import {
 } from '@/components/ui/dialog';
 import { ProtocolWizard } from '@/components/forms/ProtocolWizard';
 import { GenerationModal, type GenerationStage } from './GenerationModal';
+import { Loader2 } from 'lucide-react';
 import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
+
+interface UserConfig {
+  personal_info: PersonalInfo;
+  goals: Goal[];
+  requirements: string[];
+}
 
 interface GenerateProtocolDialogProps {
   open: boolean;
@@ -19,6 +26,27 @@ export function GenerateProtocolDialog({ open, onOpenChange }: GenerateProtocolD
   const router = useRouter();
   const [generationStage, setGenerationStage] = useState<GenerationStage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<UserConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configFetched, setConfigFetched] = useState(false);
+
+  // Fetch user's saved config when dialog opens
+  useEffect(() => {
+    if (open && !configFetched && !configLoading) {
+      setConfigLoading(true);
+      fetch('/api/config')
+        .then(res => res.json())
+        .then(data => {
+          setConfig(data.config ?? null);
+          setConfigFetched(true);
+        })
+        .catch(err => {
+          console.error('Error fetching config:', err);
+          setConfigFetched(true);
+        })
+        .finally(() => setConfigLoading(false));
+    }
+  }, [open, configFetched, configLoading]);
 
   const handleGenerate = async (inputConfig: {
     personal_info: PersonalInfo;
@@ -113,6 +141,11 @@ export function GenerateProtocolDialog({ open, onOpenChange }: GenerateProtocolD
           <div className="p-6">
             <GenerationModal stage={generationStage} error={error} inline />
           </div>
+        ) : configLoading ? (
+          <div className="p-6 flex flex-col items-center justify-center min-h-[400px]">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="mt-4 text-sm text-muted-foreground">Loading your settings...</p>
+          </div>
         ) : (
           <div className="p-6 space-y-6">
             <div>
@@ -131,6 +164,11 @@ export function GenerateProtocolDialog({ open, onOpenChange }: GenerateProtocolD
             <ProtocolWizard
               onGenerate={handleGenerate}
               isLoading={!!generationStage}
+              initialConfig={config ? {
+                personal_info: config.personal_info,
+                goals: config.goals,
+                requirements: config.requirements,
+              } : undefined}
             />
           </div>
         )}

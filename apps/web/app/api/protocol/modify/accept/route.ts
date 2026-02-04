@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { mergeCitations } from '@/lib/gemini/citations';
+import type { Citation } from '@/lib/schemas/protocol';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
       .eq('id', current.id)
       .eq('user_id', user.id);
 
-    // Extract scores from proposed_scores
+    // Extract scores from proposed_scores (now includes citations)
     const proposedScores = modification.proposed_scores as {
       weighted_goal_score?: number;
       viability_score?: number;
@@ -56,9 +58,15 @@ export async function POST(request: NextRequest) {
       requirement_scores?: unknown;
       goal_scores?: unknown;
       critiques?: unknown;
+      citations?: Citation[];
     } | null;
 
-    // Create new version with proposed data
+    // Merge citations from the proposal with existing citations on the current protocol
+    const existingCitations = (current.citations as Citation[]) || [];
+    const proposedCitations = proposedScores?.citations || [];
+    const mergedCitations = mergeCitations(existingCitations, proposedCitations);
+
+    // Create new version with proposed data and merged citations
     const { data: newVersion, error: insertError } = await supabase
       .from('protocols')
       .insert({
@@ -80,6 +88,7 @@ export async function POST(request: NextRequest) {
         requirement_scores: proposedScores?.requirement_scores ?? null,
         goal_scores: proposedScores?.goal_scores ?? null,
         critiques: proposedScores?.critiques ?? null,
+        citations: mergedCitations,
         iteration: current.iteration,
         is_anonymous: false,
       })

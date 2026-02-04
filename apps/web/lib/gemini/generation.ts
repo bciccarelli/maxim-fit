@@ -1,7 +1,8 @@
 import { getGeminiClient, MODEL_GROUNDED, MODEL_FAST } from './client';
-import { dailyProtocolSchema, normalizeProtocol, type DailyProtocol, type VerificationResult } from '../schemas/protocol';
+import { dailyProtocolSchema, normalizeProtocol, type DailyProtocol, type VerificationResult, type Citation } from '../schemas/protocol';
 import type { UserConfig, AnonymousUserConfig } from '../schemas/user-config';
 import { goalSchema, type Goal } from '../schemas/user-config';
+import { extractCitations, getGroundingMetadata } from './citations';
 
 /**
  * Validate and fix corrupted exercise data from Gemini responses.
@@ -44,21 +45,22 @@ export const dailyProtocolGeminiSchema = {
           },
           wake_time: { type: 'string', description: 'Wake time in HH:MM 24-hour format, e.g. "07:00"' },
           sleep_time: { type: 'string', description: 'Sleep time in HH:MM 24-hour format, e.g. "22:00"' },
-          schedule: {
+          other_events: {
             type: 'array',
+            description: 'Events that are NOT meals, supplements, or workouts. Includes activities like morning routine, commute, wind down, meditation, work, etc.',
             items: {
               type: 'object',
               properties: {
                 start_time: { type: 'string', description: 'Start time in HH:MM 24-hour format, e.g. "07:00"' },
                 end_time: { type: 'string', description: 'End time in HH:MM 24-hour format, e.g. "08:00"' },
-                activity: { type: 'string' },
-                requirement_satisfied: { type: 'string' },
+                activity: { type: 'string', description: 'Activity name, e.g. "Morning routine", "Commute", "Work", "Wind down"' },
+                requirement_satisfied: { type: 'string', description: 'Optional: name of requirement this activity satisfies' },
               },
               required: ['start_time', 'end_time', 'activity'],
             },
           },
         },
-        required: ['days', 'wake_time', 'sleep_time', 'schedule'],
+        required: ['days', 'wake_time', 'sleep_time', 'other_events'],
       },
     },
     diet: {
@@ -102,11 +104,12 @@ export const dailyProtocolGeminiSchema = {
               dosage_amount: { type: 'string', description: 'Numeric amount only, e.g. "500", "2000", "1"' },
               dosage_unit: { type: 'string', description: 'Unit of measurement, e.g. "mg", "g", "mcg", "IU", "capsules"' },
               dosage_notes: { type: 'string', description: 'Optional notes about the dosage, e.g. "standardized to 3%", "elemental magnesium"' },
-              timing: { type: 'string' },
+              time: { type: 'string', description: 'Specific time to take the supplement in HH:MM 24-hour format, e.g. "07:00", "12:00", "21:30"' },
+              timing: { type: 'string', description: 'Context for when to take the supplement, e.g. "Morning with breakfast", "Before bed", "Post-workout"' },
               purpose: { type: 'string' },
               notes: { type: 'string' },
             },
-            required: ['name', 'dosage_amount', 'dosage_unit', 'timing', 'purpose'],
+            required: ['name', 'dosage_amount', 'dosage_unit', 'time', 'timing', 'purpose'],
           },
         },
         general_notes: { type: 'array', items: { type: 'string' } },
@@ -125,6 +128,7 @@ export const dailyProtocolGeminiSchema = {
             properties: {
               name: { type: 'string' },
               day: { type: 'string' },
+              time: { type: 'string', description: 'Workout start time in HH:MM 24-hour format, e.g. "06:00", "17:30"' },
               duration_min: { type: 'integer', minimum: 1 },
               exercises: {
                 type: 'array',
@@ -144,7 +148,7 @@ export const dailyProtocolGeminiSchema = {
               warmup: { type: 'string' },
               cooldown: { type: 'string' },
             },
-            required: ['name', 'day', 'duration_min', 'exercises', 'warmup', 'cooldown'],
+            required: ['name', 'day', 'time', 'duration_min', 'exercises', 'warmup', 'cooldown'],
           },
         },
         rest_days: { type: 'array', items: { type: 'string' } },
@@ -245,15 +249,30 @@ ${requirementsText}${notesText}
 
 1. Use Google Search to find the latest evidence-based recommendations for this user's specific goals and conditions.
 2. Design a complete daily protocol including:
-   - Schedule variant(s) from wake to sleep
-   - A comprehensive diet plan with macros and specific meals
-   - A supplementation plan tailored to their goals
-   - A training program appropriate for their fitness level and goals
+   - Schedule variant(s) with wake/sleep times and other activities
+   - A comprehensive diet plan with macros and specific meals (each meal has its own time)
+   - A supplementation plan tailored to their goals (each supplement has its own time)
+   - A training program appropriate for their fitness level and goals (each workout has a day and time)
 3. Ensure all requirements are satisfied where possible.
 4. Prioritize adherence - the protocol must be realistic and sustainable.
 5. Optimize for the user's stated wellness goals and lifestyle preferences.
 
-## Schedule Generation Rules
+## Schedule Architecture Rules
+
+The schedule is EVENT-DRIVEN. Timing information lives in the relevant section:
+- **Meals**: Each meal has a "time" field (e.g., breakfast at "07:30")
+- **Supplements**: Each supplement has a "time" field (e.g., vitamin D at "07:00")
+- **Workouts**: Each workout has a "time" field (e.g., strength training at "06:00")
+- **Other events**: Activities that aren't meals, supplements, or workouts go in "other_events" (e.g., morning routine, commute, work, wind down)
+
+DO NOT duplicate meal, supplement, or workout times in other_events. Only include activities like:
+- Morning routine (e.g., "07:00" - "07:30")
+- Commute (e.g., "08:00" - "08:30")
+- Work (e.g., "09:00" - "17:00")
+- Personal time, reading, etc.
+- Wind down / evening routine (e.g., "21:00" - "22:00")
+
+## Schedule Variant Rules
 
 Analyze the user's requirements to determine if different schedules are needed for different days:
 - If requirements mention work schedule, office hours, weekdays, or weekends, create separate schedule variants (e.g., "Weekday Schedule" for Mon-Fri and "Weekend Schedule" for Sat-Sun)
@@ -334,11 +353,12 @@ function formatTrainingSummary(protocol: DailyProtocol): string {
 
 /**
  * Verify a protocol's evidence base using Google Search grounding.
+ * Returns verification result along with citations from grounding.
  */
 export async function verifyProtocol(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig
-): Promise<VerificationResult> {
+): Promise<{ verification: VerificationResult; citations: Citation[] }> {
   const client = getGeminiClient();
 
   const prompt = `You are a critical verifier of health protocols. Verify this protocol's evidence base using current research. Analyze the following protocol and provide honest, thorough feedback.
@@ -378,7 +398,14 @@ Be thorough and honest. A protocol that won't be followed is worthless.`;
     throw new Error('No verification response from Gemini');
   }
 
-  return JSON.parse(text);
+  // Extract citations from grounding metadata
+  const groundingMetadata = getGroundingMetadata(response);
+  const citations = extractCitations(groundingMetadata, 'verify');
+
+  return {
+    verification: JSON.parse(text),
+    citations,
+  };
 }
 
 const modifyResultSchema = {
@@ -392,12 +419,13 @@ const modifyResultSchema = {
 
 /**
  * Modify a protocol based on user suggestions, using Google Search grounding.
+ * Returns modified protocol, reasoning, and citations from grounding.
  */
 export async function modifyProtocol(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   userMessage: string
-): Promise<{ protocol: DailyProtocol; reasoning: string }> {
+): Promise<{ protocol: DailyProtocol; reasoning: string; citations: Citation[] }> {
   const client = getGeminiClient();
 
   const prompt = `You are an expert health protocol modifier. The user wants to change their protocol. Research their suggestions using current evidence and generate a modified protocol.
@@ -440,9 +468,14 @@ Generate the modified protocol with reasoning now.`;
   validateExerciseData(parsed);
   const protocolData = dailyProtocolSchema.parse(parsed);
 
+  // Extract citations from grounding metadata
+  const groundingMetadata = getGroundingMetadata(response);
+  const citations = extractCitations(groundingMetadata, 'modify');
+
   return {
     protocol: protocolData,
     reasoning: parsed.reasoning || 'Protocol modified based on your suggestions.',
+    citations,
   };
 }
 
@@ -486,13 +519,14 @@ Answer concisely now.`;
 
 /**
  * Answer a question about a protocol, optionally using search grounding.
+ * Returns answer, modification suggestion flag, and citations from grounding.
  */
 export async function askAboutProtocol(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
   history: QAHistoryItem[] = []
-): Promise<{ answer: string; suggestsModification: boolean }> {
+): Promise<{ answer: string; suggestsModification: boolean; citations: Citation[] }> {
   const client = getGeminiClient();
 
   const prompt = buildAskPrompt(protocol, config, question, history);
@@ -512,7 +546,16 @@ export async function askAboutProtocol(
     throw new Error('No response from Gemini when answering question');
   }
 
-  return JSON.parse(text);
+  // Extract citations from grounding metadata
+  const groundingMetadata = getGroundingMetadata(response);
+  const citations = extractCitations(groundingMetadata, 'ask');
+
+  const parsed = JSON.parse(text);
+  return {
+    answer: parsed.answer,
+    suggestsModification: parsed.suggestsModification,
+    citations,
+  };
 }
 
 // Combined schema for parsing protocol text with inferred goals
@@ -572,20 +615,21 @@ Examples:
 
 1. Extract all relevant information from the text above.
 2. Structure it into a complete daily health protocol with:
-   - Schedule (wake time, sleep time, daily activities with times in HH:MM format)
-   - Diet (calories, macros, meals with nutritional info)
-   - Supplementation (supplements with dosage, timing, purpose)
-   - Training (workout program with exercises, sets, reps)
+   - Schedule variants (wake time, sleep time, and "other_events" for activities that aren't meals/supplements/workouts)
+   - Diet (calories, macros, meals - each meal has its own "time" field)
+   - Supplementation (supplements with dosage, timing, purpose - each supplement has its own "time" field)
+   - Training (workout program with exercises, sets, reps - each workout has "day" and "time" fields)
 
 3. If information is missing or unclear:
    - For schedule: Use reasonable defaults (e.g., "07:00" wake, "22:00" sleep)
    - For diet: Estimate based on any mentioned foods or goals
-   - For supplements: Only include what's explicitly mentioned
-   - For training: Structure any mentioned exercises appropriately
+   - For supplements: Only include what's explicitly mentioned, add a "time" field based on the timing context
+   - For training: Structure any mentioned exercises appropriately, add a "time" field for when the workout starts
 
 4. Make reasonable inferences where the text is ambiguous, but don't invent information that contradicts what's provided.
 5. Ensure all required fields are filled with sensible values.
-6. REMINDER: All start_time and end_time fields MUST be in HH:MM format (e.g., "06:00", "14:30", "22:00").
+6. REMINDER: All time fields MUST be in HH:MM format (e.g., "06:00", "14:30", "22:00").
+7. IMPORTANT: Meals, supplements, and workouts have their own "time" fields. DO NOT duplicate them in "other_events". Only include activities like morning routine, commute, work, wind down, etc. in "other_events".
 
 ## Goal Inference Instructions
 
@@ -755,14 +799,14 @@ Generate the modified protocol with reasoning now.`;
 }
 
 /**
- * Stream answer to a question about the protocol. Yields text chunks, returns answer.
+ * Stream answer to a question about the protocol. Yields text chunks, returns answer with citations.
  */
 export async function* askAboutProtocolStream(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
   history: QAHistoryItem[] = []
-): AsyncGenerator<string, { answer: string; suggestsModification: boolean }, unknown> {
+): AsyncGenerator<string, { answer: string; suggestsModification: boolean; citations: Citation[] }, unknown> {
   const client = getGeminiClient();
   const prompt = buildAskPrompt(protocol, config, question, history);
 
@@ -777,7 +821,13 @@ export async function* askAboutProtocolStream(
   });
 
   let fullText = '';
+  let lastChunk: { candidates?: Array<{ groundingMetadata?: unknown }> } | null = null;
+
   for await (const chunk of stream) {
+    // Grounding metadata is typically in the final chunk, so capture each chunk
+    if (chunk.candidates?.[0]?.groundingMetadata) {
+      lastChunk = chunk;
+    }
     const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (text) {
       fullText += text;
@@ -785,7 +835,21 @@ export async function* askAboutProtocolStream(
     }
   }
 
-  return JSON.parse(fullText);
+  // Extract citations from grounding metadata (available in final chunk with grounding data)
+  const groundingMetadata = lastChunk?.candidates?.[0]?.groundingMetadata
+    ? getGroundingMetadata({ candidates: [{ groundingMetadata: lastChunk.candidates[0].groundingMetadata }] })
+    : undefined;
+  const citations = extractCitations(groundingMetadata, 'ask');
+
+  console.log('[askAboutProtocolStream] has grounding metadata:', !!lastChunk?.candidates?.[0]?.groundingMetadata);
+  console.log('[askAboutProtocolStream] extracted citations:', citations.length);
+
+  const parsed = JSON.parse(fullText);
+  return {
+    answer: parsed.answer,
+    suggestsModification: parsed.suggestsModification,
+    citations,
+  };
 }
 
 // ---------------------------------------------------------------------------

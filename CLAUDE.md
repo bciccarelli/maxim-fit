@@ -2,7 +2,7 @@
 
 ## Marketing
 
-Get an evidence-based daily health protocol that fits your lifestyle. The protocol will satisfy hard requirements (work schedule, workout frequency, etc.) while optimizing for  goals (muscle gain, longevity, etc.).
+With Maxim Fit, get an evidence-based daily health protocol that fits your lifestyle. The protocol will satisfy hard requirements (work schedule, workout frequency, etc.) while optimizing for  goals (muscle gain, longevity, etc.).
 
 
 ## Mission

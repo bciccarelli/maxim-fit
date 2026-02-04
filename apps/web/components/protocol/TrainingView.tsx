@@ -54,7 +54,7 @@ export function TrainingView({ training, editable = false, onChange }: TrainingV
 
   const handleAddWorkout = () => {
     const newIndex = draft.workouts.length;
-    updateDraft({ ...draft, workouts: [...draft.workouts, { name: 'New workout', day: 'Day ' + (draft.workouts.length + 1), duration_min: 60, exercises: [], warmup: '5 min general warmup', cooldown: '5 min stretching' }] });
+    updateDraft({ ...draft, workouts: [...draft.workouts, { name: 'New workout', day: 'Day ' + (draft.workouts.length + 1), time: '06:00', duration_min: 60, exercises: [], warmup: '5 min general warmup', cooldown: '5 min stretching' }] });
     setExpandedWorkout(newIndex);
     setEditingWorkout(newIndex);
   };

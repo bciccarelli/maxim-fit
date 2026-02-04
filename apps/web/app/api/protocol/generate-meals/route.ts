@@ -67,15 +67,10 @@ export async function POST(request: NextRequest) {
       sleepTime: firstSchedule?.sleep_time || '22:00',
     };
 
-    // Extract workout times from schedule for nutrient timing
-    const workoutTimes = firstSchedule?.schedule
-      ?.filter((block) =>
-        block.activity.toLowerCase().includes('workout') ||
-        block.activity.toLowerCase().includes('training') ||
-        block.activity.toLowerCase().includes('exercise') ||
-        block.activity.toLowerCase().includes('gym')
-      )
-      .map((block) => block.start_time) || [];
+    // Extract workout times from training workouts for nutrient timing
+    const workoutTimes = protocolData.training.workouts
+      .map((workout) => workout.time)
+      .filter((time): time is string => !!time);
 
     // Extract dietary restrictions from config
     const dietaryRestrictions = config?.success

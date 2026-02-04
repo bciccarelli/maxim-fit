@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { askAboutProtocol, askAboutProtocolStream, type QAHistoryItem } from '@/lib/gemini/generation';
-import { normalizeProtocol } from '@/lib/schemas/protocol';
+import { normalizeProtocol, type Citation } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
+import { mergeCitations } from '@/lib/gemini/citations';
 
 function buildConfig(configData: Record<string, unknown> | null) {
   if (!configData) return null;
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
             );
 
             const generator = askAboutProtocolStream(protocolData, askConfig, question, history);
-            let genResult: IteratorResult<string, { answer: string; suggestsModification: boolean }>;
+            let genResult: IteratorResult<string, { answer: string; suggestsModification: boolean; citations: Citation[] }>;
             do {
               genResult = await generator.next();
               if (!genResult.done && genResult.value) {
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
               }
             } while (!genResult.done);
 
-            const { answer, suggestsModification } = genResult.value;
+            const { answer, suggestsModification, citations: newCitations } = genResult.value;
 
             // Save Q&A
             await supabase
@@ -157,10 +158,23 @@ export async function POST(request: NextRequest) {
                 answer,
               });
 
+            // Merge new citations with existing ones on the protocol
+            const existingCitations = (protocol.citations as Citation[]) || [];
+            const mergedCitations = mergeCitations(existingCitations, newCitations);
+
+            // Update protocol with merged citations if there are new ones
+            if (newCitations.length > 0) {
+              await supabase
+                .from('protocols')
+                .update({ citations: mergedCitations })
+                .eq('id', protocolId)
+                .eq('user_id', user.id);
+            }
+
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 done: true,
-                result: { answer, suggestsModification },
+                result: { answer, suggestsModification, citations: newCitations },
               })}\n\n`)
             );
           } catch (error) {
@@ -178,8 +192,12 @@ export async function POST(request: NextRequest) {
       return new Response(stream, { headers: SSE_HEADERS });
     }
 
-    // Non-streaming path
-    const { answer, suggestsModification } = await askAboutProtocol(protocolData, askConfig, question, history);
+    // Non-streaming path - now captures citations
+    const { answer, suggestsModification, citations: newCitations } = await askAboutProtocol(protocolData, askConfig, question, history);
+
+    // Merge new citations with existing ones on the protocol
+    const existingCitations = (protocol.citations as Citation[]) || [];
+    const mergedCitations = mergeCitations(existingCitations, newCitations);
 
     // Save Q&A
     const { error: saveError } = await supabase
@@ -196,7 +214,16 @@ export async function POST(request: NextRequest) {
       console.error('Error saving question:', saveError);
     }
 
-    return NextResponse.json({ answer, suggestsModification });
+    // Update protocol with merged citations
+    if (newCitations.length > 0) {
+      await supabase
+        .from('protocols')
+        .update({ citations: mergedCitations })
+        .eq('id', protocolId)
+        .eq('user_id', user.id);
+    }
+
+    return NextResponse.json({ answer, suggestsModification, citations: mergedCitations });
   } catch (error) {
     console.error('Protocol ask error:', error);
     return NextResponse.json(

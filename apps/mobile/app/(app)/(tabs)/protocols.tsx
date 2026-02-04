@@ -7,13 +7,15 @@ import { supabase } from '@/lib/supabase';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { normalizeProtocol } from '@protocol/shared/schemas';
-import type { DailyProtocol } from '@protocol/shared/schemas';
+import type { DailyProtocol, Critique } from '@protocol/shared/schemas';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
+import { CritiquesSection } from '@/components/protocol/CritiquesSection';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
 import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
 import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
 import { ProFeatureButton } from '@/components/subscription/ProFeatureButton';
+import { useUserConfig } from '@/hooks/useUserConfig';
 
 type ProtocolChain = {
   id: string;
@@ -32,12 +34,14 @@ type ProtocolVersion = {
   version_chain_id: string;
   created_at: string;
   change_source: string | null;
+  critiques: Critique[] | null;
 };
 
 export default function ProtocolsScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { config: userConfig } = useUserConfig();
 
   // Protocol chains (unique protocols)
   const [chains, setChains] = useState<ProtocolChain[]>([]);
@@ -100,7 +104,7 @@ export default function ProtocolsScreen() {
 
     const { data, error } = await supabase
       .from('protocols')
-      .select('id, version, name, protocol_data, verified, weighted_goal_score, viability_score, version_chain_id, created_at, change_source')
+      .select('id, version, name, protocol_data, verified, weighted_goal_score, viability_score, version_chain_id, created_at, change_source, critiques')
       .eq('version_chain_id', selectedChain.version_chain_id)
       .order('version', { ascending: false });
 
@@ -333,6 +337,11 @@ export default function ProtocolsScreen() {
           visible={showGenerateModal}
           onClose={() => setShowGenerateModal(false)}
           onComplete={handleGenerateComplete}
+          initialConfig={userConfig ? {
+            personal_info: userConfig.personal_info,
+            goals: userConfig.goals,
+            requirements: userConfig.requirements,
+          } : undefined}
         />
       </ScrollView>
     );
@@ -530,11 +539,18 @@ export default function ProtocolsScreen() {
       )}
 
       {/* Protocol Content */}
-      {parsedData ? (
+      {parsedData && selectedVersion ? (
         <ProtocolTabs
           protocol={parsedData}
           editable={true}
           onProtocolChange={handleProtocolChange}
+          protocolId={selectedVersion.id}
+          critiques={selectedVersion.critiques}
+          verified={selectedVersion.verified}
+          onCritiquesUpdated={(critiques) => {
+            setSelectedVersion((prev) => prev ? { ...prev, critiques } : null);
+          }}
+          onProtocolUpdated={fetchVersions}
         />
       ) : (
         <View style={styles.loadingContainer}>
@@ -563,6 +579,11 @@ export default function ProtocolsScreen() {
         visible={showGenerateModal}
         onClose={() => setShowGenerateModal(false)}
         onComplete={handleGenerateComplete}
+        initialConfig={userConfig ? {
+          personal_info: userConfig.personal_info,
+          goals: userConfig.goals,
+          requirements: userConfig.requirements,
+        } : undefined}
       />
     </View>
   );

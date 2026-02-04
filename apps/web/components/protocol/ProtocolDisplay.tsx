@@ -6,7 +6,7 @@ import { DietPlanView } from './DietPlanView';
 import { SupplementView } from './SupplementView';
 import { TrainingView } from './TrainingView';
 import { VerifyBanner } from './VerifyBanner';
-import type { DailyProtocol, ScheduleVariant, DietPlan, SupplementationPlan, TrainingProgram } from '@/lib/schemas/protocol';
+import type { DailyProtocol, DietPlan, SupplementationPlan, TrainingProgram } from '@/lib/schemas/protocol';
 
 interface ProtocolDisplayProps {
   protocol: DailyProtocol;
@@ -19,8 +19,8 @@ interface ProtocolDisplayProps {
 }
 
 export function ProtocolDisplay({ protocol, protocolId, editable = false, verified = true, onProtocolChange, onVerify, onMealsGenerated }: ProtocolDisplayProps) {
-  const handleSchedulesChange = (schedules: ScheduleVariant[]) => {
-    onProtocolChange?.({ ...protocol, schedules });
+  const handleScheduleChange = (updatedProtocol: DailyProtocol) => {
+    onProtocolChange?.(updatedProtocol);
   };
 
   const handleDietChange = (diet: DietPlan) => {
@@ -56,7 +56,7 @@ export function ProtocolDisplay({ protocol, protocolId, editable = false, verifi
           <TabsTrigger value="training">Training</TabsTrigger>
         </TabsList>
         <TabsContent value="schedule">
-          <ScheduleView schedules={protocol.schedules} editable={editable} onChange={handleSchedulesChange} />
+          <ScheduleView protocol={protocol} editable={editable} onChange={handleScheduleChange} />
         </TabsContent>
         <TabsContent value="diet">
           <DietPlanView

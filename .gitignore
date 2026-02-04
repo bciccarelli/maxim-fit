@@ -48,6 +48,8 @@ venv/
 
 *.ipa
 
+.expo/
+
 # Expo / React Native (for mobile app)
 apps/mobile/.expo/
 *.jks

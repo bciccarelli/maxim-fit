@@ -227,6 +227,7 @@ export type Database = {
         Row: {
           change_note: string | null
           change_source: string | null
+          citations: Json | null
           config_id: string | null
           created_at: string | null
           critiques: Json | null
@@ -252,6 +253,7 @@ export type Database = {
         Insert: {
           change_note?: string | null
           change_source?: string | null
+          citations?: Json | null
           config_id?: string | null
           created_at?: string | null
           critiques?: Json | null
@@ -277,6 +279,7 @@ export type Database = {
         Update: {
           change_note?: string | null
           change_source?: string | null
+          citations?: Json | null
           config_id?: string | null
           created_at?: string | null
           critiques?: Json | null

@@ -3,17 +3,21 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Send } from 'lucide-react-native';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
+import { ChatCitationsDropdown } from './ChatCitationsDropdown';
+import type { Citation } from '@protocol/shared/schemas';
 
 type QuestionAnswer = {
   id: string;
   question: string;
   answer: string;
   created_at: string;
+  citations?: Citation[];
 };
 
 type AskResult = {
   answer: string;
   suggestsModification: boolean;
+  citations?: Citation[];
 };
 
 interface AskSheetProps {
@@ -86,6 +90,7 @@ export function AskSheet({
           question: currentQuestion,
           answer: result.answer,
           created_at: new Date().toISOString(),
+          citations: result.citations,
         },
       ]);
       setCurrentQuestion('');
@@ -185,6 +190,9 @@ export function AskSheet({
                   </View>
                   <View style={styles.answerBubble}>
                     <Text style={styles.answerText}>{qa.answer}</Text>
+                    {qa.citations && qa.citations.length > 0 && (
+                      <ChatCitationsDropdown citations={qa.citations} />
+                    )}
                   </View>
                 </View>
               ))}

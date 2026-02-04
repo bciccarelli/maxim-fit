@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ConfigSummary } from '@/components/settings/ConfigSummary';
 import { ConfigEditForm } from '@/components/settings/ConfigEditForm';
 import { UserNotes } from '@/components/settings/UserNotes';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, MessageSquare, ExternalLink } from 'lucide-react';
 import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
 
 interface UserConfig {
@@ -159,6 +159,28 @@ export function SettingsClient({ config: initialConfig, notes: initialNotes }: S
             onAdd={handleAddNote}
             onDelete={handleDeleteNote}
           />
+        </CardContent>
+      </Card>
+
+      {/* Feedback Section */}
+      <Card className="border-l-2 border-l-primary">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Feedback</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Help us improve Maxim Fit by sharing your feedback, reporting bugs, or requesting features.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <a
+            href="https://maximfit.featurebase.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Share feedback
+            <ExternalLink className="h-3 w-3" />
+          </a>
         </CardContent>
       </Card>
     </div>

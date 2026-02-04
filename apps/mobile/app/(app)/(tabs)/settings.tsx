@@ -1,65 +1,42 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LogOut, User, Target, CheckSquare, CreditCard } from 'lucide-react-native';
+import { LogOut, User, Target, CheckSquare, CreditCard, MessageSquare, ExternalLink, Pencil, X, Check } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { NotificationSettingsCard } from '@/components/settings/NotificationSettingsCard';
-
-type PersonalInfo = {
-  age: number;
-  weight_lbs: number;
-  height_in: number;
-  sex: string;
-  fitness_level: string;
-  dietary_restrictions: string[];
-  lifestyle_considerations: string[];
-};
-
-type Goal = {
-  name: string;
-  weight: number;
-  description?: string;
-};
-
-type UserConfig = {
-  personal_info: PersonalInfo;
-  goals: Goal[];
-  requirements: string[];
-};
+import { useUserConfig, type UserConfig } from '@/hooks/useUserConfig';
+import { PersonalInfoStep } from '@/components/protocol/wizard/PersonalInfoStep';
+import { GoalsStep } from '@/components/protocol/wizard/GoalsStep';
+import { RequirementsStep } from '@/components/protocol/wizard/RequirementsStep';
+import type { PersonalInfo, Goal } from '@protocol/shared/schemas';
 
 type Subscription = {
   tier: 'free' | 'pro';
   renewalDate: string | null;
 };
 
+type EditingSection = 'personal' | 'goals' | 'requirements' | null;
+
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
-  const [config, setConfig] = useState<UserConfig | null>(null);
+  const { config, isLoading: configLoading, saveConfig, isSaving } = useUserConfig();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isSubLoading, setIsSubLoading] = useState(true);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
 
+  // Edit mode state
+  const [editingSection, setEditingSection] = useState<EditingSection>(null);
+  const [draftPersonalInfo, setDraftPersonalInfo] = useState<Partial<PersonalInfo>>({});
+  const [draftGoals, setDraftGoals] = useState<Goal[]>([]);
+  const [draftRequirements, setDraftRequirements] = useState<string[]>([]);
+
   useEffect(() => {
-    async function fetchData() {
+    async function fetchSubscription() {
       if (!user) return;
 
-      // Fetch user config
-      const { data: configData } = await supabase
-        .from('user_configs')
-        .select('personal_info, goals, requirements')
-        .eq('user_id', user.id)
-        .eq('is_default', true)
-        .single();
-
-      if (configData) {
-        setConfig(configData as UserConfig);
-      }
-
-      // Fetch subscription
       try {
         const headers = await getAuthHeaders();
         const response = await fetch(apiUrl('/api/subscription'), { headers });
@@ -74,11 +51,63 @@ export default function SettingsScreen() {
         console.error('Error fetching subscription:', err);
       }
 
-      setIsLoading(false);
+      setIsSubLoading(false);
     }
 
-    fetchData();
+    fetchSubscription();
   }, [user]);
+
+  const startEditing = (section: EditingSection) => {
+    if (!config) return;
+
+    if (section === 'personal') {
+      setDraftPersonalInfo(config.personal_info);
+    } else if (section === 'goals') {
+      setDraftGoals([...config.goals]);
+    } else if (section === 'requirements') {
+      setDraftRequirements([...config.requirements]);
+    }
+    setEditingSection(section);
+  };
+
+  const cancelEditing = () => {
+    setEditingSection(null);
+    setDraftPersonalInfo({});
+    setDraftGoals([]);
+    setDraftRequirements([]);
+  };
+
+  const handleSave = async () => {
+    if (!config || !editingSection) return;
+
+    try {
+      let updatedConfig: UserConfig;
+
+      if (editingSection === 'personal') {
+        updatedConfig = {
+          ...config,
+          personal_info: draftPersonalInfo as PersonalInfo,
+        };
+      } else if (editingSection === 'goals') {
+        updatedConfig = {
+          ...config,
+          goals: draftGoals,
+        };
+      } else {
+        updatedConfig = {
+          ...config,
+          requirements: draftRequirements,
+        };
+      }
+
+      await saveConfig(updatedConfig);
+      cancelEditing();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+    }
+  };
+
+  const isLoading = configLoading || isSubLoading;
 
   const handleManageBilling = async () => {
     setIsBillingLoading(true);
@@ -158,84 +187,182 @@ export default function SettingsScreen() {
           <View style={styles.cardHeader}>
             <User size={20} color="#2d5a2d" />
             <Text style={styles.cardTitle}>Personal Info</Text>
+            <View style={styles.cardHeaderSpacer} />
+            {editingSection === 'personal' ? (
+              <View style={styles.editActions}>
+                <Pressable style={styles.cancelButton} onPress={cancelEditing} disabled={isSaving}>
+                  <X size={18} color="#666" />
+                </Pressable>
+                <Pressable style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Check size={18} color="#fff" />
+                  )}
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable style={styles.editButton} onPress={() => startEditing('personal')}>
+                <Pencil size={16} color="#666" />
+              </Pressable>
+            )}
           </View>
-          <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Age</Text>
-              <Text style={styles.infoValue}>{config.personal_info.age}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Sex</Text>
-              <Text style={styles.infoValue}>{config.personal_info.sex}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Weight</Text>
-              <Text style={styles.infoValue}>{config.personal_info.weight_lbs} lbs</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Height</Text>
-              <Text style={styles.infoValue}>{formatHeight(config.personal_info.height_in)}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Fitness Level</Text>
-              <Text style={styles.infoValue}>{config.personal_info.fitness_level}</Text>
-            </View>
-          </View>
-          {config.personal_info.dietary_restrictions.length > 0 && (
-            <View style={styles.listSection}>
-              <Text style={styles.listLabel}>Dietary Restrictions</Text>
-              <Text style={styles.listValue}>
-                {config.personal_info.dietary_restrictions.join(', ')}
-              </Text>
-            </View>
-          )}
-          {config.personal_info.lifestyle_considerations.length > 0 && (
-            <View style={styles.listSection}>
-              <Text style={styles.listLabel}>Lifestyle</Text>
-              <Text style={styles.listValue}>
-                {config.personal_info.lifestyle_considerations.join(', ')}
-              </Text>
-            </View>
+          {editingSection === 'personal' ? (
+            <PersonalInfoStep
+              personalInfo={draftPersonalInfo}
+              onChange={setDraftPersonalInfo}
+            />
+          ) : (
+            <>
+              <View style={styles.infoGrid}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Age</Text>
+                  <Text style={styles.infoValue}>{config.personal_info.age}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Sex</Text>
+                  <Text style={styles.infoValue}>{config.personal_info.sex}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Weight</Text>
+                  <Text style={styles.infoValue}>{config.personal_info.weight_lbs} lbs</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Height</Text>
+                  <Text style={styles.infoValue}>{formatHeight(config.personal_info.height_in)}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Fitness Level</Text>
+                  <Text style={styles.infoValue}>{config.personal_info.fitness_level}</Text>
+                </View>
+              </View>
+              {config.personal_info.dietary_restrictions.length > 0 && (
+                <View style={styles.listSection}>
+                  <Text style={styles.listLabel}>Dietary Restrictions</Text>
+                  <Text style={styles.listValue}>
+                    {config.personal_info.dietary_restrictions.join(', ')}
+                  </Text>
+                </View>
+              )}
+              {config.personal_info.lifestyle_considerations.length > 0 && (
+                <View style={styles.listSection}>
+                  <Text style={styles.listLabel}>Lifestyle</Text>
+                  <Text style={styles.listValue}>
+                    {config.personal_info.lifestyle_considerations.join(', ')}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </View>
       )}
 
       {/* Goals */}
-      {config?.goals && config.goals.length > 0 && (
+      {(config?.goals && config.goals.length > 0) || editingSection === 'goals' ? (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Target size={20} color="#2d5a2d" />
             <Text style={styles.cardTitle}>Goals</Text>
+            <View style={styles.cardHeaderSpacer} />
+            {editingSection === 'goals' ? (
+              <View style={styles.editActions}>
+                <Pressable style={styles.cancelButton} onPress={cancelEditing} disabled={isSaving}>
+                  <X size={18} color="#666" />
+                </Pressable>
+                <Pressable style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Check size={18} color="#fff" />
+                  )}
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable style={styles.editButton} onPress={() => startEditing('goals')}>
+                <Pencil size={16} color="#666" />
+              </Pressable>
+            )}
           </View>
-          {config.goals.map((goal, index) => (
-            <View key={index} style={styles.goalItem}>
-              <View style={styles.goalHeader}>
-                <Text style={styles.goalName}>{goal.name}</Text>
-                <Text style={styles.goalWeight}>{Math.round(goal.weight * 100)}%</Text>
+          {editingSection === 'goals' ? (
+            <GoalsStep
+              goals={draftGoals}
+              onChange={setDraftGoals}
+            />
+          ) : (
+            config?.goals.map((goal, index) => (
+              <View key={index} style={styles.goalItem}>
+                <View style={styles.goalHeader}>
+                  <Text style={styles.goalName}>{goal.name}</Text>
+                  <Text style={styles.goalWeight}>{Math.round(goal.weight * 100)}%</Text>
+                </View>
+                <View style={styles.goalBar}>
+                  <View style={[styles.goalBarFill, { width: `${goal.weight * 100}%` }]} />
+                </View>
               </View>
-              <View style={styles.goalBar}>
-                <View style={[styles.goalBarFill, { width: `${goal.weight * 100}%` }]} />
-              </View>
-            </View>
-          ))}
+            ))
+          )}
         </View>
-      )}
+      ) : null}
 
       {/* Requirements */}
-      {config?.requirements && config.requirements.length > 0 && (
+      {(config?.requirements && config.requirements.length > 0) || editingSection === 'requirements' ? (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <CheckSquare size={20} color="#2d5a2d" />
             <Text style={styles.cardTitle}>Requirements</Text>
+            <View style={styles.cardHeaderSpacer} />
+            {editingSection === 'requirements' ? (
+              <View style={styles.editActions}>
+                <Pressable style={styles.cancelButton} onPress={cancelEditing} disabled={isSaving}>
+                  <X size={18} color="#666" />
+                </Pressable>
+                <Pressable style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Check size={18} color="#fff" />
+                  )}
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable style={styles.editButton} onPress={() => startEditing('requirements')}>
+                <Pencil size={16} color="#666" />
+              </Pressable>
+            )}
           </View>
-          {config.requirements.map((req, index) => (
-            <View key={index} style={styles.requirementItem}>
-              <View style={styles.bullet} />
-              <Text style={styles.requirementText}>{req}</Text>
-            </View>
-          ))}
+          {editingSection === 'requirements' ? (
+            <RequirementsStep
+              requirements={draftRequirements}
+              onChange={setDraftRequirements}
+            />
+          ) : (
+            config?.requirements.map((req, index) => (
+              <View key={index} style={styles.requirementItem}>
+                <View style={styles.bullet} />
+                <Text style={styles.requirementText}>{req}</Text>
+              </View>
+            ))
+          )}
         </View>
-      )}
+      ) : null}
+
+      {/* Feedback */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <MessageSquare size={20} color="#2d5a2d" />
+          <Text style={styles.cardTitle}>Feedback</Text>
+        </View>
+        <Text style={styles.feedbackDescription}>
+          Help us improve Maxim Fit by sharing your feedback, reporting bugs, or requesting features.
+        </Text>
+        <Pressable
+          style={styles.feedbackButton}
+          onPress={() => WebBrowser.openBrowserAsync('https://maximfit.featurebase.app')}
+        >
+          <Text style={styles.feedbackButtonText}>Share feedback</Text>
+          <ExternalLink size={14} color="#2d5a2d" />
+        </Pressable>
+      </View>
 
       {/* Sign Out */}
       <Pressable style={styles.signOutButton} onPress={signOut}>
@@ -284,6 +411,31 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  cardHeaderSpacer: {
+    flex: 1,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f0',
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cancelButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f0',
+  },
+  saveButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#2d5a2d',
+    minWidth: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subscriptionRow: {
     flexDirection: 'row',
@@ -412,6 +564,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 20,
+  },
+  feedbackDescription: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  feedbackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  feedbackButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2d5a2d',
   },
   signOutButton: {
     flexDirection: 'row',

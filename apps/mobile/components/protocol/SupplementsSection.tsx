@@ -16,7 +16,8 @@ const EMPTY_SUPPLEMENT: Supplement = {
   dosage_amount: '',
   dosage_unit: 'mg',
   dosage_notes: null,
-  timing: '',
+  time: '08:00',
+  timing: 'Morning',
   purpose: '',
   notes: null,
 };

@@ -39,7 +39,7 @@ export function SupplementView({ supplementation, editable = false, onChange }: 
 
   const handleAddSupplement = () => {
     const newIndex = draft.supplements.length;
-    updateDraft({ ...draft, supplements: [...draft.supplements, { name: 'New supplement', dosage_amount: '', dosage_unit: 'mg', dosage_notes: null, timing: '', purpose: '', notes: null }] });
+    updateDraft({ ...draft, supplements: [...draft.supplements, { name: 'New supplement', dosage_amount: '', dosage_unit: 'mg', dosage_notes: null, time: '08:00', timing: 'Morning', purpose: '', notes: null }] });
     setExpandedIndex(newIndex);
     setEditingIndex(newIndex);
   };

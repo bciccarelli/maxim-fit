@@ -1,0 +1,104 @@
+import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react-native';
+import type { Citation } from '@protocol/shared/schemas';
+
+type Props = {
+  citations: Citation[];
+};
+
+export function ChatCitationsDropdown({ citations }: Props) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!citations || citations.length === 0) return null;
+
+  const handleOpenUrl = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error('Failed to open URL:', error);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Pressable style={styles.header} onPress={() => setExpanded(!expanded)}>
+        {expanded ? (
+          <ChevronUp size={12} color="#666" />
+        ) : (
+          <ChevronDown size={12} color="#666" />
+        )}
+        <Text style={styles.headerText}>
+          {citations.length} source{citations.length !== 1 ? 's' : ''}
+        </Text>
+      </Pressable>
+
+      {expanded && (
+        <View style={styles.content}>
+          {citations.map((citation) => (
+            <Pressable
+              key={citation.id}
+              style={styles.citationItem}
+              onPress={() => handleOpenUrl(citation.url)}
+            >
+              <ExternalLink size={10} color="#666" style={styles.linkIcon} />
+              <View style={styles.citationText}>
+                <Text style={styles.citationDomain}>{citation.domain}</Text>
+                {citation.title && (
+                  <Text style={styles.citationTitle} numberOfLines={1}>
+                    {citation.title}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    marginTop: 8,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerText: {
+    fontSize: 11,
+    color: '#666',
+  },
+  content: {
+    marginTop: 6,
+    paddingLeft: 4,
+    borderLeftWidth: 1,
+    borderLeftColor: '#e5e5e5',
+    gap: 4,
+  },
+  citationItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 4,
+    paddingLeft: 8,
+    gap: 6,
+  },
+  linkIcon: {
+    marginTop: 2,
+  },
+  citationText: {
+    flex: 1,
+    gap: 1,
+  },
+  citationDomain: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#333',
+  },
+  citationTitle: {
+    fontSize: 10,
+    color: '#666',
+  },
+});

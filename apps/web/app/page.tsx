@@ -133,7 +133,7 @@ export default function HomePage() {
                 Based on your requirements and goals
               </h1>
               <h2 className="text-1xl font-bold tracking-tight text-primary mb-4">
-                No cost to sign up for now
+                No cost to sign up
               </h2>
               
               <p className="text-sm text-muted-foreground max-w-lg mx-auto">

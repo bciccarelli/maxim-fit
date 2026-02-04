@@ -158,7 +158,7 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
 
         <View style={styles.hydration}>
           <Text style={styles.hydrationText}>
-            💧 {diet.hydration_oz} oz water daily
+            {diet.hydration_oz} oz water daily
           </Text>
         </View>
       </Pressable>

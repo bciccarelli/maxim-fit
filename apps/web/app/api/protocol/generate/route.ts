@@ -11,25 +11,29 @@ function generateProtocolName(goals: { name: string; weight: number }[]): string
 }
 
 // Simple placeholder verification for anonymous users - no AI call, instant response
+// Returns same shape as verifyProtocol for consistency
 function getPlaceholderVerification(config: UserConfig | AnonymousUserConfig) {
   return {
-    requirement_scores: config.requirements.map((req) => ({
-      requirement_name: req,
-      target: 100,
-      achieved: 85,
-      adherence_percent: 85,
-      suggestions: 'Sign in for detailed analysis',
-    })),
-    goal_scores: config.goals.map((goal) => ({
-      goal_name: goal.name,
-      score: 80 + Math.floor(Math.random() * 15), // 80-94
-      reasoning: 'Protocol aligned with this goal',
-      suggestions: 'Sign in for personalized recommendations',
-    })),
-    critiques: [],
-    requirements_met: true,
-    weighted_goal_score: 85,
-    viability_score: 82,
+    verification: {
+      requirement_scores: config.requirements.map((req) => ({
+        requirement_name: req,
+        target: 100,
+        achieved: 85,
+        adherence_percent: 85,
+        suggestions: 'Sign in for detailed analysis',
+      })),
+      goal_scores: config.goals.map((goal) => ({
+        goal_name: goal.name,
+        score: 80 + Math.floor(Math.random() * 15), // 80-94
+        reasoning: 'Protocol aligned with this goal',
+        suggestions: 'Sign in for personalized recommendations',
+      })),
+      critiques: [],
+      requirements_met: true,
+      weighted_goal_score: 85,
+      viability_score: 82,
+    },
+    citations: [],
   };
 }
 
@@ -38,10 +42,12 @@ async function saveProtocol(
   userId: string | null | undefined,
   isAuthenticated: boolean,
   protocol: DailyProtocol,
-  verification: ReturnType<typeof getPlaceholderVerification> | Awaited<ReturnType<typeof verifyProtocol>>,
+  verificationResult: ReturnType<typeof getPlaceholderVerification> | Awaited<ReturnType<typeof verifyProtocol>>,
   name: string | null,
   config: UserConfig | AnonymousUserConfig,
 ) {
+  // Extract verification and citations from the result
+  const { verification, citations } = verificationResult;
   const startTime = Date.now();
   const log = (step: string) => console.log(`[saveProtocol] ${step} @ ${Date.now() - startTime}ms`);
 
@@ -82,6 +88,7 @@ async function saveProtocol(
     requirement_scores: verification.requirement_scores,
     goal_scores: verification.goal_scores,
     critiques: verification.critiques,
+    citations,
     is_anonymous: !isAuthenticated,
     expires_at: !isAuthenticated
       ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
@@ -201,7 +208,7 @@ export async function POST(request: NextRequest) {
             );
 
             streamLog('starting verification');
-            const verification = isAuthenticated
+            const verificationResult = isAuthenticated
               ? await verifyProtocol(protocol, config)
               : getPlaceholderVerification(config);
             streamLog('verification complete');
@@ -209,10 +216,11 @@ export async function POST(request: NextRequest) {
             // Stage 3: Save
             streamLog('starting save');
             const protocolName = generateProtocolName(config.goals);
-            const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName, config);
+            const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verificationResult, protocolName, config);
             streamLog('save complete');
 
             // Stage 4: Complete
+            const { verification: verificationData, citations } = verificationResult;
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 done: true,
@@ -220,13 +228,14 @@ export async function POST(request: NextRequest) {
                   id: savedProtocol?.id,
                   protocol,
                   evaluation: {
-                    requirement_scores: verification.requirement_scores,
-                    goal_scores: verification.goal_scores,
-                    critiques: verification.critiques,
-                    requirements_met: verification.requirements_met,
-                    weighted_goal_score: verification.weighted_goal_score,
-                    viability_score: verification.viability_score,
+                    requirement_scores: verificationData.requirement_scores,
+                    goal_scores: verificationData.goal_scores,
+                    critiques: verificationData.critiques,
+                    requirements_met: verificationData.requirements_met,
+                    weighted_goal_score: verificationData.weighted_goal_score,
+                    viability_score: verificationData.viability_score,
                   },
+                  citations,
                 },
               })}\n\n`)
             );
@@ -254,16 +263,17 @@ export async function POST(request: NextRequest) {
     log('generation complete');
 
     log('starting verification');
-    const verification = isAuthenticated
+    const verificationResult = isAuthenticated
       ? await verifyProtocol(protocol, config)
       : getPlaceholderVerification(config);
     log('verification complete');
 
     log('starting save');
     const protocolName = generateProtocolName(config.goals);
-    const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verification, protocolName, config);
+    const savedProtocol = await saveProtocol(supabase, user?.id, isAuthenticated, protocol, verificationResult, protocolName, config);
     log('save complete');
 
+    const { verification, citations } = verificationResult;
     log('sending response');
     return NextResponse.json({
       id: savedProtocol?.id,
@@ -276,6 +286,7 @@ export async function POST(request: NextRequest) {
         weighted_goal_score: verification.weighted_goal_score,
         viability_score: verification.viability_score,
       },
+      citations,
     });
   } catch (error) {
     console.error('Protocol generation error:', error);

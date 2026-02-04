@@ -6,6 +6,8 @@ export {
   // Schedule schemas
   timeBlockSchema,
   type TimeBlock,
+  otherEventSchema,
+  type OtherEvent,
   dayOfWeekSchema,
   type DayOfWeek,
   ALL_DAYS,
@@ -55,6 +57,13 @@ export {
   type Critique,
   critiqueEvaluationSchema,
   type CritiqueEvaluation,
+
+  // Citation schemas
+  citationSchema,
+  citationOperationSchema,
+  citationsArraySchema,
+  type Citation,
+  type CitationOperation,
 
   // Result types
   type VerificationResult,

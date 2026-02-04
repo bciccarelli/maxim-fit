@@ -4,6 +4,7 @@ import { z } from 'zod';
 // Schedule Schemas
 // =============================================================================
 
+// TimeBlock is used for legacy format backward compatibility
 export const timeBlockSchema = z.object({
   start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
   end_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
@@ -12,6 +13,16 @@ export const timeBlockSchema = z.object({
 });
 
 export type TimeBlock = z.infer<typeof timeBlockSchema>;
+
+// OtherEvent - events that don't fit in diet, supplements, or training
+export const otherEventSchema = z.object({
+  start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
+  end_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
+  activity: z.string(),
+  requirement_satisfied: z.string().optional().nullable(),
+});
+
+export type OtherEvent = z.infer<typeof otherEventSchema>;
 
 export const dayOfWeekSchema = z.enum([
   'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
@@ -26,13 +37,13 @@ export const ALL_DAYS: DayOfWeek[] = [
 export const WEEKDAYS: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 export const WEEKENDS: DayOfWeek[] = ['saturday', 'sunday'];
 
-// Schedule variant with day assignments (new multi-day format)
+// Schedule variant with day assignments - uses other_events for non-meal/supplement/workout activities
 export const scheduleVariantSchema = z.object({
   label: z.string().optional(),
   days: z.array(dayOfWeekSchema).min(1),
   wake_time: z.string(),
   sleep_time: z.string(),
-  schedule: z.array(timeBlockSchema),
+  other_events: z.array(otherEventSchema),
 });
 
 export type ScheduleVariant = z.infer<typeof scheduleVariantSchema>;
@@ -45,6 +56,15 @@ export const dailyScheduleSchema = z.object({
 });
 
 export type DailySchedule = z.infer<typeof dailyScheduleSchema>;
+
+// Legacy schedule variant format (for backward compatibility)
+export const legacyScheduleVariantSchema = z.object({
+  label: z.string().optional(),
+  days: z.array(dayOfWeekSchema).min(1),
+  wake_time: z.string(),
+  sleep_time: z.string(),
+  schedule: z.array(timeBlockSchema),
+});
 
 // =============================================================================
 // Diet Schemas
@@ -91,7 +111,8 @@ export const supplementSchema = z.object({
   dosage_amount: z.string(),
   dosage_unit: z.string(),
   dosage_notes: z.string().optional().nullable(),
-  timing: z.string(),
+  time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
+  timing: z.string(), // Kept for context (e.g., "with breakfast", "before bed")
   purpose: z.string(),
   notes: z.string().optional().nullable(),
 });
@@ -123,6 +144,7 @@ export type Exercise = z.infer<typeof exerciseSchema>;
 export const workoutSchema = z.object({
   name: z.string(),
   day: z.string(),
+  time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
   duration_min: z.number().int().positive(),
   exercises: z.array(exerciseSchema),
   warmup: z.string(),
@@ -221,6 +243,27 @@ export const critiqueEvaluationSchema = z.object({
 });
 
 export type CritiqueEvaluation = z.infer<typeof critiqueEvaluationSchema>;
+
+// =============================================================================
+// Citation Schemas
+// =============================================================================
+
+export const citationOperationSchema = z.enum(['verify', 'modify', 'ask', 'generate_meals']);
+export type CitationOperation = z.infer<typeof citationOperationSchema>;
+
+export const citationSchema = z.object({
+  id: z.string().uuid(),
+  url: z.string().url(),
+  title: z.string(),
+  domain: z.string(),
+  relevantText: z.string().optional().nullable(),  // Text segment this citation supports
+  operation: citationOperationSchema,
+  operationTimestamp: z.string(),  // ISO datetime when citation was captured
+});
+
+export type Citation = z.infer<typeof citationSchema>;
+
+export const citationsArraySchema = z.array(citationSchema);
 
 // =============================================================================
 // Verification Result
@@ -352,15 +395,207 @@ function migrateSupplementDosage(supplement: Record<string, unknown>): Record<st
 }
 
 /**
+ * Infer a time from a timing description string.
+ * Examples: "Morning with breakfast" -> "07:00", "Before bed" -> "21:30"
+ */
+function inferTimeFromTiming(timing: string, wakeTime = '07:00', sleepTime = '22:00'): string {
+  const lower = timing.toLowerCase();
+
+  // Parse wake/sleep times to minutes for calculations
+  const [wakeH, wakeM] = wakeTime.split(':').map(Number);
+  const [sleepH, sleepM] = sleepTime.split(':').map(Number);
+  const wakeMins = wakeH * 60 + wakeM;
+  const sleepMins = sleepH * 60 + sleepM;
+
+  const toTimeStr = (mins: number) => {
+    const h = Math.floor(mins / 60) % 24;
+    const m = mins % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  // Morning keywords
+  if (lower.includes('morning') || lower.includes('breakfast') || lower.includes('upon waking') || lower.includes('wake')) {
+    return toTimeStr(wakeMins + 30); // 30 min after wake
+  }
+
+  // Noon/lunch keywords
+  if (lower.includes('lunch') || lower.includes('midday') || lower.includes('noon')) {
+    return '12:00';
+  }
+
+  // Afternoon keywords
+  if (lower.includes('afternoon')) {
+    return '15:00';
+  }
+
+  // Evening/dinner keywords
+  if (lower.includes('evening') || lower.includes('dinner')) {
+    return '18:00';
+  }
+
+  // Night/bed keywords
+  if (lower.includes('night') || lower.includes('bed') || lower.includes('sleep')) {
+    return toTimeStr(sleepMins - 30); // 30 min before sleep
+  }
+
+  // Pre-workout
+  if (lower.includes('pre-workout') || lower.includes('before workout') || lower.includes('before training')) {
+    return '06:00'; // Default pre-workout time
+  }
+
+  // Post-workout
+  if (lower.includes('post-workout') || lower.includes('after workout') || lower.includes('after training')) {
+    return '07:30'; // Default post-workout time
+  }
+
+  // Default to mid-morning if we can't determine
+  return toTimeStr(wakeMins + 120); // 2 hours after wake
+}
+
+/**
+ * Add time field to supplement if missing.
+ */
+function migrateSupplementTime(supplement: Record<string, unknown>, wakeTime?: string, sleepTime?: string): Record<string, unknown> {
+  if ('time' in supplement && typeof supplement.time === 'string' && /^\d{2}:\d{2}$/.test(supplement.time)) {
+    return supplement;
+  }
+
+  const timing = typeof supplement.timing === 'string' ? supplement.timing : 'morning';
+  const inferredTime = inferTimeFromTiming(timing, wakeTime, sleepTime);
+
+  return {
+    ...supplement,
+    time: inferredTime,
+  };
+}
+
+/**
+ * Add time field to workout if missing.
+ * Tries to find matching time from legacy schedule events.
+ */
+function migrateWorkoutTime(
+  workout: Record<string, unknown>,
+  legacyScheduleBlocks?: TimeBlock[],
+  workoutIndex?: number
+): Record<string, unknown> {
+  if ('time' in workout && typeof workout.time === 'string' && /^\d{2}:\d{2}$/.test(workout.time)) {
+    return workout;
+  }
+
+  const workoutName = typeof workout.name === 'string' ? workout.name.toLowerCase() : '';
+
+  // Try to find a matching event in the legacy schedule
+  if (legacyScheduleBlocks && legacyScheduleBlocks.length > 0) {
+    // Look for exact name match first
+    const exactMatch = legacyScheduleBlocks.find(block =>
+      block.activity.toLowerCase() === workoutName
+    );
+    if (exactMatch) {
+      return { ...workout, time: exactMatch.start_time };
+    }
+
+    // Look for partial name match
+    const partialMatch = legacyScheduleBlocks.find(block => {
+      const activityLower = block.activity.toLowerCase();
+      return activityLower.includes(workoutName) || workoutName.includes(activityLower);
+    });
+    if (partialMatch) {
+      return { ...workout, time: partialMatch.start_time };
+    }
+
+    // Look for workout-related keywords
+    const workoutKeywords = ['workout', 'training', 'exercise', 'gym', 'cardio', 'strength', 'hiit', 'weights'];
+    const keywordMatch = legacyScheduleBlocks.find(block => {
+      const activityLower = block.activity.toLowerCase();
+      return workoutKeywords.some(kw => activityLower.includes(kw));
+    });
+    if (keywordMatch) {
+      return { ...workout, time: keywordMatch.start_time };
+    }
+  }
+
+  // Infer reasonable default based on workout name
+  if (workoutName.includes('morning') || workoutName.includes(' am')) {
+    return { ...workout, time: '06:00' };
+  }
+  if (workoutName.includes('evening') || workoutName.includes(' pm') || workoutName.includes('after work')) {
+    return { ...workout, time: '18:00' };
+  }
+  if (workoutName.includes('lunch') || workoutName.includes('noon') || workoutName.includes('midday')) {
+    return { ...workout, time: '12:00' };
+  }
+
+  // Default: vary based on workout index to avoid all workouts at same time
+  const defaultTimes = ['06:00', '17:00', '07:00', '18:00', '06:30', '17:30', '07:30'];
+  const idx = workoutIndex ?? 0;
+  const defaultTime = defaultTimes[idx % defaultTimes.length];
+
+  return {
+    ...workout,
+    time: defaultTime,
+  };
+}
+
+/**
+ * Migrate legacy schedule array to other_events.
+ * Filters out events that likely correspond to meals, supplements, or workouts.
+ */
+function migrateScheduleToOtherEvents(
+  scheduleBlocks: TimeBlock[],
+  meals: Array<{ time: string; name: string }>,
+  supplements: Array<{ time: string; name: string }>,
+  workouts: Array<{ time?: string; name: string }>
+): OtherEvent[] {
+  // Create a set of times and activity patterns that correspond to known events
+  const mealTimes = new Set(meals.map(m => m.time));
+  const supplementTimes = new Set(supplements.map(s => s.time));
+  const workoutNames = new Set(workouts.map(w => w.name.toLowerCase()));
+
+  // Keywords that indicate meal/supplement/workout events
+  const mealKeywords = ['breakfast', 'lunch', 'dinner', 'snack', 'meal', 'eat'];
+  const supplementKeywords = ['supplement', 'vitamin', 'take', 'medication'];
+  const workoutKeywords = ['workout', 'training', 'exercise', 'gym', 'cardio', 'strength', 'hiit'];
+
+  return scheduleBlocks.filter(block => {
+    const activityLower = block.activity.toLowerCase();
+
+    // Skip if time matches a meal time
+    if (mealTimes.has(block.start_time)) return false;
+
+    // Skip if time matches a supplement time
+    if (supplementTimes.has(block.start_time)) return false;
+
+    // Skip if activity mentions meals
+    if (mealKeywords.some(k => activityLower.includes(k))) return false;
+
+    // Skip if activity mentions supplements
+    if (supplementKeywords.some(k => activityLower.includes(k))) return false;
+
+    // Skip if activity mentions workouts or matches a workout name
+    if (workoutKeywords.some(k => activityLower.includes(k))) return false;
+    if (workoutNames.has(activityLower)) return false;
+
+    return true;
+  }).map(block => ({
+    start_time: block.start_time,
+    end_time: block.end_time,
+    activity: block.activity,
+    requirement_satisfied: block.requirement_satisfied,
+  }));
+}
+
+/**
  * Normalizes protocol data to the current schema format.
- * Converts legacy single-schedule format to the new multi-schedule format.
- * Converts legacy supplement dosage strings to structured fields.
+ * - Converts legacy single-schedule format to the new multi-schedule format.
+ * - Converts legacy supplement dosage strings to structured fields.
+ * - Adds time fields to supplements and workouts.
+ * - Migrates schedule arrays to other_events.
  */
 export function normalizeProtocol(data: unknown): DailyProtocol {
   const obj = data as Record<string, unknown>;
   let converted = { ...obj };
 
-  // Handle legacy schedule format
+  // Handle legacy single-schedule format (before multi-day support)
   if (!Array.isArray(obj.schedules) && obj.schedule && typeof obj.schedule === 'object') {
     const legacySchedule = obj.schedule as DailySchedule;
     converted = {
@@ -370,24 +605,95 @@ export function normalizeProtocol(data: unknown): DailyProtocol {
         days: ALL_DAYS,
         wake_time: legacySchedule.wake_time,
         sleep_time: legacySchedule.sleep_time,
-        schedule: legacySchedule.schedule,
+        schedule: legacySchedule.schedule, // Will be migrated to other_events below
       }],
     };
     delete (converted as Record<string, unknown>).schedule;
   }
 
-  // Handle legacy supplement dosage format
+  // Get wake/sleep times from first schedule for time inference
+  const schedulesArr = converted.schedules as Array<Record<string, unknown>>;
+  const firstSchedule = schedulesArr?.[0] || {};
+  const wakeTime = typeof firstSchedule.wake_time === 'string' ? firstSchedule.wake_time : '07:00';
+  const sleepTime = typeof firstSchedule.sleep_time === 'string' ? firstSchedule.sleep_time : '22:00';
+
+  // Collect all legacy schedule blocks for workout time inference
+  const legacyScheduleBlocks: TimeBlock[] = [];
+  if (Array.isArray(schedulesArr)) {
+    for (const variant of schedulesArr) {
+      if (Array.isArray(variant.schedule)) {
+        legacyScheduleBlocks.push(...(variant.schedule as TimeBlock[]));
+      }
+    }
+  }
+
+  // Handle legacy supplement dosage format and add time field
   if (converted.supplementation && typeof converted.supplementation === 'object') {
     const supp = converted.supplementation as Record<string, unknown>;
     if (Array.isArray(supp.supplements)) {
-      const migratedSupplements = supp.supplements.map((s: unknown) =>
-        migrateSupplementDosage(s as Record<string, unknown>)
-      );
+      const migratedSupplements = supp.supplements.map((s: unknown) => {
+        let supplement = migrateSupplementDosage(s as Record<string, unknown>);
+        supplement = migrateSupplementTime(supplement, wakeTime, sleepTime);
+        return supplement;
+      });
       converted.supplementation = {
         ...supp,
         supplements: migratedSupplements,
       };
     }
+  }
+
+  // Add time field to workouts (using legacy schedule blocks for time inference)
+  if (converted.training && typeof converted.training === 'object') {
+    const training = converted.training as Record<string, unknown>;
+    if (Array.isArray(training.workouts)) {
+      const migratedWorkouts = training.workouts.map((w: unknown, index: number) =>
+        migrateWorkoutTime(w as Record<string, unknown>, legacyScheduleBlocks, index)
+      );
+      converted.training = {
+        ...training,
+        workouts: migratedWorkouts,
+      };
+    }
+  }
+
+  // Migrate schedule arrays to other_events
+  if (Array.isArray(converted.schedules)) {
+    const diet = converted.diet as { meals?: Array<{ time: string; name: string }> } | undefined;
+    const supplementation = converted.supplementation as { supplements?: Array<{ time: string; name: string }> } | undefined;
+    const training = converted.training as { workouts?: Array<{ time?: string; name: string }> } | undefined;
+
+    const meals = diet?.meals || [];
+    const supplements = supplementation?.supplements || [];
+    const workouts = training?.workouts || [];
+
+    converted.schedules = schedulesArr.map((variant: Record<string, unknown>) => {
+      // If already has other_events and no schedule, skip migration
+      if (Array.isArray(variant.other_events) && !Array.isArray(variant.schedule)) {
+        return variant;
+      }
+
+      // If has legacy schedule array, migrate to other_events
+      if (Array.isArray(variant.schedule)) {
+        const otherEvents = migrateScheduleToOtherEvents(
+          variant.schedule as TimeBlock[],
+          meals,
+          supplements,
+          workouts
+        );
+        const { schedule: _, ...rest } = variant;
+        return {
+          ...rest,
+          other_events: otherEvents,
+        };
+      }
+
+      // No schedule or other_events, add empty other_events
+      return {
+        ...variant,
+        other_events: [],
+      };
+    });
   }
 
   // Validate with schedules array
@@ -399,9 +705,46 @@ export function normalizeProtocol(data: unknown): DailyProtocol {
 }
 
 /**
- * Checks if protocol data is in legacy format (singular schedule).
+ * Checks if protocol data is in legacy format.
+ * Legacy formats include:
+ * - Singular schedule field (before multi-day support)
+ * - Schedule arrays in variants (before event-driven architecture)
+ * - Supplements without time field
+ * - Workouts without time field
  */
 export function isLegacyProtocol(data: unknown): boolean {
   const obj = data as Record<string, unknown>;
-  return !Array.isArray(obj.schedules) && obj.schedule !== undefined;
+
+  // Check for old singular schedule format
+  if (!Array.isArray(obj.schedules) && obj.schedule !== undefined) {
+    return true;
+  }
+
+  // Check for legacy schedule array in variants
+  if (Array.isArray(obj.schedules)) {
+    const hasLegacyScheduleArray = (obj.schedules as Array<Record<string, unknown>>).some(
+      (v) => Array.isArray(v.schedule) && !Array.isArray(v.other_events)
+    );
+    if (hasLegacyScheduleArray) return true;
+  }
+
+  // Check for supplements without time field
+  if (obj.supplementation && typeof obj.supplementation === 'object') {
+    const supp = obj.supplementation as { supplements?: Array<Record<string, unknown>> };
+    if (Array.isArray(supp.supplements)) {
+      const hasMissingTime = supp.supplements.some(s => !('time' in s));
+      if (hasMissingTime) return true;
+    }
+  }
+
+  // Check for workouts without time field
+  if (obj.training && typeof obj.training === 'object') {
+    const training = obj.training as { workouts?: Array<Record<string, unknown>> };
+    if (Array.isArray(training.workouts)) {
+      const hasMissingTime = training.workouts.some(w => !('time' in w));
+      if (hasMissingTime) return true;
+    }
+  }
+
+  return false;
 }

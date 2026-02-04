@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { verifyProtocol } from '@/lib/gemini/generation';
-import { normalizeProtocol } from '@/lib/schemas/protocol';
+import { normalizeProtocol, type Citation } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
+import { mergeCitations } from '@/lib/gemini/citations';
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,10 +69,14 @@ export async function POST(request: NextRequest) {
 
     const verificationConfig = config?.success ? config.data : fallbackConfig;
 
-    // Run verification
-    const verification = await verifyProtocol(protocolData, verificationConfig);
+    // Run verification - now returns citations along with verification result
+    const { verification, citations: newCitations } = await verifyProtocol(protocolData, verificationConfig);
 
-    // Update the protocol row in-place with verification scores
+    // Merge new citations with existing ones
+    const existingCitations = (protocol.citations as Citation[]) || [];
+    const mergedCitations = mergeCitations(existingCitations, newCitations);
+
+    // Update the protocol row in-place with verification scores and citations
     const { error: updateError } = await supabase
       .from('protocols')
       .update({
@@ -81,6 +86,7 @@ export async function POST(request: NextRequest) {
         requirement_scores: verification.requirement_scores,
         goal_scores: verification.goal_scores,
         critiques: verification.critiques,
+        citations: mergedCitations,
         verified: true,
         verified_at: new Date().toISOString(),
       })
@@ -91,7 +97,7 @@ export async function POST(request: NextRequest) {
       console.error('Error updating protocol verification:', updateError);
     }
 
-    return NextResponse.json({ verification });
+    return NextResponse.json({ verification, citations: mergedCitations });
   } catch (error) {
     console.error('Protocol verification error:', error);
     return NextResponse.json(

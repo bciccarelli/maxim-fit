@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { modifyProtocol, modifyProtocolStream, verifyProtocol, extractPreferenceNotes } from '@/lib/gemini/generation';
-import { normalizeProtocol, type DailyProtocol } from '@/lib/schemas/protocol';
+import { normalizeProtocol, type DailyProtocol, type Citation } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
+import { mergeCitations } from '@/lib/gemini/citations';
 
 /**
  * Extract and save preference notes from a user's modification message.
@@ -125,13 +126,18 @@ export async function POST(request: NextRequest) {
 
             const { protocol: modifiedProtocol, reasoning } = genResult.value;
 
-            // Verify the modified protocol
+            // Verify the modified protocol (now returns citations)
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ stage: 'verifying' })}\n\n`)
             );
-            const verification = await verifyProtocol(modifiedProtocol, modifyConfig);
+            const { verification, citations: verifyCitations } = await verifyProtocol(modifiedProtocol, modifyConfig);
 
-            // Save proposal
+            // Save proposal with citations included in proposed_scores
+            const proposedScoresWithCitations = {
+              ...verification,
+              citations: verifyCitations,
+            };
+
             const { data: modification } = await supabase
               .from('protocol_modifications')
               .insert({
@@ -139,7 +145,7 @@ export async function POST(request: NextRequest) {
                 user_id: user.id,
                 user_message: userMessage,
                 proposed_protocol_data: modifiedProtocol,
-                proposed_scores: verification,
+                proposed_scores: proposedScoresWithCitations,
                 current_scores: currentScores,
                 reasoning,
                 status: 'pending',
@@ -155,7 +161,7 @@ export async function POST(request: NextRequest) {
                 done: true,
                 result: {
                   modificationId: modification?.id,
-                  proposal: { protocol: modifiedProtocol, reasoning, verification },
+                  proposal: { protocol: modifiedProtocol, reasoning, verification, citations: verifyCitations },
                   currentScores,
                 },
               })}\n\n`)
@@ -175,14 +181,23 @@ export async function POST(request: NextRequest) {
       return new Response(stream, { headers: SSE_HEADERS });
     }
 
-    // Non-streaming path
-    const { protocol: modifiedProtocol, reasoning } = await modifyProtocol(
+    // Non-streaming path - now captures citations
+    const { protocol: modifiedProtocol, reasoning, citations: modifyCitations } = await modifyProtocol(
       protocolData,
       modifyConfig,
       userMessage
     );
 
-    const verification = await verifyProtocol(modifiedProtocol, modifyConfig);
+    const { verification, citations: verifyCitations } = await verifyProtocol(modifiedProtocol, modifyConfig);
+
+    // Merge citations from modify and verify operations
+    const allCitations = mergeCitations(modifyCitations, verifyCitations);
+
+    // Save proposal with citations included in proposed_scores
+    const proposedScoresWithCitations = {
+      ...verification,
+      citations: allCitations,
+    };
 
     const { data: modification, error: saveError } = await supabase
       .from('protocol_modifications')
@@ -191,7 +206,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         user_message: userMessage,
         proposed_protocol_data: modifiedProtocol,
-        proposed_scores: verification,
+        proposed_scores: proposedScoresWithCitations,
         current_scores: currentScores,
         reasoning,
         status: 'pending',
@@ -212,6 +227,7 @@ export async function POST(request: NextRequest) {
         protocol: modifiedProtocol,
         reasoning,
         verification,
+        citations: allCitations,
       },
       currentScores,
     });

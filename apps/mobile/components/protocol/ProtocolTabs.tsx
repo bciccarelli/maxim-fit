@@ -4,16 +4,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Undo2 } from 'lucide-react-native';
 import type {
   DailyProtocol,
-  ScheduleVariant,
   DietPlan,
   SupplementationPlan,
   TrainingProgram,
+  Critique,
+  Citation,
 } from '@protocol/shared/schemas';
 import { ScheduleSection } from './ScheduleSection';
 import { DietSection } from './DietSection';
 import { SupplementsSection } from './SupplementsSection';
 import { TrainingSection } from './TrainingSection';
 import { SaveChangesButton } from './SaveChangesButton';
+import { CritiquesSection } from './CritiquesSection';
+import { CitationsSection } from './CitationsSection';
 
 type TabId = 'schedule' | 'diet' | 'supplements' | 'training';
 
@@ -33,12 +36,24 @@ interface ProtocolTabsProps {
   protocol: DailyProtocol;
   editable?: boolean;
   onProtocolChange?: (protocol: DailyProtocol) => Promise<void>;
+  protocolId?: string;
+  critiques?: Critique[] | null;
+  citations?: Citation[] | null;
+  verified?: boolean;
+  onCritiquesUpdated?: (critiques: Critique[]) => void;
+  onProtocolUpdated?: () => void;
 }
 
 export function ProtocolTabs({
   protocol,
   editable = false,
   onProtocolChange,
+  protocolId,
+  critiques,
+  citations,
+  verified = true,
+  onCritiquesUpdated,
+  onProtocolUpdated,
 }: ProtocolTabsProps) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabId>('schedule');
@@ -46,8 +61,8 @@ export function ProtocolTabs({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const handleScheduleChange = useCallback((schedules: ScheduleVariant[]) => {
-    setDraft((prev) => ({ ...prev, schedules }));
+  const handleScheduleChange = useCallback((updatedProtocol: DailyProtocol) => {
+    setDraft(updatedProtocol);
     setDirty(true);
   }, []);
 
@@ -89,7 +104,7 @@ export function ProtocolTabs({
       case 'schedule':
         return (
           <ScheduleSection
-            schedules={display.schedules}
+            protocol={display}
             editable={editable}
             onChange={handleScheduleChange}
           />
@@ -153,6 +168,22 @@ export function ProtocolTabs({
         keyboardShouldPersistTaps="always"
       >
         {renderContent()}
+        {critiques && critiques.length > 0 && protocolId && (
+          <View style={styles.critiquesContainer}>
+            <CritiquesSection
+              critiques={critiques}
+              protocolId={protocolId}
+              verified={verified}
+              onCritiquesUpdated={onCritiquesUpdated}
+              onProtocolUpdated={onProtocolUpdated}
+            />
+          </View>
+        )}
+        {citations && citations.length > 0 && (
+          <View style={styles.citationsContainer}>
+            <CitationsSection citations={citations} />
+          </View>
+        )}
       </ScrollView>
 
       {/* Save/Undo Buttons */}
@@ -205,7 +236,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 100,
   },
   contentContainerWithButton: {
     paddingBottom: 180,
@@ -232,5 +263,11 @@ const styles = StyleSheet.create({
   },
   saveButtonWrapper: {
     flex: 1,
+  },
+  critiquesContainer: {
+    marginTop: 16,
+  },
+  citationsContainer: {
+    marginTop: 16,
   },
 });

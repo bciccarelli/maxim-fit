@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, Check, Flame, Clock, Utensils, Pill, Dumbbell, Droplets, ChevronRight } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRatingPromptContext } from '@/contexts/RatingPromptContext';
 import { normalizeProtocol } from '@protocol/shared/schemas';
 import type { DailyProtocol, DayOfWeek } from '@protocol/shared/schemas';
 import { useComplianceTracking, ActivityType } from '@/hooks/useComplianceTracking';
@@ -53,12 +54,12 @@ function getTodayActivities(protocol: DailyProtocol): {
   });
 
   return {
-    scheduleBlocks: (scheduleVariant?.schedule || []).map((block, index) => ({
+    scheduleBlocks: (scheduleVariant?.other_events || []).map((event, index) => ({
       type: 'schedule_block' as ActivityType,
       index,
-      name: block.activity,
-      time: block.start_time,
-      details: `${block.start_time} – ${block.end_time}`,
+      name: event.activity,
+      time: event.start_time,
+      details: `${event.start_time} – ${event.end_time}`,
     })),
     meals: protocol.diet.meals.map((meal, index) => ({
       type: 'meal' as ActivityType,
@@ -71,13 +72,14 @@ function getTodayActivities(protocol: DailyProtocol): {
       type: 'supplement' as ActivityType,
       index,
       name: supp.name,
-      time: supp.timing,
+      time: supp.time,
       details: `${supp.dosage_amount} ${supp.dosage_unit}`,
     })),
     workout: todayWorkout ? {
       type: 'workout' as ActivityType,
       index: 0,
       name: todayWorkout.name,
+      time: todayWorkout.time,
       details: `${todayWorkout.duration_min} min · ${todayWorkout.exercises.length} exercises`,
     } : null,
     hydrationTarget: protocol.diet.hydration_oz,
@@ -87,6 +89,7 @@ function getTodayActivities(protocol: DailyProtocol): {
 export default function ProgressScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const { recordCoreAction, maybeShowRatingPrompt } = useRatingPromptContext();
 
   // Protocol selection
   const [chains, setChains] = useState<ProtocolChain[]>([]);
@@ -101,6 +104,9 @@ export default function ProgressScreen() {
 
   // Generate modal
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+
+  // Track streak milestone for rating prompt (only trigger once per session)
+  const hasRecordedStreakMilestoneRef = useRef(false);
 
   // Expanded sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -155,17 +161,18 @@ export default function ProgressScreen() {
       .select('id, protocol_data')
       .eq('version_chain_id', selectedChain.version_chain_id)
       .eq('is_current', true)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
 
     if (error) {
       console.error('Error fetching version:', error);
       return;
     }
 
-    if (data) {
-      setSelectedVersion(data);
+    if (data && data.length > 0) {
+      setSelectedVersion(data[0]);
       try {
-        const normalized = normalizeProtocol(data.protocol_data);
+        const normalized = normalizeProtocol(data[0].protocol_data);
         setParsedProtocol(normalized);
       } catch (e) {
         console.error('Error parsing protocol:', e);
@@ -232,11 +239,31 @@ export default function ProgressScreen() {
 
   const handleActivityToggle = async (activity: TodayActivity) => {
     try {
+      const wasCompleted = isCompleted(activity.type, activity.index);
       await toggleCompletion(activity.type, activity.index, activity.name, activity.time);
+
+      // Record core action when completing a workout (not uncompleting)
+      if (activity.type === 'workout' && !wasCompleted) {
+        recordCoreAction('workout_completed');
+        maybeShowRatingPrompt();
+      }
     } catch (err) {
       console.error('Failed to toggle activity:', err);
     }
   };
+
+  // Watch for streak milestones (3+ days) to trigger rating prompt
+  useEffect(() => {
+    if (
+      stats?.currentStreak &&
+      stats.currentStreak >= 3 &&
+      !hasRecordedStreakMilestoneRef.current
+    ) {
+      hasRecordedStreakMilestoneRef.current = true;
+      recordCoreAction('compliance_streak_3');
+      maybeShowRatingPrompt();
+    }
+  }, [stats?.currentStreak, recordCoreAction, maybeShowRatingPrompt]);
 
   const handleGenerateComplete = useCallback(async () => {
     // Refresh protocols list
@@ -600,13 +627,13 @@ function ActivityChecklistItem({ activity, completed, onToggle }: ActivityCheckl
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: '#fff',
   },
   emptyContent: {
     flex: 1,

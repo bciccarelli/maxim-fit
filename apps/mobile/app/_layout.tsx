@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { RatingPromptProvider, useRatingPromptContext } from '@/contexts/RatingPromptContext';
 import { GlobalUpgradeModal } from '@/components/subscription/GlobalUpgradeModal';
 import {
   registerNotificationCategories,
@@ -16,6 +17,7 @@ function RootLayoutNav() {
   const { session, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const { trackAppOpen } = useRatingPromptContext();
   const notificationResponseSubscription = useRef<EventSubscription | null>(null);
   const notificationReceivedSubscription = useRef<EventSubscription | null>(null);
 
@@ -34,6 +36,11 @@ function RootLayoutNav() {
       notificationReceivedSubscription.current?.remove();
     };
   }, []);
+
+  // Track app open for rating prompt behavioral filtering
+  useEffect(() => {
+    trackAppOpen();
+  }, [trackAppOpen]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -63,8 +70,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <SubscriptionProvider>
-          <RootLayoutNav />
-          <GlobalUpgradeModal />
+          <RatingPromptProvider>
+            <RootLayoutNav />
+            <GlobalUpgradeModal />
+          </RatingPromptProvider>
         </SubscriptionProvider>
       </AuthProvider>
     </SafeAreaProvider>

@@ -22,6 +22,7 @@ const EMPTY_EXERCISE: Exercise = {
 const EMPTY_WORKOUT: Workout = {
   name: 'New Workout',
   day: 'Day 1',
+  time: '06:00',
   duration_min: 45,
   exercises: [{ ...EMPTY_EXERCISE }],
   warmup: '5 min cardio',

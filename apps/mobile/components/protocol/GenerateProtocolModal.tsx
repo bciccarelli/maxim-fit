@@ -1,8 +1,9 @@
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { X, ChevronLeft, Sparkles } from 'lucide-react-native';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
+import { useRatingPromptContext } from '@/contexts/RatingPromptContext';
 import { GoalsStep } from './wizard/GoalsStep';
 import { RequirementsStep } from './wizard/RequirementsStep';
 import { PersonalInfoStep } from './wizard/PersonalInfoStep';
@@ -14,6 +15,11 @@ interface GenerateProtocolModalProps {
   visible: boolean;
   onClose: () => void;
   onComplete: (protocolId: string) => void;
+  initialConfig?: {
+    personal_info?: Partial<PersonalInfo>;
+    goals?: Goal[];
+    requirements?: string[];
+  };
 }
 
 interface GenerateResult {
@@ -32,17 +38,37 @@ export function GenerateProtocolModal({
   visible,
   onClose,
   onComplete,
+  initialConfig,
 }: GenerateProtocolModalProps) {
   const [step, setStep] = useState<WizardStep>(0);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [requirements, setRequirements] = useState<string[]>([]);
-  const [personalInfo, setPersonalInfo] = useState<Partial<PersonalInfo>>({
-    lifestyle_considerations: [],
-    dietary_restrictions: [],
-  });
+  const [goals, setGoals] = useState<Goal[]>(initialConfig?.goals ?? []);
+  const [requirements, setRequirements] = useState<string[]>(initialConfig?.requirements ?? []);
+  const [personalInfo, setPersonalInfo] = useState<Partial<PersonalInfo>>(
+    initialConfig?.personal_info ?? {
+      lifestyle_considerations: [],
+      dietary_restrictions: [],
+    }
+  );
+
+  // Sync state when initialConfig changes (e.g., when loaded after mount)
+  useEffect(() => {
+    if (initialConfig && step === 0) {
+      if (initialConfig.goals && initialConfig.goals.length > 0) {
+        setGoals(initialConfig.goals);
+      }
+      if (initialConfig.requirements) {
+        setRequirements(initialConfig.requirements);
+      }
+      if (initialConfig.personal_info) {
+        setPersonalInfo(initialConfig.personal_info);
+      }
+    }
+  }, [initialConfig, step]);
 
   const { streamedText, error, isStreaming, startStream, reset } =
     useSSEStream<GenerateResult>();
+
+  const { recordCoreAction, maybeShowRatingPrompt } = useRatingPromptContext();
 
   const canProceed = useCallback(() => {
     switch (step) {
@@ -98,11 +124,15 @@ export function GenerateProtocolModal({
       });
 
       if (result?.id) {
+        // Record core action and check for rating prompt
+        recordCoreAction('protocol_generated');
+        maybeShowRatingPrompt();
+
         onComplete(result.id);
         handleClose();
       }
     }
-  }, [step, goals, requirements, personalInfo, startStream, onComplete]);
+  }, [step, goals, requirements, personalInfo, startStream, onComplete, recordCoreAction, maybeShowRatingPrompt]);
 
   const handleBack = useCallback(() => {
     if (step > 0 && step < 3) {
@@ -111,17 +141,19 @@ export function GenerateProtocolModal({
   }, [step]);
 
   const handleClose = useCallback(() => {
-    // Reset state
+    // Reset state to initial values
     setStep(0);
-    setGoals([]);
-    setRequirements([]);
-    setPersonalInfo({
-      lifestyle_considerations: [],
-      dietary_restrictions: [],
-    });
+    setGoals(initialConfig?.goals ?? []);
+    setRequirements(initialConfig?.requirements ?? []);
+    setPersonalInfo(
+      initialConfig?.personal_info ?? {
+        lifestyle_considerations: [],
+        dietary_restrictions: [],
+      }
+    );
     reset();
     onClose();
-  }, [onClose, reset]);
+  }, [onClose, reset, initialConfig]);
 
   const handleRetry = useCallback(() => {
     reset();

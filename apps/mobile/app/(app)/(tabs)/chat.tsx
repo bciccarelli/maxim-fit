@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Send, ChevronDown, Plus, Sparkles, Lock } from 'lucide-react-native';
+import { Send, ChevronDown, Plus, Wand2, Lock } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
@@ -9,6 +9,8 @@ import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
+import { ChatCitationsDropdown } from '@/components/protocol/ChatCitationsDropdown';
+import type { Citation } from '@protocol/shared/schemas';
 
 type ProtocolOption = {
   id: string;
@@ -21,11 +23,13 @@ type QuestionAnswer = {
   question: string;
   answer: string;
   created_at: string;
+  citations?: Citation[];
 };
 
 type AskResult = {
   answer: string;
   suggestsModification: boolean;
+  citations?: Citation[];
 };
 
 export default function ChatScreen() {
@@ -136,7 +140,7 @@ export default function ChatScreen() {
     });
 
     if (finalResult) {
-      // Add to history
+      // Add to history with citations
       setHistory((prev) => [
         ...prev,
         {
@@ -144,6 +148,7 @@ export default function ChatScreen() {
           question: currentQuestion,
           answer: finalResult.answer,
           created_at: new Date().toISOString(),
+          citations: finalResult.citations,
         },
       ]);
       setPendingQuestion('');
@@ -284,12 +289,15 @@ export default function ChatScreen() {
                 <View style={styles.answerWrapper}>
                   <View style={styles.answerBubble}>
                     <Text style={styles.answerText}>{qa.answer}</Text>
+                    {qa.citations && qa.citations.length > 0 && (
+                      <ChatCitationsDropdown citations={qa.citations} />
+                    )}
                   </View>
                   <Pressable
                     style={styles.sparkleButton}
                     onPress={() => handleModifyFromChat(qa.answer)}
                   >
-                    <Sparkles size={14} color="#2d5a2d" />
+                    <Wand2 size={14} color="#2d5a2d" />
                   </Pressable>
                 </View>
               </View>

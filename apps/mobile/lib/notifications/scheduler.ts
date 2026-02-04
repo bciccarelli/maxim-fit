@@ -130,24 +130,24 @@ export async function scheduleProtocolNotifications(
       }
     }
 
-    // Schedule activity block notifications
+    // Schedule activity block notifications (other_events)
     if (preferences.categories.schedule.enabled && preferences.categories.schedule.activityBlocks) {
-      for (let i = 0; i < scheduleVariant.schedule.length; i++) {
-        const block = scheduleVariant.schedule[i];
-        const blockTime = combineDateAndTime(date, block.start_time);
+      for (let i = 0; i < (scheduleVariant.other_events || []).length; i++) {
+        const event = scheduleVariant.other_events[i];
+        const eventTime = combineDateAndTime(date, event.start_time);
 
-        if (blockTime > now) {
+        if (eventTime > now) {
           await scheduleNotification({
-            title: block.activity,
-            body: `${block.start_time} – ${block.end_time}`,
-            trigger: blockTime,
+            title: event.activity,
+            body: `${event.start_time} – ${event.end_time}`,
+            trigger: eventTime,
             data: {
               type: 'schedule_block',
               activityIndex: i,
-              activityName: block.activity,
+              activityName: event.activity,
               protocolId,
               scheduledDate: dateStr,
-              scheduledTime: block.start_time,
+              scheduledTime: event.start_time,
             },
           });
           scheduledCount++;

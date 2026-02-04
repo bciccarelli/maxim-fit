@@ -1,99 +1,235 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useState, useCallback } from 'react';
-import { Plus, Trash2, X } from 'lucide-react-native';
-import type { ScheduleVariant, TimeBlock } from '@protocol/shared/schemas';
+import { useState, useCallback, useMemo } from 'react';
+import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock } from 'lucide-react-native';
+import type { DailyProtocol, ScheduleVariant, OtherEvent, DayOfWeek } from '@protocol/shared/schemas';
+import {
+  computeScheduleEvents,
+  getVariantIndexForDay,
+  type ScheduleEvent,
+  type ScheduleEventSource,
+} from '@protocol/shared';
 import { EditableField } from './EditableField';
 
 type Props = {
-  schedules: ScheduleVariant[];
+  protocol: DailyProtocol;
   editable?: boolean;
-  onChange?: (schedules: ScheduleVariant[]) => void;
+  onChange?: (protocol: DailyProtocol) => void;
 };
 
-const EMPTY_TIME_BLOCK: TimeBlock = {
+const DAYS: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const DAY_ABBR: Record<DayOfWeek, string> = {
+  monday: 'Mon',
+  tuesday: 'Tue',
+  wednesday: 'Wed',
+  thursday: 'Thu',
+  friday: 'Fri',
+  saturday: 'Sat',
+  sunday: 'Sun',
+};
+
+const EMPTY_OTHER_EVENT: OtherEvent = {
   start_time: '12:00',
   end_time: '13:00',
   activity: 'New activity',
   requirement_satisfied: null,
 };
 
+function SourceIcon({ source }: { source: ScheduleEventSource }) {
+  const iconProps = { size: 14 };
+  switch (source) {
+    case 'meal':
+      return <Utensils {...iconProps} color="#2d5a2d" />;
+    case 'supplement':
+      return <Pill {...iconProps} color="#0284c7" />;
+    case 'workout':
+      return <Dumbbell {...iconProps} color="#d97706" />;
+    case 'other':
+      return <Clock {...iconProps} color="#666" />;
+  }
+}
+
 export function ScheduleSection({
-  schedules,
+  protocol,
   editable = false,
   onChange,
 }: Props) {
-  const [editingScheduleIndex, setEditingScheduleIndex] = useState<number | null>(null);
-  const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
+  const [selectedDay, setSelectedDay] = useState<DayOfWeek>('monday');
+  const [editingEventIndex, setEditingEventIndex] = useState<number | null>(null);
 
-  const updateSchedule = useCallback(
-    (scheduleIndex: number, updates: Partial<ScheduleVariant>) => {
-      const newSchedules = [...schedules];
-      newSchedules[scheduleIndex] = { ...newSchedules[scheduleIndex], ...updates };
-      onChange?.(newSchedules);
-    },
-    [schedules, onChange]
+  const variantIndex = useMemo(
+    () => getVariantIndexForDay(protocol.schedules, selectedDay),
+    [protocol.schedules, selectedDay]
+  );
+  const selectedVariant = protocol.schedules[variantIndex];
+
+  const events = useMemo(
+    () => computeScheduleEvents(protocol, selectedDay),
+    [protocol, selectedDay]
   );
 
-  const updateTimeBlock = useCallback(
-    (scheduleIndex: number, blockIndex: number, updates: Partial<TimeBlock>) => {
-      const newSchedules = [...schedules];
-      const newBlocks = [...newSchedules[scheduleIndex].schedule];
-      newBlocks[blockIndex] = { ...newBlocks[blockIndex], ...updates };
-      newSchedules[scheduleIndex] = { ...newSchedules[scheduleIndex], schedule: newBlocks };
-      onChange?.(newSchedules);
+  const updateProtocol = useCallback(
+    (updated: DailyProtocol) => {
+      onChange?.(updated);
     },
-    [schedules, onChange]
+    [onChange]
   );
 
-  const addTimeBlock = useCallback(
-    (scheduleIndex: number) => {
-      const newSchedules = [...schedules];
-      const newBlocks = [...newSchedules[scheduleIndex].schedule, { ...EMPTY_TIME_BLOCK }];
-      newSchedules[scheduleIndex] = { ...newSchedules[scheduleIndex], schedule: newBlocks };
-      onChange?.(newSchedules);
-      setEditingScheduleIndex(scheduleIndex);
-      setEditingBlockIndex(newBlocks.length - 1);
+  const handleUpdateVariant = useCallback(
+    (updates: Partial<ScheduleVariant>) => {
+      const newSchedules = [...protocol.schedules];
+      newSchedules[variantIndex] = { ...newSchedules[variantIndex], ...updates };
+      updateProtocol({ ...protocol, schedules: newSchedules });
     },
-    [schedules, onChange]
+    [protocol, variantIndex, updateProtocol]
   );
 
-  const removeTimeBlock = useCallback(
-    (scheduleIndex: number, blockIndex: number) => {
-      const newSchedules = [...schedules];
-      const newBlocks = newSchedules[scheduleIndex].schedule.filter((_, i) => i !== blockIndex);
-      newSchedules[scheduleIndex] = { ...newSchedules[scheduleIndex], schedule: newBlocks };
-      onChange?.(newSchedules);
-      setEditingBlockIndex(null);
+  const handleUpdateEventTime = useCallback(
+    (event: ScheduleEvent, newStartTime: string, newEndTime?: string) => {
+      let updated = protocol;
+
+      switch (event.source) {
+        case 'meal': {
+          const newMeals = [...protocol.diet.meals];
+          if (newMeals[event.sourceIndex]) {
+            newMeals[event.sourceIndex] = { ...newMeals[event.sourceIndex], time: newStartTime };
+          }
+          updated = { ...protocol, diet: { ...protocol.diet, meals: newMeals } };
+          break;
+        }
+        case 'supplement': {
+          const newSupplements = [...protocol.supplementation.supplements];
+          if (newSupplements[event.sourceIndex]) {
+            newSupplements[event.sourceIndex] = { ...newSupplements[event.sourceIndex], time: newStartTime };
+          }
+          updated = { ...protocol, supplementation: { ...protocol.supplementation, supplements: newSupplements } };
+          break;
+        }
+        case 'workout': {
+          const newWorkouts = [...protocol.training.workouts];
+          if (newWorkouts[event.sourceIndex]) {
+            newWorkouts[event.sourceIndex] = { ...newWorkouts[event.sourceIndex], time: newStartTime };
+          }
+          updated = { ...protocol, training: { ...protocol.training, workouts: newWorkouts } };
+          break;
+        }
+        case 'other': {
+          const newSchedules = [...protocol.schedules];
+          const variant = newSchedules[variantIndex];
+          if (variant) {
+            const newOtherEvents = [...variant.other_events];
+            if (newOtherEvents[event.sourceIndex]) {
+              newOtherEvents[event.sourceIndex] = {
+                ...newOtherEvents[event.sourceIndex],
+                start_time: newStartTime,
+                ...(newEndTime && { end_time: newEndTime }),
+              };
+            }
+            newSchedules[variantIndex] = { ...variant, other_events: newOtherEvents };
+          }
+          updated = { ...protocol, schedules: newSchedules };
+          break;
+        }
+      }
+
+      updateProtocol(updated);
     },
-    [schedules, onChange]
+    [protocol, variantIndex, updateProtocol]
   );
 
-  const renderTimeBlock = (
-    block: TimeBlock,
-    blockIndex: number,
-    scheduleIndex: number
-  ) => {
-    const isEditing =
-      editingScheduleIndex === scheduleIndex && editingBlockIndex === blockIndex;
+  const handleUpdateOtherEventActivity = useCallback(
+    (event: ScheduleEvent, activity: string) => {
+      if (event.source !== 'other') return;
+
+      const newSchedules = [...protocol.schedules];
+      const variant = newSchedules[variantIndex];
+      if (variant) {
+        const newOtherEvents = [...variant.other_events];
+        if (newOtherEvents[event.sourceIndex]) {
+          newOtherEvents[event.sourceIndex] = { ...newOtherEvents[event.sourceIndex], activity };
+        }
+        newSchedules[variantIndex] = { ...variant, other_events: newOtherEvents };
+      }
+      updateProtocol({ ...protocol, schedules: newSchedules });
+    },
+    [protocol, variantIndex, updateProtocol]
+  );
+
+  const handleDeleteEvent = useCallback(
+    (event: ScheduleEvent) => {
+      let updated = protocol;
+
+      switch (event.source) {
+        case 'meal': {
+          const newMeals = protocol.diet.meals.filter((_, i) => i !== event.sourceIndex);
+          updated = { ...protocol, diet: { ...protocol.diet, meals: newMeals } };
+          break;
+        }
+        case 'supplement': {
+          const newSupplements = protocol.supplementation.supplements.filter((_, i) => i !== event.sourceIndex);
+          updated = { ...protocol, supplementation: { ...protocol.supplementation, supplements: newSupplements } };
+          break;
+        }
+        case 'workout': {
+          const newWorkouts = protocol.training.workouts.filter((_, i) => i !== event.sourceIndex);
+          updated = {
+            ...protocol,
+            training: { ...protocol.training, workouts: newWorkouts, days_per_week: newWorkouts.length },
+          };
+          break;
+        }
+        case 'other': {
+          const newSchedules = [...protocol.schedules];
+          const variant = newSchedules[variantIndex];
+          if (variant) {
+            const newOtherEvents = variant.other_events.filter((_, i) => i !== event.sourceIndex);
+            newSchedules[variantIndex] = { ...variant, other_events: newOtherEvents };
+          }
+          updated = { ...protocol, schedules: newSchedules };
+          break;
+        }
+      }
+
+      updateProtocol(updated);
+      setEditingEventIndex(null);
+    },
+    [protocol, variantIndex, updateProtocol]
+  );
+
+  const handleAddOtherEvent = useCallback(() => {
+    const newSchedules = [...protocol.schedules];
+    const variant = newSchedules[variantIndex];
+    if (variant) {
+      newSchedules[variantIndex] = {
+        ...variant,
+        other_events: [...variant.other_events, { ...EMPTY_OTHER_EVENT }],
+      };
+    }
+    updateProtocol({ ...protocol, schedules: newSchedules });
+    setEditingEventIndex(events.length);
+  }, [protocol, variantIndex, events.length, updateProtocol]);
+
+  const renderEvent = (event: ScheduleEvent, eventIndex: number) => {
+    const isEditing = editingEventIndex === eventIndex;
+    const canEditActivity = event.source === 'other';
 
     if (isEditing && editable) {
       return (
-        <View key={blockIndex} style={styles.timeBlockEdit}>
+        <View key={eventIndex} style={styles.eventEdit}>
           <View style={styles.editHeader}>
-            <Text style={styles.editLabel}>Edit Time Block</Text>
+            <View style={styles.editHeaderLeft}>
+              <SourceIcon source={event.source} />
+              <Text style={styles.editLabel}>{event.activity}</Text>
+            </View>
             <View style={styles.editActions}>
               <Pressable
                 style={styles.iconButton}
-                onPress={() => removeTimeBlock(scheduleIndex, blockIndex)}
+                onPress={() => handleDeleteEvent(event)}
               >
                 <Trash2 size={18} color="#c62828" />
               </Pressable>
               <Pressable
                 style={styles.iconButton}
-                onPress={() => {
-                  setEditingScheduleIndex(null);
-                  setEditingBlockIndex(null);
-                }}
+                onPress={() => setEditingEventIndex(null)}
               >
                 <X size={18} color="#666" />
               </Pressable>
@@ -104,10 +240,8 @@ export function ScheduleSection({
             <View style={[styles.editField, { flex: 1 }]}>
               <Text style={styles.fieldLabel}>Start</Text>
               <EditableField
-                value={block.start_time}
-                onChange={(start_time) =>
-                  updateTimeBlock(scheduleIndex, blockIndex, { start_time })
-                }
+                value={event.start_time}
+                onChange={(start_time) => handleUpdateEventTime(event, start_time)}
                 type="time"
                 editable
                 mono
@@ -116,156 +250,193 @@ export function ScheduleSection({
             <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
               <Text style={styles.fieldLabel}>End</Text>
               <EditableField
-                value={block.end_time}
-                onChange={(end_time) =>
-                  updateTimeBlock(scheduleIndex, blockIndex, { end_time })
-                }
+                value={event.end_time}
+                onChange={(end_time) => handleUpdateEventTime(event, event.start_time, end_time)}
                 type="time"
-                editable
+                editable={event.source === 'other'}
                 mono
               />
             </View>
           </View>
 
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Activity</Text>
-            <EditableField
-              value={block.activity}
-              onChange={(activity) =>
-                updateTimeBlock(scheduleIndex, blockIndex, { activity })
-              }
-              editable
-            />
-          </View>
+          {canEditActivity && (
+            <View style={styles.editField}>
+              <Text style={styles.fieldLabel}>Activity</Text>
+              <EditableField
+                value={event.activity}
+                onChange={(activity) => handleUpdateOtherEventActivity(event, activity)}
+                editable
+              />
+            </View>
+          )}
         </View>
       );
     }
 
     return (
       <Pressable
-        key={blockIndex}
-        style={styles.timeBlock}
+        key={eventIndex}
+        style={styles.event}
         onPress={() => {
           if (editable) {
-            setEditingScheduleIndex(scheduleIndex);
-            setEditingBlockIndex(blockIndex);
+            setEditingEventIndex(eventIndex);
           }
         }}
       >
-        <View style={styles.timeBlockTime}>
-          <Text style={styles.blockTimeText}>
-            {block.start_time} – {block.end_time}
+        <View style={styles.eventTime}>
+          <Text style={styles.eventTimeText}>
+            {event.start_time}
           </Text>
         </View>
-        <View style={styles.timeBlockContent}>
-          <Text style={styles.blockActivity}>{block.activity}</Text>
+        <View style={styles.eventContent}>
+          <View style={styles.eventRow}>
+            <SourceIcon source={event.source} />
+            <Text style={styles.eventActivity}>{event.activity}</Text>
+          </View>
         </View>
       </Pressable>
     );
   };
 
-  const renderSchedule = (schedule: ScheduleVariant, scheduleIndex: number) => {
-    const isEditingTimes = editingScheduleIndex === scheduleIndex && editingBlockIndex === -1;
+  if (!selectedVariant) return null;
 
-    return (
-      <View key={scheduleIndex} style={styles.card}>
-        {schedule.label && (
-          <Text style={styles.scheduleLabel}>{schedule.label}</Text>
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Schedule</Text>
+
+      {/* Day selector */}
+      {protocol.schedules.length > 1 && (
+        <View style={styles.daySelector}>
+          {DAYS.map((day) => {
+            const isSelected = day === selectedDay;
+            const dayVariantIndex = getVariantIndexForDay(protocol.schedules, day);
+            const isSameVariant = dayVariantIndex === variantIndex;
+
+            return (
+              <Pressable
+                key={day}
+                style={[
+                  styles.dayButton,
+                  isSelected && styles.dayButtonSelected,
+                  !isSelected && isSameVariant && styles.dayButtonSameVariant,
+                ]}
+                onPress={() => setSelectedDay(day)}
+              >
+                <Text
+                  style={[
+                    styles.dayButtonText,
+                    isSelected && styles.dayButtonTextSelected,
+                    !isSelected && isSameVariant && styles.dayButtonTextSameVariant,
+                  ]}
+                >
+                  {DAY_ABBR[day]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      <View style={styles.card}>
+        {selectedVariant.label && (
+          <Text style={styles.scheduleLabel}>{selectedVariant.label}</Text>
         )}
 
-        {isEditingTimes && editable ? (
-          <View style={styles.timesEditCard}>
-            <View style={styles.editHeader}>
-              <Text style={styles.editLabel}>Edit Times</Text>
+        <Pressable
+          onPress={() => {
+            if (editable) {
+              setEditingEventIndex(-1);
+            }
+          }}
+        >
+          <View style={styles.timesRow}>
+            <View style={styles.timeItem}>
+              <Text style={styles.timeLabel}>Wake</Text>
+              {editable && editingEventIndex === -1 ? (
+                <EditableField
+                  value={selectedVariant.wake_time}
+                  onChange={(wake_time) => handleUpdateVariant({ wake_time })}
+                  type="time"
+                  editable
+                  mono
+                  style={styles.timeEditValue}
+                />
+              ) : (
+                <Text style={styles.timeValue}>{selectedVariant.wake_time}</Text>
+              )}
+            </View>
+            <View style={styles.timeItem}>
+              <Text style={styles.timeLabel}>Sleep</Text>
+              {editable && editingEventIndex === -1 ? (
+                <EditableField
+                  value={selectedVariant.sleep_time}
+                  onChange={(sleep_time) => handleUpdateVariant({ sleep_time })}
+                  type="time"
+                  editable
+                  mono
+                  style={styles.timeEditValue}
+                />
+              ) : (
+                <Text style={styles.timeValue}>{selectedVariant.sleep_time}</Text>
+              )}
+            </View>
+            {editable && editingEventIndex === -1 && (
               <Pressable
                 style={styles.iconButton}
-                onPress={() => {
-                  setEditingScheduleIndex(null);
-                  setEditingBlockIndex(null);
-                }}
+                onPress={() => setEditingEventIndex(null)}
               >
                 <X size={18} color="#666" />
               </Pressable>
-            </View>
-
-            <View style={styles.editFieldRow}>
-              <View style={[styles.editField, { flex: 1 }]}>
-                <Text style={styles.fieldLabel}>Wake Time</Text>
-                <EditableField
-                  value={schedule.wake_time}
-                  onChange={(wake_time) => updateSchedule(scheduleIndex, { wake_time })}
-                  type="time"
-                  editable
-                  mono
-                  style={styles.timeEditValue}
-                />
-              </View>
-              <View style={[styles.editField, { flex: 1, marginLeft: 24 }]}>
-                <Text style={styles.fieldLabel}>Sleep Time</Text>
-                <EditableField
-                  value={schedule.sleep_time}
-                  onChange={(sleep_time) => updateSchedule(scheduleIndex, { sleep_time })}
-                  type="time"
-                  editable
-                  mono
-                  style={styles.timeEditValue}
-                />
-              </View>
-            </View>
+            )}
           </View>
-        ) : (
-          <Pressable
-            onPress={() => {
-              if (editable) {
-                setEditingScheduleIndex(scheduleIndex);
-                setEditingBlockIndex(-1);
-              }
-            }}
-          >
-            <View style={styles.timesRow}>
-              <View style={styles.timeItem}>
-                <Text style={styles.timeLabel}>Wake</Text>
-                <Text style={styles.timeValue}>{schedule.wake_time}</Text>
-              </View>
-              <View style={styles.timeItem}>
-                <Text style={styles.timeLabel}>Sleep</Text>
-                <Text style={styles.timeValue}>{schedule.sleep_time}</Text>
-              </View>
-            </View>
-          </Pressable>
-        )}
+        </Pressable>
 
         <View style={styles.daysRow}>
-          {schedule.days.map((day) => (
+          {selectedVariant.days.map((day) => (
             <View key={day} style={styles.dayBadge}>
               <Text style={styles.dayText}>{day.slice(0, 3).toUpperCase()}</Text>
             </View>
           ))}
         </View>
 
+        {/* Legend */}
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <Utensils size={12} color="#2d5a2d" />
+            <Text style={styles.legendText}>Meal</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Pill size={12} color="#0284c7" />
+            <Text style={styles.legendText}>Supplement</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Dumbbell size={12} color="#d97706" />
+            <Text style={styles.legendText}>Workout</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Clock size={12} color="#666" />
+            <Text style={styles.legendText}>Other</Text>
+          </View>
+        </View>
+
         <View style={styles.timeline}>
-          {schedule.schedule.map((block, blockIndex) =>
-            renderTimeBlock(block, blockIndex, scheduleIndex)
+          {events.map((event, index) => renderEvent(event, index))}
+
+          {events.length === 0 && (
+            <Text style={styles.noEvents}>No events scheduled for this day</Text>
           )}
 
           {editable && (
             <Pressable
               style={styles.addButton}
-              onPress={() => addTimeBlock(scheduleIndex)}
+              onPress={handleAddOtherEvent}
             >
               <Plus size={16} color="#2d5a2d" />
-              <Text style={styles.addButtonText}>Add time block</Text>
+              <Text style={styles.addButtonText}>Add other event</Text>
             </Pressable>
           )}
         </View>
       </View>
-    );
-  };
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Schedule</Text>
-      {schedules.map(renderSchedule)}
     </View>
   );
 }
@@ -282,6 +453,35 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
     marginLeft: 4,
+  },
+  daySelector: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 12,
+  },
+  dayButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
+  },
+  dayButtonSelected: {
+    backgroundColor: '#2d5a2d',
+  },
+  dayButtonSameVariant: {
+    backgroundColor: 'rgba(45, 90, 45, 0.2)',
+  },
+  dayButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#666',
+    fontVariant: ['tabular-nums'],
+  },
+  dayButtonTextSelected: {
+    color: '#fff',
+  },
+  dayButtonTextSameVariant: {
+    color: '#2d5a2d',
   },
   card: {
     backgroundColor: '#fff',
@@ -301,6 +501,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 24,
     marginBottom: 12,
+    alignItems: 'center',
   },
   timeItem: {},
   timeLabel: {
@@ -315,12 +516,6 @@ const styles = StyleSheet.create({
     color: '#1a2e1a',
     fontVariant: ['tabular-nums'],
   },
-  timesEditCard: {
-    backgroundColor: '#f9f9f7',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
   timeEditValue: {
     fontSize: 18,
   },
@@ -328,7 +523,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   dayBadge: {
     backgroundColor: '#e8f5e9',
@@ -341,32 +536,53 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2d5a2d',
   },
-  timeline: {
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 12,
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  timeBlock: {
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#666',
+  },
+  timeline: {
+    paddingTop: 4,
+  },
+  event: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  timeBlockTime: {
-    width: 100,
+  eventTime: {
+    width: 50,
   },
-  blockTimeText: {
+  eventTimeText: {
     fontSize: 12,
     color: '#666',
     fontVariant: ['tabular-nums'],
   },
-  timeBlockContent: {
+  eventContent: {
     flex: 1,
   },
-  blockActivity: {
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  eventActivity: {
     fontSize: 14,
     color: '#1a2e1a',
   },
-  timeBlockEdit: {
+  eventEdit: {
     backgroundColor: '#f9f9f7',
     borderRadius: 8,
     padding: 12,
@@ -377,6 +593,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  editHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   editLabel: {
     fontSize: 13,
@@ -404,6 +625,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
+  },
+  noEvents: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+    paddingVertical: 24,
   },
   addButton: {
     flexDirection: 'row',

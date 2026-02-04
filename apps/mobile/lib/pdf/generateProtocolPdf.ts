@@ -8,7 +8,9 @@ import type {
   TrainingProgram,
   Workout,
   Exercise,
+  DayOfWeek,
 } from '@protocol/shared/schemas';
+import { computeScheduleEvents, type ScheduleEvent } from '@protocol/shared';
 import { colors } from '../theme';
 
 export type ProtocolMetadata = {
@@ -40,10 +42,23 @@ function formatDays(days: string[]): string {
   return days.map((d) => dayAbbrevs[d] || d).join(', ');
 }
 
-function buildScheduleHtml(schedules: ScheduleVariant[]): string {
-  return schedules
-    .map(
-      (variant, index) => `
+function getSourceIcon(source: ScheduleEvent['source']): string {
+  switch (source) {
+    case 'meal': return '🍽';
+    case 'supplement': return '💊';
+    case 'workout': return '🏋️';
+    case 'other': return '⏰';
+  }
+}
+
+function buildScheduleHtml(protocol: DailyProtocol): string {
+  return protocol.schedules
+    .map((variant, index) => {
+      // Get the first day from this variant to compute events
+      const firstDay = variant.days[0] as DayOfWeek;
+      const events = computeScheduleEvents(protocol, firstDay);
+
+      return `
     <div class="card">
       <div class="card-header">
         <span class="section-label">${escapeHtml(variant.label || `Schedule ${index + 1}`)}</span>
@@ -55,20 +70,20 @@ function buildScheduleHtml(schedules: ScheduleVariant[]): string {
         <span class="mono">${variant.sleep_time}</span>
       </div>
       <div class="timeline">
-        ${variant.schedule
+        ${events
           .map(
-            (block) => `
+            (event) => `
           <div class="timeline-item">
-            <span class="time mono">${block.start_time} – ${block.end_time}</span>
-            <span class="activity">${escapeHtml(block.activity)}</span>
+            <span class="time mono">${event.start_time} – ${event.end_time}</span>
+            <span class="activity">${getSourceIcon(event.source)} ${escapeHtml(event.activity)}</span>
           </div>
         `
           )
           .join('')}
       </div>
     </div>
-  `
-    )
+  `;
+    })
     .join('');
 }
 
@@ -600,7 +615,7 @@ function buildProtocolHtml(protocol: DailyProtocol, metadata: ProtocolMetadata):
   </div>
 
   <div class="section-label">SCHEDULE</div>
-  ${buildScheduleHtml(protocol.schedules)}
+  ${buildScheduleHtml(protocol)}
 
   ${buildDietHtml(protocol.diet)}
 
@@ -609,7 +624,7 @@ function buildProtocolHtml(protocol: DailyProtocol, metadata: ProtocolMetadata):
   ${buildTrainingHtml(protocol.training)}
 
   <div class="footer">
-    Generated on ${generatedDate} · Protocol App
+    Generated on ${generatedDate} · Maxim Fit
   </div>
 </body>
 </html>

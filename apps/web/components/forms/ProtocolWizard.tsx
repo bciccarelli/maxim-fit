@@ -17,6 +17,11 @@ interface ProtocolWizardProps {
     requirements: string[];
   }) => Promise<void>;
   isLoading?: boolean;
+  initialConfig?: {
+    personal_info?: Partial<PersonalInfo>;
+    goals?: Goal[];
+    requirements?: string[];
+  };
 }
 
 const STEPS = [
@@ -25,14 +30,16 @@ const STEPS = [
   { id: 'personal', title: 'Personal Info', description: 'Tell us about yourself' },
 ];
 
-export function ProtocolWizard({ onGenerate, isLoading = false }: ProtocolWizardProps) {
+export function ProtocolWizard({ onGenerate, isLoading = false, initialConfig }: ProtocolWizardProps) {
   const [step, setStep] = useState(0);
-  const [personalInfo, setPersonalInfo] = useState<Partial<PersonalInfo>>({
-    lifestyle_considerations: [],
-    dietary_restrictions: [],
-  });
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [requirements, setRequirements] = useState<string[]>([]);
+  const [personalInfo, setPersonalInfo] = useState<Partial<PersonalInfo>>(
+    initialConfig?.personal_info ?? {
+      lifestyle_considerations: [],
+      dietary_restrictions: [],
+    }
+  );
+  const [goals, setGoals] = useState<Goal[]>(initialConfig?.goals ?? []);
+  const [requirements, setRequirements] = useState<string[]>(initialConfig?.requirements ?? []);
 
   const canProceed = () => {
     switch (step) {

@@ -12,7 +12,17 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, Send, ArrowRight, MessageSquarePlus } from 'lucide-react';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
-import type { ProtocolQuestion } from '@/lib/schemas/protocol';
+import { ChatCitationsDropdown } from './ChatCitationsDropdown';
+import type { Citation } from '@/lib/schemas/protocol';
+
+// Extended type to include citations per Q&A
+type QuestionWithCitations = {
+  id: string;
+  question: string;
+  answer: string;
+  created_at: string;
+  citations?: Citation[];
+};
 
 interface AskModalProps {
   open: boolean;
@@ -24,7 +34,7 @@ interface AskModalProps {
 
 export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExportToModify }: AskModalProps) {
   const [question, setQuestion] = useState('');
-  const [history, setHistory] = useState<ProtocolQuestion[]>([]);
+  const [history, setHistory] = useState<QuestionWithCitations[]>([]);
   const [error, setError] = useState<string | null>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
   const [sessionStart, setSessionStart] = useState<string | null>(null);
@@ -32,6 +42,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
   const { streamedText, result, isStreaming, stage, startStream, reset } = useSSEStream<{
     answer: string;
     suggestsModification: boolean;
+    citations?: Citation[];
   }>();
 
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
@@ -55,6 +66,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
           question: pendingQuestion,
           answer: result.answer,
           created_at: new Date().toISOString(),
+          citations: result.citations,
         },
       ]);
       setPendingQuestion(null);
@@ -140,6 +152,9 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
               <div className="border-l-2 border-l-info pl-4 py-1">
                 <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Answer</p>
                 <p className="text-sm whitespace-pre-wrap">{qa.answer}</p>
+                {qa.citations && qa.citations.length > 0 && (
+                  <ChatCitationsDropdown citations={qa.citations} />
+                )}
               </div>
             </div>
           ))}
