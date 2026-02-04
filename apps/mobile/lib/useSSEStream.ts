@@ -10,6 +10,8 @@ export interface UseSSEStreamReturn<T> {
   error: string | null;
   /** Whether stream is currently active */
   isStreaming: boolean;
+  /** Current stage from server (e.g., 'researching') */
+  stage: string | null;
   /** Start a new stream */
   startStream: (url: string, options?: RequestInit) => Promise<T | null>;
   /** Reset state and abort any active stream */
@@ -35,6 +37,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
   const [result, setResult] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [stage, setStage] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const reset = useCallback(() => {
@@ -48,6 +51,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     setResult(null);
     setError(null);
     setIsStreaming(false);
+    setStage(null);
   }, []);
 
   const startStream = useCallback(async (url: string, options?: RequestInit): Promise<T | null> => {
@@ -57,6 +61,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     setResult(null);
     setError(null);
     setIsStreaming(true);
+    setStage(null);
 
     return new Promise((resolve) => {
       let finalResult: T | null = null;
@@ -108,8 +113,9 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
             eventSourceRef.current = null;
             resolve(null);
           } else if ('stage' in message) {
-            // Stage update (e.g., 'verifying') - ignore for now
+            // Stage update (e.g., 'researching', 'verifying')
             console.log('[SSE] Stage:', message.stage);
+            setStage(message.stage);
           }
         } catch (parseError) {
           // Skip JSON parse errors
@@ -150,6 +156,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     result,
     error,
     isStreaming,
+    stage,
     startStream,
     reset,
   };

@@ -59,9 +59,15 @@ export async function getUserTier(userId: string): Promise<Tier> {
 }
 
 /**
- * Check if a tier has access to Pro features
+ * Check if a tier has access to Pro features.
+ * Can be bypassed with BYPASS_SUBSCRIPTION_CHECK=true for development/testing.
  */
 export function isPro(tier: Tier): boolean {
+  const bypass = process.env.BYPASS_SUBSCRIPTION_CHECK;
+  console.log('[Subscription] isPro check - tier:', tier, 'bypass:', bypass);
+  if (bypass === 'true') {
+    return true;
+  }
   return tier === 'pro';
 }
 

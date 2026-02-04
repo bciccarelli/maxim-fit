@@ -9,7 +9,6 @@ import { useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors, borderRadius } from '@/lib/theme';
-import { Alert } from 'react-native';
 
 function GoogleLogo() {
   return (
@@ -40,11 +39,8 @@ export function GoogleSignInButton() {
 
   const handlePress = async () => {
     setLoading(true);
-    const { error } = await signInWithGoogle();
+    await signInWithGoogle();
     setLoading(false);
-    if (error) {
-      Alert.alert('Error', error.message);
-    }
   };
 
   return (

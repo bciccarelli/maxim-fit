@@ -3,6 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { GlobalUpgradeModal } from '@/components/subscription/GlobalUpgradeModal';
 import {
   registerNotificationCategories,
   setupNotificationResponseListener,
@@ -60,7 +62,10 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <RootLayoutNav />
+        <SubscriptionProvider>
+          <RootLayoutNav />
+          <GlobalUpgradeModal />
+        </SubscriptionProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

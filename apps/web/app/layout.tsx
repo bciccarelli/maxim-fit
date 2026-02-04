@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Protocol — Evidence-Based Health Protocols',
+  title: 'Maxim — Evidence-Based Health Protocols',
   description: 'Stop guessing. Get a precise, evidence-based daily protocol — schedule, diet, supplements, training — tailored to your goals.',
 };
 

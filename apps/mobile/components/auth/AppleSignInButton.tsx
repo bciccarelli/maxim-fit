@@ -1,4 +1,4 @@
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,11 +17,8 @@ export function AppleSignInButton() {
   const handlePress = async () => {
     if (loading) return;
     setLoading(true);
-    const { error } = await signInWithApple();
+    await signInWithApple();
     setLoading(false);
-    if (error) {
-      Alert.alert('Error', error.message);
-    }
   };
 
   return (

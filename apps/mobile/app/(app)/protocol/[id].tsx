@@ -150,14 +150,6 @@ export default function ProtocolDetailScreen() {
               <Text style={styles.scoreLabel}>Goal Score</Text>
             </View>
           )}
-          {protocol.viability_score !== null && (
-            <View style={styles.scoreItem}>
-              <Text style={styles.scoreValue}>
-                {protocol.viability_score.toFixed(1)}
-              </Text>
-              <Text style={styles.scoreLabel}>Viability</Text>
-            </View>
-          )}
           <View style={styles.scoreItem}>
             <Text style={[styles.scoreValue, protocol.verified ? styles.verified : styles.unverified]}>
               {protocol.verified ? '✓' : '○'}

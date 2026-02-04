@@ -137,7 +137,7 @@ export function SupplementsSection({
     }
 
     const dosageDisplay = supplement.dosage_amount
-      ? `${supplement.dosage_amount} ${supplement.dosage_unit}${supplement.dosage_notes ? ` (${supplement.dosage_notes})` : ''}`
+      ? `${supplement.dosage_amount} ${supplement.dosage_unit}`
       : '';
 
     return (
@@ -147,9 +147,14 @@ export function SupplementsSection({
         onPress={() => editable && setEditingIndex(index)}
       >
         <View style={styles.supplementHeader}>
-          <Text style={styles.supplementName}>{supplement.name}</Text>
-          <Text style={styles.supplementDosage}>{dosageDisplay}</Text>
+          <Text style={styles.supplementName} numberOfLines={1}>{supplement.name}</Text>
+          {dosageDisplay ? (
+            <Text style={styles.supplementDosage}>{dosageDisplay}</Text>
+          ) : null}
         </View>
+        {supplement.dosage_notes && (
+          <Text style={styles.dosageNotes}>{supplement.dosage_notes}</Text>
+        )}
         <Text style={styles.supplementTiming}>{supplement.timing}</Text>
         <Text style={styles.supplementPurpose}>{supplement.purpose}</Text>
         {supplement.notes && (
@@ -233,6 +238,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#2d5a2d',
     fontVariant: ['tabular-nums'],
+  },
+  dosageNotes: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
   },
   supplementTiming: {
     fontSize: 13,

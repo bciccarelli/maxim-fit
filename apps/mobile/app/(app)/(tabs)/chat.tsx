@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Send, ChevronDown, Plus, Sparkles } from 'lucide-react-native';
+import { Send, ChevronDown, Plus, Sparkles, Lock } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
@@ -29,6 +30,7 @@ type AskResult = {
 
 export default function ChatScreen() {
   const { user } = useAuth();
+  const { canAccess, showUpgradeModal, isBypassEnabled } = useSubscriptionContext();
   const insets = useSafeAreaInsets();
   const [protocols, setProtocols] = useState<ProtocolOption[]>([]);
   const [selectedProtocol, setSelectedProtocol] = useState<ProtocolOption | null>(null);
@@ -39,7 +41,10 @@ export default function ChatScreen() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const { streamedText, result, error, isStreaming, startStream, reset } = useSSEStream<AskResult>();
+  const { streamedText, result, error, isStreaming, stage, startStream, reset } = useSSEStream<AskResult>();
+
+  // Check if user has access to the ask feature
+  const hasAskAccess = canAccess('ask');
 
   // Modify sheet state
   const [showModifySheet, setShowModifySheet] = useState(false);
@@ -105,6 +110,12 @@ export default function ChatScreen() {
   const handleSend = useCallback(async () => {
     if (!question.trim() || !selectedProtocol || isStreaming) return;
 
+    // Check Pro access before sending
+    if (!hasAskAccess) {
+      showUpgradeModal('ask');
+      return;
+    }
+
     const currentQuestion = question.trim();
     setPendingQuestion(currentQuestion);
     setQuestion('');
@@ -138,7 +149,7 @@ export default function ChatScreen() {
       setPendingQuestion('');
       reset();
     }
-  }, [question, selectedProtocol, isStreaming, startStream, reset]);
+  }, [question, selectedProtocol, isStreaming, hasAskAccess, showUpgradeModal, startStream, reset]);
 
   const handleNewChat = useCallback(() => {
     setHistory([]);
@@ -295,7 +306,12 @@ export default function ChatScreen() {
                     {streamedText ? (
                       <Text style={styles.answerText}>{streamedText}</Text>
                     ) : (
-                      <Text style={styles.thinkingText}>Thinking...</Text>
+                      <View style={styles.thinkingContainer}>
+                        <ActivityIndicator size="small" color="#2d5a2d" />
+                        <Text style={styles.thinkingText}>
+                          {stage === 'researching' ? 'Researching...' : 'Thinking...'}
+                        </Text>
+                      </View>
                     )}
                   </View>
                 </View>
@@ -324,12 +340,18 @@ export default function ChatScreen() {
           editable={!isStreaming}
         />
         <Pressable
-          style={[styles.sendButton, (!question.trim() || isStreaming) && styles.sendButtonDisabled]}
+          style={[
+            styles.sendButton,
+            (!question.trim() || isStreaming) && styles.sendButtonDisabled,
+            !hasAskAccess && !isBypassEnabled && styles.sendButtonLocked,
+          ]}
           onPress={handleSend}
           disabled={!question.trim() || isStreaming}
         >
           {isStreaming ? (
             <ActivityIndicator size="small" color="#fff" />
+          ) : !hasAskAccess && !isBypassEnabled ? (
+            <Lock size={18} color="#fff" />
           ) : (
             <Send size={20} color="#fff" />
           )}
@@ -537,6 +559,11 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 20,
   },
+  thinkingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   thinkingText: {
     fontSize: 14,
     color: '#999',
@@ -582,5 +609,8 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#ccc',
+  },
+  sendButtonLocked: {
+    backgroundColor: '#8B6914',
   },
 });

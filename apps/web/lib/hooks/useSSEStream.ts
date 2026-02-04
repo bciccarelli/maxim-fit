@@ -22,6 +22,7 @@ interface UseSSEStreamReturn<T> {
   result: T | null;
   error: string | null;
   isStreaming: boolean;
+  stage: string | null;
   startStream: (url: string, options?: RequestInit) => Promise<T | null>;
   reset: () => void;
 }
@@ -35,6 +36,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
   const [result, setResult] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [stage, setStage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const reset = useCallback(() => {
@@ -46,6 +48,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     setResult(null);
     setError(null);
     setIsStreaming(false);
+    setStage(null);
   }, []);
 
   const startStream = useCallback(async (url: string, options?: RequestInit): Promise<T | null> => {
@@ -98,6 +101,8 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
             if ('chunk' in message) {
               accumulated += message.chunk;
               setStreamedText(accumulated);
+            } else if ('stage' in message) {
+              setStage((message as { stage: string }).stage);
             } else if ('done' in message && message.done) {
               finalResult = message.result;
               setResult(finalResult);
@@ -122,5 +127,5 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     }
   }, [reset]);
 
-  return { streamedText, result, error, isStreaming, startStream, reset };
+  return { streamedText, result, error, isStreaming, stage, startStream, reset };
 }

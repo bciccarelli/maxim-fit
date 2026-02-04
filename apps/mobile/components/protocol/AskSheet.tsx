@@ -37,7 +37,7 @@ export function AskSheet({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const { streamedText, result, error, isStreaming, startStream, reset } = useSSEStream<AskResult>();
+  const { streamedText, result, error, isStreaming, stage, startStream, reset } = useSSEStream<AskResult>();
 
   // Fetch Q&A history when modal opens
   useEffect(() => {
@@ -199,7 +199,12 @@ export function AskSheet({
                     {streamedText ? (
                       <Text style={styles.answerText}>{streamedText}</Text>
                     ) : (
-                      <Text style={styles.thinkingText}>Thinking...</Text>
+                      <View style={styles.thinkingContainer}>
+                        <ActivityIndicator size="small" color="#2d5a2d" />
+                        <Text style={styles.thinkingText}>
+                          {stage === 'researching' ? 'Researching...' : 'Thinking...'}
+                        </Text>
+                      </View>
                     )}
                   </View>
                 </View>
@@ -342,6 +347,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 20,
+  },
+  thinkingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   thinkingText: {
     fontSize: 14,

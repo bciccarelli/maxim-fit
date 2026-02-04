@@ -2,7 +2,23 @@ import { supabase } from './supabase';
 
 // API base URL - uses the web app's API routes
 // In production, this would be your deployed web app URL
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+/**
+ * Error thrown when a Pro subscription is required for a feature.
+ * Includes the current tier so UI can show appropriate upgrade prompts.
+ */
+export class UpgradeRequiredError extends Error {
+  readonly code = 'UPGRADE_REQUIRED';
+  readonly currentTier: string;
+
+  constructor(message: string, currentTier: string = 'free') {
+    super(message);
+    this.name = 'UpgradeRequiredError';
+    this.currentTier = currentTier;
+  }
+}
 
 /**
  * Build a full API URL from a path
@@ -50,6 +66,15 @@ export async function fetchApi<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
+
+    // Handle 402 Payment Required (Pro subscription required)
+    if (response.status === 402) {
+      throw new UpgradeRequiredError(
+        error.error || 'This feature requires a Pro subscription',
+        error.currentTier || 'free'
+      );
+    }
+
     throw new Error(error.error || error.message || `HTTP ${response.status}`);
   }
 

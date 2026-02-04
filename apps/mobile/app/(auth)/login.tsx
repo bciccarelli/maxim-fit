@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useState } from 'react';
 import { Stack, Link } from 'expo-router';
@@ -54,9 +55,11 @@ export default function LoginScreen() {
           >
             {/* Header / Branding Area */}
             <View style={styles.header}>
-              <View style={styles.logoContainer}>
-                <Text style={styles.logoText}>P</Text>
-              </View>
+              <Image
+                source={require('@/assets/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
               <Text style={styles.title}>Welcome back</Text>
               <Text style={styles.subtitle}>
                 Sign in to access your health protocol
@@ -150,19 +153,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  logoContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.primaryDark,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
+    width: 80,
+    height: 80,
     marginBottom: spacing.md,
-  },
-  logoText: {
-    color: '#fff',
-    fontSize: fontSize['2xl'],
-    fontWeight: '700',
   },
   title: {
     fontSize: fontSize['3xl'],

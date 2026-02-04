@@ -128,6 +128,11 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
+            // Signal that Google Search grounding is happening
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ stage: 'researching' })}\n\n`)
+            );
+
             const generator = askAboutProtocolStream(protocolData, askConfig, question, history);
             let genResult: IteratorResult<string, { answer: string; suggestsModification: boolean }>;
             do {

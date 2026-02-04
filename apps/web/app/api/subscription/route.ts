@@ -16,6 +16,20 @@ export async function GET() {
       );
     }
 
+    // Check if subscription check is bypassed
+    const bypassed = process.env.BYPASS_SUBSCRIPTION_CHECK === 'true';
+    if (bypassed) {
+      return NextResponse.json({
+        tier: 'pro',
+        status: 'active',
+        isTrialing: false,
+        trialEndsAt: null,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        bypassed: true,
+      });
+    }
+
     const details = await getSubscriptionDetails(user.id);
 
     return NextResponse.json(details);

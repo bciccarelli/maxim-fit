@@ -13,6 +13,7 @@ import { ModifySheet } from '@/components/protocol/ModifySheet';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
 import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
 import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
+import { ProFeatureButton } from '@/components/subscription/ProFeatureButton';
 
 type ProtocolChain = {
   id: string;
@@ -228,7 +229,11 @@ export default function ProtocolsScreen() {
       revert: 'Reverted',
     };
     const source = version.change_source ? sourceLabels[version.change_source] || version.change_source : '';
-    return `v${version.version}${source ? ` - ${source}` : ''}`;
+    return `v${version.version}${source ? ` – ${source}` : ''}`;
+  };
+
+  const getShortVersionLabel = (version: ProtocolVersion) => {
+    return `v${version.version}`;
   };
 
   const handleStartEditName = () => {
@@ -433,7 +438,7 @@ export default function ProtocolsScreen() {
               ) : (
                 <>
                   <Text style={styles.versionText} numberOfLines={1} ellipsizeMode="tail">
-                    {selectedVersion ? getVersionLabel(selectedVersion) : 'Select'}
+                    {selectedVersion ? getShortVersionLabel(selectedVersion) : 'Select'}
                   </Text>
                   <ChevronDown size={14} color="#666" />
                 </>
@@ -484,50 +489,42 @@ export default function ProtocolsScreen() {
                 <Text style={styles.scoreChipLabel}>goal</Text>
               </View>
             )}
-            {selectedVersion.viability_score !== null && (
-              <View style={styles.scoreChip}>
-                <Text style={styles.scoreChipValue}>
-                  {selectedVersion.viability_score.toFixed(1)}
-                </Text>
-                <Text style={styles.scoreChipLabel}>via</Text>
-              </View>
-            )}
           </View>
 
           {/* Actions */}
           <View style={styles.actionsRow}>
             {/* Verified Button */}
-            <Pressable
-              style={[
-                styles.verifyButton,
-                selectedVersion.verified && styles.verifyButtonVerified,
-              ]}
-              onPress={handleVerify}
-              disabled={isVerifying}
-            >
-              {isVerifying ? (
-                <ActivityIndicator size="small" color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
-              ) : (
-                <>
-                  <ShieldCheck size={16} color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
-                  <Text style={[
-                    styles.verifyButtonText,
-                    selectedVersion.verified && styles.verifyButtonTextVerified,
-                  ]}>
-                    {selectedVersion.verified ? 'Verified' : 'Verify'}
-                  </Text>
-                </>
-              )}
-            </Pressable>
+            <ProFeatureButton feature="verify" onPress={handleVerify}>
+              <View
+                style={[
+                  styles.verifyButton,
+                  selectedVersion.verified && styles.verifyButtonVerified,
+                ]}
+                pointerEvents="none"
+              >
+                {isVerifying ? (
+                  <ActivityIndicator size="small" color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
+                ) : (
+                  <>
+                    <ShieldCheck size={16} color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
+                    <Text style={[
+                      styles.verifyButtonText,
+                      selectedVersion.verified && styles.verifyButtonTextVerified,
+                    ]}>
+                      {selectedVersion.verified ? 'Verified' : 'Verify'}
+                    </Text>
+                  </>
+                )}
+              </View>
+            </ProFeatureButton>
 
             {/* Modify Button */}
-            <Pressable
-              style={styles.actionButton}
-              onPress={() => openModifyWithContext()}
-            >
-              <Wand2 size={16} color="#2d5a2d" />
-              <Text style={styles.actionButtonText}>Modify</Text>
-            </Pressable>
+            <ProFeatureButton feature="modify" onPress={() => openModifyWithContext()}>
+              <View style={styles.actionButton} pointerEvents="none">
+                <Wand2 size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Modify</Text>
+              </View>
+            </ProFeatureButton>
           </View>
         </View>
       )}

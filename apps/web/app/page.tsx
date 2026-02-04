@@ -126,7 +126,7 @@ export default function HomePage() {
           <>
             {/* Hero */}
             <section className="container mx-auto px-4 pt-4 pb-8 text-center">
-              <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
+              <h1 className="text-3xl font-bold tracking-tight mb-2">
                 Optimize your protocol
               </h1>
               <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
@@ -231,7 +231,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t mt-12">
         <div className="container mx-auto px-4 py-6 text-center text-xs text-muted-foreground">
-          Protocol — Evidence-based health optimization
+          Maxim — Evidence-based health optimization
         </div>
       </footer>
     </div>

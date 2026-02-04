@@ -29,7 +29,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
   const historyEndRef = useRef<HTMLDivElement>(null);
   const [sessionStart, setSessionStart] = useState<string | null>(null);
 
-  const { streamedText, result, isStreaming, startStream, reset } = useSSEStream<{
+  const { streamedText, result, isStreaming, stage, startStream, reset } = useSSEStream<{
     answer: string;
     suggestsModification: boolean;
   }>();
@@ -158,7 +158,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
                 ) : (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Thinking...
+                    {stage === 'researching' ? 'Researching...' : 'Thinking...'}
                   </div>
                 )}
               </div>
@@ -206,7 +206,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
               {isStreaming ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Thinking...
+                  {stage === 'researching' ? 'Researching...' : 'Thinking...'}
                 </>
               ) : (
                 <>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Select } from '@/components/ui/select';
+import { VersionSelect } from '@/components/ui/version-select';
 import { Button } from '@/components/ui/button';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
 import { ProtocolActions } from '@/components/protocol/ProtocolActions';
@@ -118,6 +119,7 @@ export function DashboardProtocolView({
   const versionOptions = versions.map((v) => ({
     value: v.id,
     label: getVersionLabel(v),
+    shortLabel: `v${v.version}`,
   }));
 
   // Fetch versions when chain changes
@@ -253,7 +255,6 @@ export function DashboardProtocolView({
           <EvaluationSummary
             requirementsMet={selectedProtocol.requirements_met ?? undefined}
             goalScore={selectedProtocol.weighted_goal_score ?? undefined}
-            viabilityScore={selectedProtocol.viability_score ?? undefined}
             verified={isVerified}
           />
         </div>
@@ -301,21 +302,15 @@ export function DashboardProtocolView({
           <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
             Version
           </label>
-          {isLoadingVersions ? (
-            <div className="h-10 min-w-[140px] flex items-center justify-center rounded-md border border-input bg-background">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <Select
-              options={versionOptions}
-              value={selectedProtocol.id}
-              onChange={(e) => {
-                setConfirmDelete(false);
-                router.push(`?protocol=${e.target.value}`, { scroll: false });
-              }}
-              className="min-w-[140px] font-mono text-sm"
-            />
-          )}
+          <VersionSelect
+            options={versionOptions}
+            value={selectedProtocol.id}
+            onChange={(value) => {
+              setConfirmDelete(false);
+              router.push(`?protocol=${value}`, { scroll: false });
+            }}
+            isLoading={isLoadingVersions}
+          />
         </div>
 
         {/* Delete Button */}
