@@ -35,6 +35,7 @@ interface ModifySheetProps {
     viability_score: number | null;
   };
   onAccepted: (newProtocolId: string) => void;
+  initialMessage?: string;
 }
 
 export function ModifySheet({
@@ -43,9 +44,10 @@ export function ModifySheet({
   protocolId,
   currentScores,
   onAccepted,
+  initialMessage,
 }: ModifySheetProps) {
   const [state, setState] = useState<ModifyState>('input');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(initialMessage || '');
   const [proposal, setProposal] = useState<ModifyProposal | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -53,6 +55,13 @@ export function ModifySheet({
   const lastStatusRef = useRef<string>('');
 
   const { streamedText, error, isStreaming, startStream, reset } = useSSEStream<ModifyProposal>();
+
+  // Set initial message when prop changes
+  useEffect(() => {
+    if (initialMessage && visible) {
+      setMessage(initialMessage);
+    }
+  }, [initialMessage, visible]);
 
   // Track status changes and build history
   const currentStatus = getStreamingStatus(streamedText);

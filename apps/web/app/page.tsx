@@ -126,14 +126,11 @@ export default function HomePage() {
           <>
             {/* Hero */}
             <section className="container mx-auto px-4 pt-4 pb-8 text-center">
-              <h1 className="text-3xl font-bold tracking-tight pt-4 mt-4 mb-2">
-                Your life is unique.
-              </h1>
               <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
-                Get a protocol that works for it. 
+                Optimize your protocol based on your requirements and goals
               </h1>
               <h2 className="text-1xl font-bold tracking-tight text-primary mb-4">
-                (For free)
+                No cost to sign up for now
               </h2>
               
               <p className="text-sm text-muted-foreground max-w-lg mx-auto">

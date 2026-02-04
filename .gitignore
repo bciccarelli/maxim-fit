@@ -46,6 +46,8 @@ venv/
 # Turborepo
 .turbo
 
+*.ipa
+
 # Expo / React Native (for mobile app)
 apps/mobile/.expo/
 *.jks

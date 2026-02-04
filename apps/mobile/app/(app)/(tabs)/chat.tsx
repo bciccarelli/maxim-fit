@@ -1,10 +1,13 @@
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, ChevronDown } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Send, ChevronDown, Plus, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
+import { ModifySheet } from '@/components/protocol/ModifySheet';
+import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
 
 type ProtocolOption = {
   id: string;
@@ -26,6 +29,7 @@ type AskResult = {
 
 export default function ChatScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [protocols, setProtocols] = useState<ProtocolOption[]>([]);
   const [selectedProtocol, setSelectedProtocol] = useState<ProtocolOption | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -36,6 +40,11 @@ export default function ChatScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const { streamedText, result, error, isStreaming, startStream, reset } = useSSEStream<AskResult>();
+
+  // Modify sheet state
+  const [showModifySheet, setShowModifySheet] = useState(false);
+  const [modifyContext, setModifyContext] = useState<string | undefined>(undefined);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   // Fetch user's protocols
   useEffect(() => {
@@ -131,63 +140,112 @@ export default function ChatScreen() {
     }
   }, [question, selectedProtocol, isStreaming, startStream, reset]);
 
+  const handleNewChat = useCallback(() => {
+    setHistory([]);
+    reset();
+  }, [reset]);
+
+  const handleModifyFromChat = useCallback((answerText: string) => {
+    setModifyContext(`Based on this conversation about my protocol:\n\n"${answerText}"\n\nPlease make appropriate modifications.`);
+    setShowModifySheet(true);
+  }, []);
+
+  const handleModifyAccepted = useCallback(() => {
+    // Could refresh protocol data here if needed
+  }, []);
+
+  const handleGenerateComplete = useCallback(async (protocolId: string) => {
+    // Refresh protocols list
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('protocols')
+      .select('id, name, version_chain_id')
+      .eq('user_id', user.id)
+      .eq('is_current', true)
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      setProtocols(data);
+      setSelectedProtocol(data[0]);
+    }
+  }, [user]);
+
   if (!selectedProtocol) {
     return (
-      <View style={styles.emptyContainer}>
+      <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
         <Text style={styles.emptyTitle}>No protocols available</Text>
         <Text style={styles.emptyText}>
-          Generate a protocol on the web app to start chatting.
+          Create a protocol to start chatting about your health plan.
         </Text>
+        <Pressable
+          style={styles.generateButton}
+          onPress={() => setShowGenerateModal(true)}
+        >
+          <Text style={styles.generateButtonText}>Generate Protocol</Text>
+        </Pressable>
+        <GenerateProtocolModal
+          visible={showGenerateModal}
+          onClose={() => setShowGenerateModal(false)}
+          onComplete={handleGenerateComplete}
+        />
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={100}
+      keyboardVerticalOffset={insets.top}
     >
-      {/* Protocol Selector */}
-      <View style={styles.selectorContainer}>
-        <Pressable
-          style={styles.selector}
-          onPress={() => setShowDropdown(!showDropdown)}
-        >
-          <Text style={styles.selectorText} numberOfLines={1}>
-            {selectedProtocol.name || 'Untitled Protocol'}
-          </Text>
-          <ChevronDown size={20} color="#666" />
-        </Pressable>
+      {/* Header with Protocol Selector and New Chat Button */}
+      <View style={styles.headerContainer}>
+        <View style={[styles.selectorWrapper, { zIndex: 10 }]}>
+          <Pressable
+            style={styles.selector}
+            onPress={() => setShowDropdown(!showDropdown)}
+          >
+            <Text style={styles.selectorText} numberOfLines={1}>
+              {selectedProtocol.name || 'Untitled Protocol'}
+            </Text>
+            <ChevronDown size={18} color="#666" />
+          </Pressable>
 
-        {showDropdown && (
-          <View style={styles.dropdown}>
-            {protocols.map((protocol) => (
-              <Pressable
-                key={protocol.id}
-                style={[
-                  styles.dropdownItem,
-                  protocol.id === selectedProtocol.id && styles.dropdownItemSelected,
-                ]}
-                onPress={() => {
-                  setSelectedProtocol(protocol);
-                  setShowDropdown(false);
-                  setHistory([]);
-                }}
-              >
-                <Text
+          {showDropdown && (
+            <View style={styles.dropdown}>
+              {protocols.map((protocol) => (
+                <Pressable
+                  key={protocol.id}
                   style={[
-                    styles.dropdownItemText,
-                    protocol.id === selectedProtocol.id && styles.dropdownItemTextSelected,
+                    styles.dropdownItem,
+                    protocol.id === selectedProtocol.id && styles.dropdownItemSelected,
                   ]}
-                  numberOfLines={1}
+                  onPress={() => {
+                    setSelectedProtocol(protocol);
+                    setShowDropdown(false);
+                    setHistory([]);
+                  }}
                 >
-                  {protocol.name || 'Untitled Protocol'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      protocol.id === selectedProtocol.id && styles.dropdownItemTextSelected,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {protocol.name || 'Untitled Protocol'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* New Chat Button */}
+        <Pressable style={styles.newChatButton} onPress={handleNewChat}>
+          <Plus size={20} color="#2d5a2d" />
+        </Pressable>
       </View>
 
       {/* Chat Messages */}
@@ -212,8 +270,16 @@ export default function ChatScreen() {
                 <View style={styles.questionBubble}>
                   <Text style={styles.questionText}>{qa.question}</Text>
                 </View>
-                <View style={styles.answerBubble}>
-                  <Text style={styles.answerText}>{qa.answer}</Text>
+                <View style={styles.answerWrapper}>
+                  <View style={styles.answerBubble}>
+                    <Text style={styles.answerText}>{qa.answer}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.sparkleButton}
+                    onPress={() => handleModifyFromChat(qa.answer)}
+                  >
+                    <Sparkles size={14} color="#2d5a2d" />
+                  </Pressable>
                 </View>
               </View>
             ))}
@@ -224,12 +290,14 @@ export default function ChatScreen() {
                 <View style={styles.questionBubble}>
                   <Text style={styles.questionText}>{pendingQuestion}</Text>
                 </View>
-                <View style={styles.answerBubble}>
-                  {streamedText ? (
-                    <Text style={styles.answerText}>{streamedText}</Text>
-                  ) : (
-                    <Text style={styles.thinkingText}>Thinking...</Text>
-                  )}
+                <View style={styles.answerWrapper}>
+                  <View style={styles.answerBubble}>
+                    {streamedText ? (
+                      <Text style={styles.answerText}>{streamedText}</Text>
+                    ) : (
+                      <Text style={styles.thinkingText}>Thinking...</Text>
+                    )}
+                  </View>
                 </View>
               </View>
             )}
@@ -243,8 +311,8 @@ export default function ChatScreen() {
         )}
       </ScrollView>
 
-      {/* Input Area */}
-      <View style={styles.inputContainer}>
+      {/* Input Area - extra padding for tab bar */}
+      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 72 }]}>
         <TextInput
           style={styles.input}
           value={question}
@@ -267,6 +335,22 @@ export default function ChatScreen() {
           )}
         </Pressable>
       </View>
+
+      {/* Modify Sheet */}
+      <ModifySheet
+        visible={showModifySheet}
+        onClose={() => {
+          setShowModifySheet(false);
+          setModifyContext(undefined);
+        }}
+        protocolId={selectedProtocol.id}
+        currentScores={{
+          weighted_goal_score: null,
+          viability_score: null,
+        }}
+        onAccepted={handleModifyAccepted}
+        initialMessage={modifyContext}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -274,13 +358,13 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: '#fff',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: '#fff',
     padding: 32,
   },
   emptyTitle: {
@@ -293,13 +377,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    marginBottom: 20,
   },
-  selectorContainer: {
+  generateButton: {
+    backgroundColor: '#2d5a2d',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  generateButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
-    zIndex: 10,
+    gap: 8,
+  },
+  selectorWrapper: {
+    flex: 1,
+    position: 'relative',
   },
   selector: {
     flexDirection: 'row',
@@ -315,6 +417,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a2e1a',
     flex: 1,
+  },
+  newChatButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#e8f5e9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdown: {
     position: 'absolute',
@@ -350,6 +460,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+    backgroundColor: '#f5f5f0',
   },
   messagesContent: {
     padding: 16,
@@ -395,16 +506,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     lineHeight: 20,
   },
-  answerBubble: {
+  answerWrapper: {
     alignSelf: 'flex-start',
+    maxWidth: '85%',
+  },
+  answerBubble: {
     backgroundColor: '#fff',
     borderRadius: 16,
     borderBottomLeftRadius: 4,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    maxWidth: '85%',
     borderLeftWidth: 3,
     borderLeftColor: '#2d5a2d',
+  },
+  sparkleButton: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e8f5e9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   answerText: {
     fontSize: 14,

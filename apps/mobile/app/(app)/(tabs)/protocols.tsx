@@ -1,14 +1,18 @@
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, MessageCircle, Wand2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronDown, Wand2, Plus, ShieldCheck, Pencil } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { normalizeProtocol } from '@protocol/shared/schemas';
 import type { DailyProtocol } from '@protocol/shared/schemas';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
-import { AskSheet } from '@/components/protocol/AskSheet';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
+import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
+import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
+import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
 
 type ProtocolChain = {
   id: string;
@@ -31,6 +35,8 @@ type ProtocolVersion = {
 
 export default function ProtocolsScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   // Protocol chains (unique protocols)
   const [chains, setChains] = useState<ProtocolChain[]>([]);
@@ -49,10 +55,16 @@ export default function ProtocolsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Name editing
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
 
   // Modals
-  const [showAskSheet, setShowAskSheet] = useState(false);
   const [showModifySheet, setShowModifySheet] = useState(false);
+  const [modifyContext, setModifyContext] = useState<string | undefined>(undefined);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   // Fetch protocol chains (current versions only, grouped by chain)
   const fetchChains = useCallback(async () => {
@@ -120,6 +132,34 @@ export default function ProtocolsScreen() {
       setParsedData(null);
     }
   }, [selectedVersion]);
+
+  // Schedule notifications when protocol is loaded
+  const lastScheduledProtocolId = useRef<string | null>(null);
+  useEffect(() => {
+    async function scheduleNotifications() {
+      if (!parsedData || !selectedVersion) return;
+
+      // Only schedule once per protocol version
+      if (lastScheduledProtocolId.current === selectedVersion.id) return;
+
+      try {
+        const preferences = await getNotificationPreferences();
+        if (preferences.enabled) {
+          const count = await scheduleProtocolNotifications(
+            parsedData,
+            preferences,
+            selectedVersion.id
+          );
+          console.log(`Scheduled ${count} notifications for protocol`);
+          lastScheduledProtocolId.current = selectedVersion.id;
+        }
+      } catch (error) {
+        console.error('Error scheduling notifications:', error);
+      }
+    }
+
+    scheduleNotifications();
+  }, [parsedData, selectedVersion]);
 
   // Initial fetch
   useEffect(() => {
@@ -191,9 +231,73 @@ export default function ProtocolsScreen() {
     return `v${version.version}${source ? ` - ${source}` : ''}`;
   };
 
+  const handleStartEditName = () => {
+    setEditedName(selectedChain?.name || '');
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!selectedVersion || !editedName.trim()) {
+      setIsEditingName(false);
+      return;
+    }
+
+    try {
+      await fetchApi('/api/protocol/name', {
+        method: 'POST',
+        body: JSON.stringify({
+          protocolId: selectedVersion.id,
+          name: editedName.trim(),
+        }),
+      });
+      // Update local state
+      if (selectedChain) {
+        setSelectedChain({ ...selectedChain, name: editedName.trim() });
+        setChains(chains.map(c =>
+          c.version_chain_id === selectedChain.version_chain_id
+            ? { ...c, name: editedName.trim() }
+            : c
+        ));
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update name.');
+    }
+    setIsEditingName(false);
+  };
+
+  const handleVerify = async () => {
+    if (!selectedVersion || isVerifying) return;
+
+    setIsVerifying(true);
+    try {
+      await fetchApi('/api/protocol/verify', {
+        method: 'POST',
+        body: JSON.stringify({ protocolId: selectedVersion.id }),
+      });
+      await fetchVersions();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to verify protocol.');
+    }
+    setIsVerifying(false);
+  };
+
+  const handleNewProtocol = () => {
+    setShowGenerateModal(true);
+  };
+
+  const handleGenerateComplete = useCallback(async (protocolId: string) => {
+    // Refresh protocols to show the new one
+    await fetchChains();
+  }, [fetchChains]);
+
+  const openModifyWithContext = (context?: string) => {
+    setModifyContext(context);
+    setShowModifySheet(true);
+  };
+
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#2d5a2d" />
       </View>
     );
@@ -202,7 +306,7 @@ export default function ProtocolsScreen() {
   if (chains.length === 0) {
     return (
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { paddingTop: insets.top }]}
         contentContainerStyle={styles.emptyContent}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#2d5a2d" />
@@ -211,35 +315,78 @@ export default function ProtocolsScreen() {
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No protocols yet</Text>
           <Text style={styles.emptyText}>
-            Generate your first protocol on the web app to see it here.
+            Create your personalized health protocol to get started.
           </Text>
+          <Pressable
+            style={styles.generateButton}
+            onPress={() => setShowGenerateModal(true)}
+          >
+            <Text style={styles.generateButtonText}>Generate Protocol</Text>
+          </Pressable>
         </View>
+        <GenerateProtocolModal
+          visible={showGenerateModal}
+          onClose={() => setShowGenerateModal(false)}
+          onComplete={handleGenerateComplete}
+        />
       </ScrollView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Dropdowns Container */}
-      <View style={styles.dropdownsContainer}>
-        {/* Protocol Selector */}
-        <View style={[styles.dropdownWrapper, { zIndex: 20 }]}>
-          <Text style={styles.dropdownLabel}>Protocol</Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header with Name and Dropdown */}
+      <View style={styles.headerContainer}>
+        {/* Editable Name */}
+        <View style={styles.nameContainer}>
+          {isEditingName ? (
+            <TextInput
+              style={styles.nameInput}
+              value={editedName}
+              onChangeText={setEditedName}
+              onBlur={handleSaveName}
+              onSubmitEditing={handleSaveName}
+              autoFocus
+              selectTextOnFocus
+              maxLength={100}
+            />
+          ) : (
+            <Pressable style={styles.nameRow} onPress={handleStartEditName}>
+              <Text style={styles.protocolName} numberOfLines={1}>
+                {selectedChain?.name || 'Untitled Protocol'}
+              </Text>
+              <Pencil size={14} color="#999" />
+            </Pressable>
+          )}
+        </View>
+
+        {/* Protocol Dropdown Button */}
+        <View style={[styles.dropdownButtonWrapper, { zIndex: 20 }]}>
           <Pressable
-            style={styles.dropdown}
+            style={styles.dropdownButton}
             onPress={() => {
               setShowChainDropdown(!showChainDropdown);
               setShowVersionDropdown(false);
             }}
           >
-            <Text style={styles.dropdownText} numberOfLines={1}>
-              {selectedChain?.name || 'Untitled Protocol'}
-            </Text>
-            <ChevronDown size={18} color="#666" />
+            <ChevronDown size={20} color="#666" />
           </Pressable>
 
           {showChainDropdown && (
             <View style={styles.dropdownMenu}>
+              <Pressable
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowChainDropdown(false);
+                  handleNewProtocol();
+                }}
+              >
+                <Plus size={16} color="#2d5a2d" />
+                <Text style={[styles.dropdownItemText, styles.newProtocolText]}>
+                  New Protocol
+                </Text>
+              </Pressable>
+              <View style={styles.dropdownDivider} />
               {chains.map((chain) => (
                 <Pressable
                   key={chain.id}
@@ -255,6 +402,7 @@ export default function ProtocolsScreen() {
                       chain.id === selectedChain?.id && styles.dropdownItemTextSelected,
                     ]}
                     numberOfLines={1}
+                    ellipsizeMode="tail"
                   >
                     {chain.name || 'Untitled Protocol'}
                   </Text>
@@ -263,104 +411,121 @@ export default function ProtocolsScreen() {
             </View>
           )}
         </View>
-
-        {/* Version Selector */}
-        <View style={[styles.dropdownWrapper, styles.versionDropdown, { zIndex: 10 }]}>
-          <Text style={styles.dropdownLabel}>Version</Text>
-          <Pressable
-            style={[styles.dropdown, isLoadingVersions && styles.dropdownDisabled]}
-            onPress={() => {
-              if (!isLoadingVersions && versions.length > 0) {
-                setShowVersionDropdown(!showVersionDropdown);
-                setShowChainDropdown(false);
-              }
-            }}
-            disabled={isLoadingVersions}
-          >
-            {isLoadingVersions ? (
-              <ActivityIndicator size="small" color="#666" />
-            ) : (
-              <>
-                <Text style={styles.dropdownText} numberOfLines={1}>
-                  {selectedVersion ? getVersionLabel(selectedVersion) : 'Select version'}
-                </Text>
-                <ChevronDown size={18} color="#666" />
-              </>
-            )}
-          </Pressable>
-
-          {showVersionDropdown && versions.length > 0 && (
-            <View style={styles.dropdownMenu}>
-              {versions.map((version) => (
-                <Pressable
-                  key={version.id}
-                  style={[
-                    styles.dropdownItem,
-                    version.id === selectedVersion?.id && styles.dropdownItemSelected,
-                  ]}
-                  onPress={() => handleVersionSelect(version)}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      version.id === selectedVersion?.id && styles.dropdownItemTextSelected,
-                    ]}
-                  >
-                    {getVersionLabel(version)}
-                  </Text>
-                  <Text style={styles.versionDate}>
-                    {new Date(version.created_at).toLocaleDateString()}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
       </View>
 
-      {/* Scores and Actions Bar */}
+      {/* Version and Actions Bar */}
       {selectedVersion && (
-        <View style={styles.scoresBar}>
-          <View style={styles.scoresRow}>
+        <View style={styles.actionsBar}>
+          {/* Version Selector */}
+          <View style={[styles.versionSelectorWrapper, { zIndex: 10 }]}>
+            <Pressable
+              style={[styles.versionSelector, isLoadingVersions && styles.dropdownDisabled]}
+              onPress={() => {
+                if (!isLoadingVersions && versions.length > 0) {
+                  setShowVersionDropdown(!showVersionDropdown);
+                  setShowChainDropdown(false);
+                }
+              }}
+              disabled={isLoadingVersions}
+            >
+              {isLoadingVersions ? (
+                <ActivityIndicator size="small" color="#666" />
+              ) : (
+                <>
+                  <Text style={styles.versionText} numberOfLines={1} ellipsizeMode="tail">
+                    {selectedVersion ? getVersionLabel(selectedVersion) : 'Select'}
+                  </Text>
+                  <ChevronDown size={14} color="#666" />
+                </>
+              )}
+            </Pressable>
+
+            {showVersionDropdown && versions.length > 0 && (
+              <View style={[styles.dropdownMenu, styles.versionDropdownMenu]}>
+                <ScrollView style={styles.versionScrollView} nestedScrollEnabled>
+                  {versions.map((version) => (
+                    <Pressable
+                      key={version.id}
+                      style={[
+                        styles.dropdownItem,
+                        version.id === selectedVersion?.id && styles.dropdownItemSelected,
+                      ]}
+                      onPress={() => handleVersionSelect(version)}
+                    >
+                      <View style={styles.versionItemContent}>
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            version.id === selectedVersion?.id && styles.dropdownItemTextSelected,
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {getVersionLabel(version)}
+                        </Text>
+                        <Text style={styles.versionDate}>
+                          {new Date(version.created_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* Scores */}
+          <View style={styles.scoresInline}>
             {selectedVersion.weighted_goal_score !== null && (
-              <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>
+              <View style={styles.scoreChip}>
+                <Text style={styles.scoreChipValue}>
                   {selectedVersion.weighted_goal_score.toFixed(1)}
                 </Text>
-                <Text style={styles.scoreLabel}>Goal</Text>
+                <Text style={styles.scoreChipLabel}>goal</Text>
               </View>
             )}
             {selectedVersion.viability_score !== null && (
-              <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>
+              <View style={styles.scoreChip}>
+                <Text style={styles.scoreChipValue}>
                   {selectedVersion.viability_score.toFixed(1)}
                 </Text>
-                <Text style={styles.scoreLabel}>Viability</Text>
+                <Text style={styles.scoreChipLabel}>via</Text>
               </View>
             )}
-            <View style={styles.scoreItem}>
-              <Text style={[styles.scoreValue, selectedVersion.verified ? styles.verified : styles.unverified]}>
-                {selectedVersion.verified ? '✓' : '○'}
-              </Text>
-              <Text style={styles.scoreLabel}>
-                {selectedVersion.verified ? 'Verified' : 'Unverified'}
-              </Text>
-            </View>
           </View>
 
+          {/* Actions */}
           <View style={styles.actionsRow}>
+            {/* Verified Button */}
             <Pressable
-              style={styles.actionButton}
-              onPress={() => setShowAskSheet(true)}
+              style={[
+                styles.verifyButton,
+                selectedVersion.verified && styles.verifyButtonVerified,
+              ]}
+              onPress={handleVerify}
+              disabled={isVerifying}
             >
-              <MessageCircle size={18} color="#2d5a2d" />
-              <Text style={styles.actionButtonText}>Ask</Text>
+              {isVerifying ? (
+                <ActivityIndicator size="small" color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
+              ) : (
+                <>
+                  <ShieldCheck size={16} color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
+                  <Text style={[
+                    styles.verifyButtonText,
+                    selectedVersion.verified && styles.verifyButtonTextVerified,
+                  ]}>
+                    {selectedVersion.verified ? 'Verified' : 'Verify'}
+                  </Text>
+                </>
+              )}
             </Pressable>
+
+            {/* Modify Button */}
             <Pressable
               style={styles.actionButton}
-              onPress={() => setShowModifySheet(true)}
+              onPress={() => openModifyWithContext()}
             >
-              <Wand2 size={18} color="#2d5a2d" />
+              <Wand2 size={16} color="#2d5a2d" />
               <Text style={styles.actionButtonText}>Modify</Text>
             </Pressable>
           </View>
@@ -382,26 +547,26 @@ export default function ProtocolsScreen() {
 
       {/* Modals */}
       {selectedVersion && (
-        <>
-          <AskSheet
-            visible={showAskSheet}
-            onClose={() => setShowAskSheet(false)}
-            protocolId={selectedVersion.id}
-            versionChainId={selectedVersion.version_chain_id}
-          />
-
-          <ModifySheet
-            visible={showModifySheet}
-            onClose={() => setShowModifySheet(false)}
-            protocolId={selectedVersion.id}
-            currentScores={{
-              weighted_goal_score: selectedVersion.weighted_goal_score,
-              viability_score: selectedVersion.viability_score,
-            }}
-            onAccepted={handleModifyAccepted}
-          />
-        </>
+        <ModifySheet
+          visible={showModifySheet}
+          onClose={() => {
+            setShowModifySheet(false);
+            setModifyContext(undefined);
+          }}
+          protocolId={selectedVersion.id}
+          currentScores={{
+            weighted_goal_score: selectedVersion.weighted_goal_score,
+            viability_score: selectedVersion.viability_score,
+          }}
+          onAccepted={handleModifyAccepted}
+          initialMessage={modifyContext}
+        />
       )}
+      <GenerateProtocolModal
+        visible={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        onComplete={handleGenerateComplete}
+      />
     </View>
   );
 }
@@ -409,13 +574,13 @@ export default function ProtocolsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: '#fff',
   },
   emptyContent: {
     flex: 1,
@@ -438,54 +603,68 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    marginBottom: 20,
   },
-  dropdownsContainer: {
+  generateButton: {
+    backgroundColor: '#2d5a2d',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  generateButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  headerContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
-    gap: 12,
+    gap: 8,
   },
-  dropdownWrapper: {
+  nameContainer: {
     flex: 1,
-    position: 'relative',
+    flexDirection: 'row',
   },
-  versionDropdown: {
-    flex: 0.6,
-  },
-  dropdownLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  dropdown: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    minHeight: 36,
+    gap: 4,
   },
-  dropdownDisabled: {
-    opacity: 0.6,
-  },
-  dropdownText: {
-    fontSize: 13,
-    fontWeight: '500',
+  protocolName: {
+    fontSize: 17,
+    fontWeight: '600',
     color: '#1a2e1a',
-    flex: 1,
+    flexShrink: 1,
+  },
+  nameInput: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1a2e1a',
+    padding: 0,
+    margin: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2d5a2d',
+  },
+  dropdownButtonWrapper: {
+    position: 'relative',
+  },
+  dropdownButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdownMenu: {
     position: 'absolute',
     top: '100%',
-    left: 0,
     right: 0,
+    minWidth: 220,
     backgroundColor: '#fff',
     borderRadius: 8,
     borderWidth: 1,
@@ -493,84 +672,148 @@ const styles = StyleSheet.create({
     marginTop: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    maxHeight: 200,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: '#e5e5e5',
   },
   dropdownItem: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 8,
   },
   dropdownItemSelected: {
     backgroundColor: '#e8f5e9',
   },
   dropdownItemText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#333',
+    flex: 1,
   },
   dropdownItemTextSelected: {
     color: '#2d5a2d',
     fontWeight: '500',
+  },
+  newProtocolText: {
+    color: '#2d5a2d',
+    fontWeight: '500',
+  },
+  actionsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    gap: 8,
+  },
+  versionSelectorWrapper: {
+    position: 'relative',
+  },
+  versionSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f0',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 4,
+    minWidth: 80,
+  },
+  versionText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1a2e1a',
+  },
+  versionDropdownMenu: {
+    left: 0,
+    right: 'auto',
+    minWidth: 180,
+    maxHeight: 250,
+  },
+  versionScrollView: {
+    maxHeight: 250,
+  },
+  versionItemContent: {
+    flex: 1,
   },
   versionDate: {
     fontSize: 11,
     color: '#999',
     marginTop: 2,
   },
-  scoresBar: {
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+  dropdownDisabled: {
+    opacity: 0.6,
   },
-  scoresRow: {
+  scoresInline: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 10,
+    gap: 6,
   },
-  scoreItem: {
-    alignItems: 'center',
+  scoreChip: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#f5f5f0',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 4,
+    gap: 2,
   },
-  scoreValue: {
-    fontSize: 20,
+  scoreChipValue: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#1a2e1a',
     fontVariant: ['tabular-nums'],
   },
-  scoreLabel: {
+  scoreChipLabel: {
     fontSize: 9,
     color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 1,
-  },
-  verified: {
-    color: '#2d5a2d',
-  },
-  unverified: {
-    color: '#999',
   },
   actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
+    marginLeft: 'auto',
+    gap: 8,
+  },
+  verifyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    gap: 4,
+  },
+  verifyButtonVerified: {
+    borderColor: '#2d5a2d',
+    backgroundColor: '#e8f5e9',
+  },
+  verifyButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666',
+  },
+  verifyButtonTextVerified: {
+    color: '#2d5a2d',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e8f5e9',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
+    backgroundColor: '#2d5a2d',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
   },
   actionButtonText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: '#fff',
   },
 });

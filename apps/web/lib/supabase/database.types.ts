@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      compliance_logs: {
+        Row: {
+          id: string
+          user_id: string
+          protocol_id: string
+          activity_type: string
+          activity_index: number
+          activity_name: string
+          scheduled_date: string
+          scheduled_time: string | null
+          completed_at: string
+          skipped: boolean
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          protocol_id: string
+          activity_type: string
+          activity_index: number
+          activity_name: string
+          scheduled_date: string
+          scheduled_time?: string | null
+          completed_at?: string
+          skipped?: boolean
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          protocol_id?: string
+          activity_type?: string
+          activity_index?: number
+          activity_name?: string
+          scheduled_date?: string
+          scheduled_time?: string | null
+          completed_at?: string
+          skipped?: boolean
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_logs_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       criticisms: {
         Row: {
           category: string

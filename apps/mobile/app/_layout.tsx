@@ -1,12 +1,37 @@
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import {
+  registerNotificationCategories,
+  setupNotificationResponseListener,
+  setupNotificationReceivedListener,
+} from '@/lib/notifications/handlers';
+import type { EventSubscription } from 'expo-notifications';
 
 function RootLayoutNav() {
   const { session, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const notificationResponseSubscription = useRef<EventSubscription | null>(null);
+  const notificationReceivedSubscription = useRef<EventSubscription | null>(null);
+
+  // Initialize notification handlers
+  useEffect(() => {
+    // Register notification categories (iOS action buttons)
+    registerNotificationCategories();
+
+    // Set up notification listeners
+    notificationResponseSubscription.current = setupNotificationResponseListener();
+    notificationReceivedSubscription.current = setupNotificationReceivedListener();
+
+    return () => {
+      // Clean up subscriptions
+      notificationResponseSubscription.current?.remove();
+      notificationReceivedSubscription.current?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -33,8 +58,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

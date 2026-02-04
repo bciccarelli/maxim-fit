@@ -46,3 +46,13 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     },
   },
 };
+
+// Notification data attached to scheduled notifications
+export type NotificationData = {
+  type: 'schedule_block' | 'meal' | 'supplement' | 'workout' | 'hydration';
+  activityIndex: number;
+  activityName: string;
+  protocolId: string;
+  scheduledDate: string; // YYYY-MM-DD
+  scheduledTime?: string; // HH:MM
+};

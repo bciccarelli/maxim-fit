@@ -31,13 +31,7 @@ export type Goal = z.infer<typeof goalSchema>;
 
 export const userConfigSchema = z.object({
   personal_info: personalInfoSchema,
-  goals: z.array(goalSchema).min(1).refine(
-    (goals) => {
-      const sum = goals.reduce((acc, g) => acc + g.weight, 0);
-      return Math.abs(sum - 1.0) < 0.001;
-    },
-    { message: 'Goal weights must sum to 1.0' }
-  ),
+  goals: z.array(goalSchema).min(1),
   requirements: z.array(z.string()),
   iterations: z.number().int().min(1).max(10).default(3),
 });
@@ -47,13 +41,7 @@ export type UserConfig = z.infer<typeof userConfigSchema>;
 // Schema for anonymous users
 export const anonymousUserConfigSchema = z.object({
   personal_info: anonymousPersonalInfoSchema,
-  goals: z.array(goalSchema).min(1).refine(
-    (goals) => {
-      const sum = goals.reduce((acc, g) => acc + g.weight, 0);
-      return Math.abs(sum - 1.0) < 0.001;
-    },
-    { message: 'Goal weights must sum to 1.0' }
-  ),
+  goals: z.array(goalSchema).min(1),
   requirements: z.array(z.string()),
 });
 

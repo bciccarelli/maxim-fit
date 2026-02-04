@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogOut, User, Target, CheckSquare, CreditCard } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
@@ -36,6 +37,7 @@ type Subscription = {
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
+  const insets = useSafeAreaInsets();
   const [config, setConfig] = useState<UserConfig | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,14 +108,14 @@ export default function SettingsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#2d5a2d" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 80 }]}>
       {/* Subscription Status */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>

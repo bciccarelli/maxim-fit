@@ -205,8 +205,13 @@ export async function generateProtocol(
 function buildGenerationPrompt(config: UserConfig | AnonymousUserConfig, userNotes?: string[]): string {
   const { personal_info, goals, requirements } = config;
 
-  const goalsText = goals
-    .map((g) => `- ${g.name} (weight: ${g.weight})`)
+  // Normalize weights to sum to 1.0 for the AI prompt
+  const totalWeight = goals.reduce((acc, g) => acc + g.weight, 0);
+  const normalizedGoals = totalWeight > 0
+    ? goals.map(g => ({ ...g, weight: g.weight / totalWeight }))
+    : goals;
+  const goalsText = normalizedGoals
+    .map((g) => `- ${g.name} (weight: ${g.weight.toFixed(2)})`)
     .join('\n');
 
   const requirementsText = requirements.length > 0

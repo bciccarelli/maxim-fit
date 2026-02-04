@@ -13,15 +13,16 @@
     "lint": "turbo lint",
     "dev:web": "turbo dev --filter=@protocol/web",
     "build:web": "turbo build --filter=@protocol/web",
-    "android": "expo run:android",
-    "ios": "expo run:ios"
+    "dev:mobile": "npm run dev --workspace=@maxim/mobile",
+    "android": "npm run android --workspace=@maxim/mobile",
+    "ios": "npm run ios --workspace=@maxim/mobile"
   },
   "devDependencies": {
     "turbo": "^2.4.4"
   },
   "dependencies": {
-    "expo": "~52.0.49",
-    "react": "18.3.1",
-    "react-native": "0.76.9"
+    "expo": "^55.0.0-preview.7",
+    "react": "19.2.0",
+    "react-native": "^0.83.1"
   }
 }

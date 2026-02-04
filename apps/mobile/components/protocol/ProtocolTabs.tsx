@@ -1,5 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useState, useCallback } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Undo2 } from 'lucide-react-native';
 import type {
   DailyProtocol,
   ScheduleVariant,
@@ -38,6 +40,7 @@ export function ProtocolTabs({
   editable = false,
   onProtocolChange,
 }: ProtocolTabsProps) {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabId>('schedule');
   const [draft, setDraft] = useState<DailyProtocol>(protocol);
   const [dirty, setDirty] = useState(false);
@@ -73,6 +76,11 @@ export function ProtocolTabs({
       setSaving(false);
     }
   }, [onProtocolChange, dirty, draft]);
+
+  const handleUndo = useCallback(() => {
+    setDraft(protocol);
+    setDirty(false);
+  }, [protocol]);
 
   const display = dirty ? draft : protocol;
 
@@ -147,10 +155,15 @@ export function ProtocolTabs({
         {renderContent()}
       </ScrollView>
 
-      {/* Save Button */}
+      {/* Save/Undo Buttons */}
       {dirty && (
-        <View style={styles.saveButtonContainer}>
-          <SaveChangesButton onPress={handleSave} loading={saving} />
+        <View style={[styles.saveButtonContainer, { bottom: insets.bottom + 63 }]}>
+          <Pressable style={styles.undoButton} onPress={handleUndo} disabled={saving}>
+            <Undo2 size={20} color="#666" />
+          </Pressable>
+          <View style={styles.saveButtonWrapper}>
+            <SaveChangesButton onPress={handleSave} loading={saving} />
+          </View>
         </View>
       )}
     </View>
@@ -195,16 +208,29 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   contentContainerWithButton: {
-    paddingBottom: 100,
+    paddingBottom: 180,
   },
   saveButtonContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
-    backgroundColor: '#f5f5f0',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  undoButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+  saveButtonWrapper: {
+    flex: 1,
   },
 });
