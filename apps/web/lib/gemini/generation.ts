@@ -503,7 +503,11 @@ ${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n'
 `
     : '';
 
-  return `You are a knowledgeable health coach having a quick chat with the user about their protocol. Answer in 2-4 sentences. Be direct and conversational — no bullet points or formal structure unless specifically asked. If the question suggests a protocol change, briefly note the trade-off and suggest they use the Modify feature to make changes.
+  return `You are a knowledgeable health coach. Answer questions about the user's protocol using current research and evidence.
+
+IMPORTANT: Use Google Search to verify any health claims, supplement recommendations, exercise science, or nutritional guidance. Ground your response in current research and cite your sources.
+
+Keep your answer to 2-4 sentences. Be direct and conversational — no bullet points or formal structure unless specifically asked. If the question suggests a protocol change, briefly note the trade-off and suggest they use the Modify feature to make changes.
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
@@ -514,7 +518,7 @@ ${JSON.stringify(protocol, null, 2)}
 ${historySection}## User's Question
 ${question}
 
-Answer concisely now.`;
+Answer now, using Google Search to verify your claims.`;
 }
 
 /**
@@ -548,9 +552,7 @@ export async function askAboutProtocol(
 
   // Extract citations from grounding metadata
   const groundingMetadata = getGroundingMetadata(response);
-  console.log('[askAboutProtocol] groundingMetadata:', JSON.stringify(groundingMetadata, null, 2));
   const citations = extractCitations(groundingMetadata, 'ask');
-  console.log('[askAboutProtocol] extracted citations:', citations.length);
 
   const parsed = JSON.parse(text);
   return {

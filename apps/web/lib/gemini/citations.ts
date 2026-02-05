@@ -38,16 +38,12 @@ export function extractCitations(
   operation: CitationOperation
 ): Citation[] {
   if (!groundingMetadata?.groundingChunks) {
-    console.log('[extractCitations] No grounding chunks found');
     return [];
   }
 
   const chunks = groundingMetadata.groundingChunks;
   const supports = groundingMetadata.groundingSupports || [];
   const timestamp = new Date().toISOString();
-
-  console.log('[extractCitations] Raw chunks count:', chunks.length);
-  console.log('[extractCitations] Sample chunks:', JSON.stringify(chunks.slice(0, 2)));
 
   // Build a map of chunk index -> text segments it supports
   const chunkToTexts = new Map<number, string[]>();
@@ -66,8 +62,6 @@ export function extractCitations(
     (chunk): chunk is GroundingChunk & { web: { uri: string; title?: string; domain?: string } } =>
       !!chunk.web?.uri
   );
-
-  console.log('[extractCitations] Valid chunks after filter:', validChunks.length);
 
   return validChunks.map((chunk, idx): Citation => {
     // Extract domain from URL if not provided

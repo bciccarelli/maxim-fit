@@ -682,9 +682,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#2d5a2d',
   },
   sparkleButton: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -692,8 +690,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: '#e8f5e9',
-    borderWidth: 2,
-    borderColor: '#fff',
+    marginTop: 6,
   },
   sparkleButtonText: {
     fontSize: 12,
