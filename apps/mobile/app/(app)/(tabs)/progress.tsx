@@ -2,24 +2,11 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, S
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, Check, Flame, Clock, Utensils, Pill, Dumbbell, Droplets, ChevronRight } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
+import { useProtocol, type ProtocolChain } from '@/contexts/ProtocolContext';
 import { useRatingPromptContext } from '@/contexts/RatingPromptContext';
-import { normalizeProtocol } from '@protocol/shared/schemas';
 import type { DailyProtocol, DayOfWeek } from '@protocol/shared/schemas';
 import { useComplianceTracking, ActivityType } from '@/hooks/useComplianceTracking';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
-
-type ProtocolChain = {
-  id: string;
-  name: string | null;
-  version_chain_id: string;
-};
-
-type ProtocolVersion = {
-  id: string;
-  protocol_data: unknown;
-};
 
 interface TodayActivity {
   type: ActivityType;
@@ -87,19 +74,22 @@ function getTodayActivities(protocol: DailyProtocol): {
 }
 
 export default function ProgressScreen() {
-  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { recordCoreAction, maybeShowRatingPrompt } = useRatingPromptContext();
 
-  // Protocol selection
-  const [chains, setChains] = useState<ProtocolChain[]>([]);
-  const [selectedChain, setSelectedChain] = useState<ProtocolChain | null>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedVersion, setSelectedVersion] = useState<ProtocolVersion | null>(null);
-  const [parsedProtocol, setParsedProtocol] = useState<DailyProtocol | null>(null);
+  // Use shared protocol context
+  const {
+    chains,
+    selectedChain,
+    selectChain,
+    selectedVersion,
+    parsedProtocol,
+    isLoadingChains: isLoading,
+    refreshChains,
+  } = useProtocol();
 
-  // Loading states
-  const [isLoading, setIsLoading] = useState(true);
+  // Local UI state
+  const [showDropdown, setShowDropdown] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Generate modal
@@ -128,77 +118,12 @@ export default function ProgressScreen() {
     refresh: refreshCompliance,
   } = useComplianceTracking(selectedVersion?.id || null);
 
-  // Fetch protocol chains
-  const fetchChains = useCallback(async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('protocols')
-      .select('id, name, version_chain_id')
-      .eq('user_id', user.id)
-      .eq('is_current', true)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching protocols:', error);
-      return;
-    }
-
-    if (data && data.length > 0) {
-      setChains(data);
-      if (!selectedChain) {
-        setSelectedChain(data[0]);
-      }
-    }
-  }, [user, selectedChain]);
-
-  // Fetch selected protocol version
-  const fetchVersion = useCallback(async () => {
-    if (!selectedChain) return;
-
-    const { data, error } = await supabase
-      .from('protocols')
-      .select('id, protocol_data')
-      .eq('version_chain_id', selectedChain.version_chain_id)
-      .eq('is_current', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error fetching version:', error);
-      return;
-    }
-
-    if (data && data.length > 0) {
-      setSelectedVersion(data[0]);
-      try {
-        const normalized = normalizeProtocol(data[0].protocol_data);
-        setParsedProtocol(normalized);
-      } catch (e) {
-        console.error('Error parsing protocol:', e);
-        setParsedProtocol(null);
-      }
-    }
-  }, [selectedChain]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchChains().finally(() => setIsLoading(false));
-  }, [fetchChains]);
-
-  // Fetch version when chain changes
-  useEffect(() => {
-    if (selectedChain) {
-      fetchVersion();
-    }
-  }, [selectedChain, fetchVersion]);
-
   // Refresh handler
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchChains(), fetchVersion(), refreshCompliance()]);
+    await Promise.all([refreshChains(), refreshCompliance()]);
     setIsRefreshing(false);
-  }, [fetchChains, fetchVersion, refreshCompliance]);
+  }, [refreshChains, refreshCompliance]);
 
   // Get today's activities
   const todayActivities = useMemo(() => {
@@ -227,10 +152,8 @@ export default function ProgressScreen() {
   }, [summary, todayActivities]);
 
   const handleChainSelect = (chain: ProtocolChain) => {
-    setSelectedChain(chain);
+    selectChain(chain);
     setShowDropdown(false);
-    setSelectedVersion(null);
-    setParsedProtocol(null);
   };
 
   const toggleSection = (section: string) => {
@@ -267,8 +190,8 @@ export default function ProgressScreen() {
 
   const handleGenerateComplete = useCallback(async () => {
     // Refresh protocols list
-    await fetchChains();
-  }, [fetchChains]);
+    await refreshChains();
+  }, [refreshChains]);
 
   if (isLoading) {
     return (

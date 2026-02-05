@@ -38,13 +38,33 @@ export async function GET(request: NextRequest) {
     }
 
     const chainId = request.nextUrl.searchParams.get('chainId');
+    const conversationId = request.nextUrl.searchParams.get('conversationId');
+
     if (!chainId) {
       return NextResponse.json({ error: 'chainId is required' }, { status: 400 });
     }
 
+    // If conversationId provided, return Q&A for that specific conversation
+    if (conversationId) {
+      const { data: questions, error } = await supabase
+        .from('protocol_questions')
+        .select('id, question, answer, created_at, citations, conversation_id')
+        .eq('version_chain_id', chainId)
+        .eq('conversation_id', conversationId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
+      }
+
+      return NextResponse.json({ questions: questions ?? [] });
+    }
+
+    // Otherwise, return all Q&A grouped by conversation
     const { data: questions, error } = await supabase
       .from('protocol_questions')
-      .select('id, question, answer, created_at')
+      .select('id, question, answer, created_at, citations, conversation_id')
       .eq('version_chain_id', chainId)
       .eq('user_id', user.id)
       .order('created_at', { ascending: true });
@@ -53,7 +73,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
     }
 
-    return NextResponse.json({ questions: questions ?? [] });
+    // Group questions by conversation_id
+    const conversationMap = new Map<string, typeof questions>();
+    for (const q of questions ?? []) {
+      const convId = q.conversation_id || 'default';
+      if (!conversationMap.has(convId)) {
+        conversationMap.set(convId, []);
+      }
+      conversationMap.get(convId)!.push(q);
+    }
+
+    // Build conversations array with metadata
+    const conversations = Array.from(conversationMap.entries()).map(([convId, qs]) => ({
+      id: convId,
+      firstQuestion: qs[0]?.question || '',
+      messageCount: qs.length,
+      createdAt: qs[0]?.created_at,
+      updatedAt: qs[qs.length - 1]?.created_at,
+    }));
+
+    // Sort by most recent first
+    conversations.sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return NextResponse.json({
+      questions: questions ?? [],
+      conversations,
+    });
   } catch (error) {
     console.error('Fetch questions error:', error);
     return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
@@ -80,7 +129,7 @@ export async function POST(request: NextRequest) {
       }, { status: 402 });
     }
 
-    const { protocolId, question, sessionStart } = await request.json();
+    const { protocolId, question, conversationId } = await request.json();
 
     if (!protocolId || typeof protocolId !== 'string') {
       return NextResponse.json({ error: 'Protocol ID is required' }, { status: 400 });
@@ -88,6 +137,9 @@ export async function POST(request: NextRequest) {
     if (!question || typeof question !== 'string') {
       return NextResponse.json({ error: 'Question is required' }, { status: 400 });
     }
+
+    // Generate new conversation ID if not provided
+    const activeConversationId = conversationId || crypto.randomUUID();
 
     // Fetch the protocol with config
     const { data: protocol, error: fetchError } = await supabase
@@ -103,21 +155,16 @@ export async function POST(request: NextRequest) {
 
     const versionChainId = protocol.version_chain_id ?? protocol.id;
 
-    // Fetch conversation history (limit to last 10 for context window)
-    let historyQuery = supabase
+    // Fetch conversation history for the current conversation (limit to last 10 for context window)
+    const { data: historyData } = await supabase
       .from('protocol_questions')
       .select('question, answer')
       .eq('version_chain_id', versionChainId)
+      .eq('conversation_id', activeConversationId)
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
       .limit(10);
 
-    // If sessionStart provided, only include history after that timestamp
-    if (sessionStart && typeof sessionStart === 'string') {
-      historyQuery = historyQuery.gt('created_at', sessionStart);
-    }
-
-    const { data: historyData } = await historyQuery;
     const history: QAHistoryItem[] = historyData ?? [];
 
     const protocolData = normalizeProtocol(protocol.protocol_data);
@@ -147,15 +194,17 @@ export async function POST(request: NextRequest) {
 
             const { answer, suggestsModification, citations: newCitations } = genResult.value;
 
-            // Save Q&A
+            // Save Q&A with conversation ID and citations
             await supabase
               .from('protocol_questions')
               .insert({
                 protocol_id: protocolId,
                 version_chain_id: protocol.version_chain_id ?? protocol.id,
+                conversation_id: activeConversationId,
                 user_id: user.id,
                 question,
                 answer,
+                citations: newCitations.length > 0 ? newCitations : null,
               });
 
             // Merge new citations with existing ones on the protocol
@@ -174,7 +223,7 @@ export async function POST(request: NextRequest) {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 done: true,
-                result: { answer, suggestsModification, citations: newCitations },
+                result: { answer, suggestsModification, citations: newCitations, conversationId: activeConversationId },
               })}\n\n`)
             );
           } catch (error) {
@@ -199,15 +248,17 @@ export async function POST(request: NextRequest) {
     const existingCitations = (protocol.citations as Citation[]) || [];
     const mergedCitations = mergeCitations(existingCitations, newCitations);
 
-    // Save Q&A
+    // Save Q&A with conversation ID and citations
     const { error: saveError } = await supabase
       .from('protocol_questions')
       .insert({
         protocol_id: protocolId,
         version_chain_id: protocol.version_chain_id ?? protocol.id,
+        conversation_id: activeConversationId,
         user_id: user.id,
         question,
         answer,
+        citations: newCitations.length > 0 ? newCitations : null,
       });
 
     if (saveError) {
@@ -223,7 +274,7 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id);
     }
 
-    return NextResponse.json({ answer, suggestsModification, citations: mergedCitations });
+    return NextResponse.json({ answer, suggestsModification, citations: mergedCitations, conversationId: activeConversationId });
   } catch (error) {
     console.error('Protocol ask error:', error);
     return NextResponse.json(

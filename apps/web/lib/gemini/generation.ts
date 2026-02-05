@@ -800,6 +800,11 @@ Generate the modified protocol with reasoning now.`;
 
 /**
  * Stream answer to a question about the protocol. Yields text chunks, returns answer with citations.
+ *
+ * Note: Gemini's streaming API (generateContentStream) does not provide grounding metadata.
+ * We use non-streaming internally to get citations, then simulate streaming by yielding
+ * the answer in chunks. This preserves the streaming UX while ensuring citations are available.
+ * See: https://github.com/BerriAI/litellm/issues/10237
  */
 export async function* askAboutProtocolStream(
   protocol: DailyProtocol,
@@ -807,49 +812,21 @@ export async function* askAboutProtocolStream(
   question: string,
   history: QAHistoryItem[] = []
 ): AsyncGenerator<string, { answer: string; suggestsModification: boolean; citations: Citation[] }, unknown> {
-  const client = getGeminiClient();
-  const prompt = buildAskPrompt(protocol, config, question, history);
+  // Use non-streaming call to get citations (streaming API doesn't provide grounding metadata)
+  const result = await askAboutProtocol(protocol, config, question, history);
 
-  const stream = await client.models.generateContentStream({
-    model: MODEL_GROUNDED,
-    contents: prompt,
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: 'application/json',
-      responseSchema: askResultSchema as any,
-    },
-  });
+  // Simulate streaming by yielding the answer in chunks for better UX
+  const chunkSize = 15; // Characters per chunk - balances smoothness vs overhead
+  const answer = result.answer;
 
-  let fullText = '';
-  let lastChunk: { candidates?: Array<{ groundingMetadata?: unknown }> } | null = null;
-
-  for await (const chunk of stream) {
-    // Grounding metadata is typically in the final chunk, so capture each chunk
-    if (chunk.candidates?.[0]?.groundingMetadata) {
-      lastChunk = chunk;
-    }
-    const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    if (text) {
-      fullText += text;
-      yield text;
-    }
+  for (let i = 0; i < answer.length; i += chunkSize) {
+    const chunk = answer.slice(i, i + chunkSize);
+    yield chunk;
+    // Small delay between chunks for natural streaming appearance
+    await new Promise(resolve => setTimeout(resolve, 15));
   }
 
-  // Extract citations from grounding metadata (available in final chunk with grounding data)
-  const groundingMetadata = lastChunk?.candidates?.[0]?.groundingMetadata
-    ? getGroundingMetadata({ candidates: [{ groundingMetadata: lastChunk.candidates[0].groundingMetadata }] })
-    : undefined;
-  const citations = extractCitations(groundingMetadata, 'ask');
-
-  console.log('[askAboutProtocolStream] has grounding metadata:', !!lastChunk?.candidates?.[0]?.groundingMetadata);
-  console.log('[askAboutProtocolStream] extracted citations:', citations.length);
-
-  const parsed = JSON.parse(fullText);
-  return {
-    answer: parsed.answer,
-    suggestsModification: parsed.suggestsModification,
-    citations,
-  };
+  return result;
 }
 
 // ---------------------------------------------------------------------------

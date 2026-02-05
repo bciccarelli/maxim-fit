@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Select } from '@/components/ui/select';
+import { ProtocolSelect } from '@/components/ui/protocol-select';
 import { VersionSelect } from '@/components/ui/version-select';
 import { Button } from '@/components/ui/button';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
@@ -11,7 +11,7 @@ import { VersionHistory } from '@/components/protocol/VersionHistory';
 import { EditableProtocolName } from '@/components/protocol/EditableProtocolName';
 import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
 import { CritiquesSection } from '@/components/protocol/CritiquesSection';
-import { Trash2, Loader2, History } from 'lucide-react';
+import { History } from 'lucide-react';
 import type { DailyProtocol, AdherenceScore, GoalScore, Critique } from '@/lib/schemas/protocol';
 import type { Tier } from '@/lib/stripe/config';
 
@@ -93,8 +93,7 @@ export function DashboardProtocolView({
   tier = 'free',
 }: DashboardProtocolViewProps) {
   const router = useRouter();
-  const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletingChainId, setDeletingChainId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   // Version dropdown state
@@ -145,18 +144,17 @@ export function DashboardProtocolView({
     }
   }, [versionChainId, fetchVersions]);
 
-  const handleDelete = async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
+  const handleDeleteChain = async (chainId: string) => {
+    // Find any protocol in this chain to get its ID for deletion
+    const chainProtocol = protocols.find((p) => p.version_chain_id === chainId);
+    if (!chainProtocol) return;
 
-    setDeleting(true);
+    setDeletingChainId(chainId);
     try {
       const response = await fetch('/api/protocol/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedProtocol.id }),
+        body: JSON.stringify({ id: chainProtocol.id }),
       });
 
       if (!response.ok) {
@@ -170,8 +168,7 @@ export function DashboardProtocolView({
       console.error('Delete error:', error);
       alert('Failed to delete protocol. Please try again.');
     } finally {
-      setDeleting(false);
-      setConfirmDelete(false);
+      setDeletingChainId(null);
     }
   };
 
@@ -275,25 +272,25 @@ export function DashboardProtocolView({
         </div>
       </div>
 
-      {/* Row 2: Protocol + Version selectors + Delete */}
+      {/* Row 2: Protocol + Version selectors */}
       <div className="flex items-end gap-3">
         {/* Protocol Selector */}
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
             Protocol
           </label>
-          <Select
+          <ProtocolSelect
             options={protocolOptions}
             value={versionChainId}
-            onChange={(e) => {
-              setConfirmDelete(false);
+            onChange={(value) => {
               // Find the current version for this chain and navigate to it
-              const chain = protocols.find((p) => p.version_chain_id === e.target.value);
+              const chain = protocols.find((p) => p.version_chain_id === value);
               if (chain) {
                 router.push(`?protocol=${chain.id}`, { scroll: false });
               }
             }}
-            className="min-w-[200px]"
+            onDelete={handleDeleteChain}
+            deletingId={deletingChainId}
           />
         </div>
 
@@ -306,51 +303,10 @@ export function DashboardProtocolView({
             options={versionOptions}
             value={selectedProtocol.id}
             onChange={(value) => {
-              setConfirmDelete(false);
               router.push(`?protocol=${value}`, { scroll: false });
             }}
             isLoading={isLoadingVersions}
           />
-        </div>
-
-        {/* Delete Button */}
-        <div className="flex items-center h-10">
-          {confirmDelete ? (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                aria-label="Confirm delete"
-              >
-                {deleting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmDelete(false)}
-                className="text-xs text-muted-foreground"
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDelete}
-              className="text-muted-foreground hover:text-destructive"
-              aria-label="Delete protocol"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </div>
 

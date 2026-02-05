@@ -178,7 +178,7 @@ export function AskSheet({
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeTitle}>Ask a question</Text>
               <Text style={styles.welcomeText}>
-                Ask questions about your protocol and get AI-powered answers based on current research.
+                Get answers based on current research.
               </Text>
             </View>
           ) : (

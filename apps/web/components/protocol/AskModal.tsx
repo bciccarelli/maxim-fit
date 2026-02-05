@@ -137,7 +137,7 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
         <DialogHeader>
           <DialogTitle>Ask about your protocol</DialogTitle>
           <DialogDescription>
-            Ask questions about your protocol. Answers are saved for reference.
+            Get answers based on current research.
           </DialogDescription>
         </DialogHeader>
 

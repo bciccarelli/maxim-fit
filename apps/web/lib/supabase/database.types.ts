@@ -188,6 +188,8 @@ export type Database = {
       protocol_questions: {
         Row: {
           answer: string
+          citations: Json | null
+          conversation_id: string
           created_at: string | null
           id: string
           protocol_id: string | null
@@ -197,6 +199,8 @@ export type Database = {
         }
         Insert: {
           answer: string
+          citations?: Json | null
+          conversation_id?: string
           created_at?: string | null
           id?: string
           protocol_id?: string | null
@@ -206,6 +210,8 @@ export type Database = {
         }
         Update: {
           answer?: string
+          citations?: Json | null
+          conversation_id?: string
           created_at?: string | null
           id?: string
           protocol_id?: string | null

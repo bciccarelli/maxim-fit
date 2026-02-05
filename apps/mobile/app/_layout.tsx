@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ProtocolProvider } from '@/contexts/ProtocolContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { RatingPromptProvider, useRatingPromptContext } from '@/contexts/RatingPromptContext';
 import { GlobalUpgradeModal } from '@/components/subscription/GlobalUpgradeModal';
@@ -69,12 +70,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <SubscriptionProvider>
-          <RatingPromptProvider>
-            <RootLayoutNav />
-            <GlobalUpgradeModal />
-          </RatingPromptProvider>
-        </SubscriptionProvider>
+        <ProtocolProvider>
+          <SubscriptionProvider>
+            <RatingPromptProvider>
+              <RootLayoutNav />
+              <GlobalUpgradeModal />
+            </RatingPromptProvider>
+          </SubscriptionProvider>
+        </ProtocolProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

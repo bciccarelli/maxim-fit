@@ -23,7 +23,7 @@ Generate a personalized, evidence-based daily health protocol. The protocol must
 - `components/ui/` - Shared UI primitives (shadcn)
 - `lib/gemini/` - Gemini API integration (generation, verification, modification, Q&A)
 - `lib/schemas/` - Zod schemas for protocol data and user config
-- `lib/supabase/` - Supabase client and database types
+- `lib/supabase/` - Supabase client and database types (you should have access to the Supabase MCP as well)
 - `lib/streaming.ts` - SSE stream creation utility
 - `lib/hooks/useSSEStream.ts` - Client-side SSE consumption hook
 

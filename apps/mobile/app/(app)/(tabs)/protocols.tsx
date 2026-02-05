@@ -1,13 +1,12 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, Wand2, Plus, ShieldCheck, Pencil } from 'lucide-react-native';
+import { ChevronDown, Wand2, Plus, ShieldCheck, Pencil, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { normalizeProtocol } from '@protocol/shared/schemas';
-import type { DailyProtocol, Critique } from '@protocol/shared/schemas';
+import { useProtocol, type ProtocolChain, type ProtocolVersion } from '@/contexts/ProtocolContext';
+import type { DailyProtocol } from '@protocol/shared/schemas';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
 import { CritiquesSection } from '@/components/protocol/CritiquesSection';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
@@ -17,48 +16,33 @@ import { getNotificationPreferences } from '@/lib/storage/notificationPreference
 import { ProFeatureButton } from '@/components/subscription/ProFeatureButton';
 import { useUserConfig } from '@/hooks/useUserConfig';
 
-type ProtocolChain = {
-  id: string;
-  name: string | null;
-  version_chain_id: string;
-};
-
-type ProtocolVersion = {
-  id: string;
-  version: number;
-  name: string | null;
-  protocol_data: unknown;
-  verified: boolean;
-  weighted_goal_score: number | null;
-  viability_score: number | null;
-  version_chain_id: string;
-  created_at: string;
-  change_source: string | null;
-  critiques: Critique[] | null;
-};
-
 export default function ProtocolsScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { config: userConfig } = useUserConfig();
 
-  // Protocol chains (unique protocols)
-  const [chains, setChains] = useState<ProtocolChain[]>([]);
-  const [selectedChain, setSelectedChain] = useState<ProtocolChain | null>(null);
+  // Use shared protocol context
+  const {
+    chains,
+    setChains,
+    selectedChain,
+    selectChain,
+    updateSelectedChain,
+    versions,
+    selectedVersion,
+    selectVersion,
+    updateSelectedVersion,
+    parsedProtocol: parsedData,
+    isLoadingChains: isLoading,
+    isLoadingVersions,
+    refreshChains,
+    refreshVersions,
+  } = useProtocol();
+
+  // Local UI state
   const [showChainDropdown, setShowChainDropdown] = useState(false);
-
-  // Versions of selected chain
-  const [versions, setVersions] = useState<ProtocolVersion[]>([]);
-  const [selectedVersion, setSelectedVersion] = useState<ProtocolVersion | null>(null);
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
-
-  // Parsed protocol data
-  const [parsedData, setParsedData] = useState<DailyProtocol | null>(null);
-
-  // Loading states
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -71,72 +55,9 @@ export default function ProtocolsScreen() {
   const [modifyContext, setModifyContext] = useState<string | undefined>(undefined);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
 
-  // Fetch protocol chains (current versions only, grouped by chain)
-  const fetchChains = useCallback(async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('protocols')
-      .select('id, name, version_chain_id')
-      .eq('user_id', user.id)
-      .eq('is_current', true)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching protocols:', error);
-      return;
-    }
-
-    if (data && data.length > 0) {
-      setChains(data);
-      // Select first chain if none selected
-      if (!selectedChain) {
-        setSelectedChain(data[0]);
-      }
-    }
-  }, [user, selectedChain]);
-
-  // Fetch versions when chain changes
-  const fetchVersions = useCallback(async () => {
-    if (!selectedChain) return;
-
-    setIsLoadingVersions(true);
-
-    const { data, error } = await supabase
-      .from('protocols')
-      .select('id, version, name, protocol_data, verified, weighted_goal_score, viability_score, version_chain_id, created_at, change_source, critiques')
-      .eq('version_chain_id', selectedChain.version_chain_id)
-      .order('version', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching versions:', error);
-      setIsLoadingVersions(false);
-      return;
-    }
-
-    if (data && data.length > 0) {
-      setVersions(data);
-      // Select the latest version (first in list since sorted desc)
-      setSelectedVersion(data[0]);
-    }
-
-    setIsLoadingVersions(false);
-  }, [selectedChain]);
-
-  // Parse protocol data when version changes
-  useEffect(() => {
-    if (selectedVersion?.protocol_data) {
-      try {
-        const normalized = normalizeProtocol(selectedVersion.protocol_data);
-        setParsedData(normalized);
-      } catch (e) {
-        console.error('Error parsing protocol:', e);
-        setParsedData(null);
-      }
-    } else {
-      setParsedData(null);
-    }
-  }, [selectedVersion]);
+  // Delete state
+  const [confirmDeleteChainId, setConfirmDeleteChainId] = useState<string | null>(null);
+  const [deletingChainId, setDeletingChainId] = useState<string | null>(null);
 
   // Schedule notifications when protocol is loaded
   const lastScheduledProtocolId = useRef<string | null>(null);
@@ -166,43 +87,29 @@ export default function ProtocolsScreen() {
     scheduleNotifications();
   }, [parsedData, selectedVersion]);
 
-  // Initial fetch
-  useEffect(() => {
-    fetchChains().finally(() => setIsLoading(false));
-  }, [fetchChains]);
-
-  // Fetch versions when chain changes
-  useEffect(() => {
-    if (selectedChain) {
-      fetchVersions();
-    }
-  }, [selectedChain, fetchVersions]);
-
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await fetchChains();
+    await refreshChains();
     if (selectedChain) {
-      await fetchVersions();
+      await refreshVersions();
     }
     setIsRefreshing(false);
-  }, [fetchChains, fetchVersions, selectedChain]);
+  }, [refreshChains, refreshVersions, selectedChain]);
 
   const handleChainSelect = (chain: ProtocolChain) => {
-    setSelectedChain(chain);
+    selectChain(chain);
     setShowChainDropdown(false);
-    setVersions([]);
-    setSelectedVersion(null);
   };
 
   const handleVersionSelect = (version: ProtocolVersion) => {
-    setSelectedVersion(version);
+    selectVersion(version);
     setShowVersionDropdown(false);
   };
 
   const handleModifyAccepted = useCallback(async (newProtocolId: string) => {
     // Refresh to get the new version
-    await fetchVersions();
-  }, [fetchVersions]);
+    await refreshVersions();
+  }, [refreshVersions]);
 
   const handleProtocolChange = useCallback(async (updatedProtocol: DailyProtocol) => {
     if (!selectedVersion) return;
@@ -216,12 +123,12 @@ export default function ProtocolsScreen() {
         }),
       });
       // Refresh versions to get the new version
-      await fetchVersions();
+      await refreshVersions();
     } catch (error) {
       Alert.alert('Error', 'Failed to save changes. Please try again.');
       throw error;
     }
-  }, [selectedVersion, fetchVersions]);
+  }, [selectedVersion, refreshVersions]);
 
   const getVersionLabel = (version: ProtocolVersion) => {
     const sourceLabels: Record<string, string> = {
@@ -259,10 +166,10 @@ export default function ProtocolsScreen() {
           name: editedName.trim(),
         }),
       });
-      // Update local state
+      // Update local state via context
       if (selectedChain) {
-        setSelectedChain({ ...selectedChain, name: editedName.trim() });
-        setChains(chains.map(c =>
+        updateSelectedChain({ name: editedName.trim() });
+        setChains(prev => prev.map(c =>
           c.version_chain_id === selectedChain.version_chain_id
             ? { ...c, name: editedName.trim() }
             : c
@@ -283,7 +190,7 @@ export default function ProtocolsScreen() {
         method: 'POST',
         body: JSON.stringify({ protocolId: selectedVersion.id }),
       });
-      await fetchVersions();
+      await refreshVersions();
     } catch (error) {
       Alert.alert('Error', 'Failed to verify protocol.');
     }
@@ -294,10 +201,40 @@ export default function ProtocolsScreen() {
     setShowGenerateModal(true);
   };
 
+  const handleDeleteChain = async (chainId: string) => {
+    // Find any protocol in this chain to get its ID for deletion
+    const chainProtocol = chains.find((c) => c.version_chain_id === chainId);
+    if (!chainProtocol) return;
+
+    if (confirmDeleteChainId !== chainId) {
+      setConfirmDeleteChainId(chainId);
+      return;
+    }
+
+    setDeletingChainId(chainId);
+    try {
+      await fetchApi('/api/protocol/delete', {
+        method: 'POST',
+        body: JSON.stringify({ id: chainProtocol.id }),
+      });
+
+      // Close dropdown and reset state
+      setShowChainDropdown(false);
+      setConfirmDeleteChainId(null);
+
+      // Refresh chains - context will handle selection if current was deleted
+      await refreshChains();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete protocol. Please try again.');
+    } finally {
+      setDeletingChainId(null);
+    }
+  };
+
   const handleGenerateComplete = useCallback(async (protocolId: string) => {
     // Refresh protocols to show the new one
-    await fetchChains();
-  }, [fetchChains]);
+    await refreshChains();
+  }, [refreshChains]);
 
   const openModifyWithContext = (context?: string) => {
     setModifyContext(context);
@@ -401,27 +338,64 @@ export default function ProtocolsScreen() {
                 </Text>
               </Pressable>
               <View style={styles.dropdownDivider} />
-              {chains.map((chain) => (
-                <Pressable
-                  key={chain.id}
-                  style={[
-                    styles.dropdownItem,
-                    chain.id === selectedChain?.id && styles.dropdownItemSelected,
-                  ]}
-                  onPress={() => handleChainSelect(chain)}
-                >
-                  <Text
+              {chains.map((chain) => {
+                const isDeleting = deletingChainId === chain.version_chain_id;
+                const isConfirming = confirmDeleteChainId === chain.version_chain_id;
+
+                return (
+                  <View
+                    key={chain.id}
                     style={[
-                      styles.dropdownItemText,
-                      chain.id === selectedChain?.id && styles.dropdownItemTextSelected,
+                      styles.dropdownItem,
+                      chain.id === selectedChain?.id && styles.dropdownItemSelected,
                     ]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
                   >
-                    {chain.name || 'Untitled Protocol'}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Pressable
+                      style={styles.dropdownItemContent}
+                      onPress={() => handleChainSelect(chain)}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          chain.id === selectedChain?.id && styles.dropdownItemTextSelected,
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {chain.name || 'Untitled Protocol'}
+                      </Text>
+                    </Pressable>
+
+                    {isConfirming && !isDeleting ? (
+                      <View style={styles.deleteConfirmRow}>
+                        <Pressable
+                          style={styles.deleteConfirmButton}
+                          onPress={() => handleDeleteChain(chain.version_chain_id)}
+                        >
+                          <Trash2 size={14} color="#dc2626" />
+                        </Pressable>
+                        <Pressable
+                          onPress={() => setConfirmDeleteChainId(null)}
+                        >
+                          <Text style={styles.deleteCancelText}>Cancel</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Pressable
+                        style={styles.deleteButton}
+                        onPress={() => handleDeleteChain(chain.version_chain_id)}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? (
+                          <ActivityIndicator size="small" color="#999" />
+                        ) : (
+                          <Trash2 size={14} color="#999" />
+                        )}
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
@@ -548,9 +522,9 @@ export default function ProtocolsScreen() {
           critiques={selectedVersion.critiques}
           verified={selectedVersion.verified}
           onCritiquesUpdated={(critiques) => {
-            setSelectedVersion((prev) => prev ? { ...prev, critiques } : null);
+            updateSelectedVersion({ critiques });
           }}
-          onProtocolUpdated={fetchVersions}
+          onProtocolUpdated={refreshVersions}
         />
       ) : (
         <View style={styles.loadingContainer}>
@@ -721,6 +695,24 @@ const styles = StyleSheet.create({
   newProtocolText: {
     color: '#2d5a2d',
     fontWeight: '500',
+  },
+  dropdownItemContent: {
+    flex: 1,
+  },
+  deleteButton: {
+    padding: 4,
+  },
+  deleteConfirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteConfirmButton: {
+    padding: 4,
+  },
+  deleteCancelText: {
+    fontSize: 12,
+    color: '#999',
   },
   actionsBar: {
     flexDirection: 'row',
