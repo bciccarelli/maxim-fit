@@ -42,14 +42,9 @@ export function ChatCitationsDropdown({ citations }: Props) {
               onPress={() => handleOpenUrl(citation.url)}
             >
               <ExternalLink size={10} color="#666" style={styles.linkIcon} />
-              <View style={styles.citationText}>
-                <Text style={styles.citationDomain}>{citation.domain}</Text>
-                {citation.title && (
-                  <Text style={styles.citationTitle} numberOfLines={1}>
-                    {citation.title}
-                  </Text>
-                )}
-              </View>
+              <Text style={styles.citationDomain} numberOfLines={1}>
+                {citation.title || citation.domain || 'Source'}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -80,25 +75,18 @@ const styles = StyleSheet.create({
   },
   citationItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 4,
     paddingLeft: 8,
     gap: 6,
   },
   linkIcon: {
-    marginTop: 2,
-  },
-  citationText: {
-    flex: 1,
-    gap: 1,
+    marginTop: 0,
   },
   citationDomain: {
+    flex: 1,
     fontSize: 11,
     fontWeight: '500',
     color: '#333',
-  },
-  citationTitle: {
-    fontSize: 10,
-    color: '#666',
   },
 });

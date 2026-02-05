@@ -40,11 +40,8 @@ export function ChatCitationsDropdown({ citations }: ChatCitationsDropdownProps)
               className="flex items-start gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
             >
               <ExternalLink className="h-3 w-3 mt-0.5 flex-shrink-0 opacity-50 group-hover:opacity-100" />
-              <span className="line-clamp-1">
-                <span className="font-medium">{citation.domain}</span>
-                {citation.title && (
-                  <span className="ml-1">- {citation.title}</span>
-                )}
+              <span className="line-clamp-1 font-medium">
+                {citation.title || citation.domain || 'Source'}
               </span>
             </a>
           ))}
