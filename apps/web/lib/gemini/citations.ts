@@ -38,12 +38,16 @@ export function extractCitations(
   operation: CitationOperation
 ): Citation[] {
   if (!groundingMetadata?.groundingChunks) {
+    console.log('[extractCitations] No grounding chunks found');
     return [];
   }
 
   const chunks = groundingMetadata.groundingChunks;
   const supports = groundingMetadata.groundingSupports || [];
   const timestamp = new Date().toISOString();
+
+  console.log('[extractCitations] Raw chunks count:', chunks.length);
+  console.log('[extractCitations] Sample chunks:', JSON.stringify(chunks.slice(0, 2)));
 
   // Build a map of chunk index -> text segments it supports
   const chunkToTexts = new Map<number, string[]>();
@@ -57,31 +61,38 @@ export function extractCitations(
     }
   }
 
-  return chunks
-    .filter((chunk): chunk is GroundingChunk & { web: NonNullable<GroundingChunk['web']> } =>
-      !!chunk.web?.uri && !!chunk.web?.title
-    )
-    .map((chunk, idx): Citation => {
-      // Extract domain from URL if not provided
-      let domain = chunk.web.domain || '';
-      if (!domain && chunk.web.uri) {
-        try {
-          domain = new URL(chunk.web.uri).hostname;
-        } catch {
-          domain = '';
-        }
-      }
+  // Filter to chunks with at least a URI (title is optional)
+  const validChunks = chunks.filter(
+    (chunk): chunk is GroundingChunk & { web: { uri: string; title?: string; domain?: string } } =>
+      !!chunk.web?.uri
+  );
 
-      return {
-        id: uuidv4(),
-        url: chunk.web.uri!,
-        title: chunk.web.title!,
-        domain,
-        relevantText: chunkToTexts.get(idx)?.[0] || null,
-        operation,
-        operationTimestamp: timestamp,
-      };
-    });
+  console.log('[extractCitations] Valid chunks after filter:', validChunks.length);
+
+  return validChunks.map((chunk, idx): Citation => {
+    // Extract domain from URL if not provided
+    let domain = chunk.web.domain || '';
+    if (!domain && chunk.web.uri) {
+      try {
+        domain = new URL(chunk.web.uri).hostname;
+      } catch {
+        domain = '';
+      }
+    }
+
+    // Use domain as fallback title if no title provided
+    const title = chunk.web.title || domain || 'Source';
+
+    return {
+      id: uuidv4(),
+      url: chunk.web.uri,
+      title,
+      domain,
+      relevantText: chunkToTexts.get(idx)?.[0] || null,
+      operation,
+      operationTimestamp: timestamp,
+    };
+  });
 }
 
 /**

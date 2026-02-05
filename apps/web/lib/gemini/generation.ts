@@ -548,7 +548,9 @@ export async function askAboutProtocol(
 
   // Extract citations from grounding metadata
   const groundingMetadata = getGroundingMetadata(response);
+  console.log('[askAboutProtocol] groundingMetadata:', JSON.stringify(groundingMetadata, null, 2));
   const citations = extractCitations(groundingMetadata, 'ask');
+  console.log('[askAboutProtocol] extracted citations:', citations.length);
 
   const parsed = JSON.parse(text);
   return {

@@ -194,6 +194,8 @@ export async function POST(request: NextRequest) {
 
             const { answer, suggestsModification, citations: newCitations } = genResult.value;
 
+            console.log('[ask/route] citations received:', newCitations?.length ?? 0);
+
             // Save Q&A with conversation ID and citations
             await supabase
               .from('protocol_questions')
