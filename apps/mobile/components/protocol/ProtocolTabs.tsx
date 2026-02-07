@@ -167,8 +167,21 @@ export function ProtocolTabs({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="always"
       >
+        {/* Show critiques above schedule on schedule tab */}
+        {activeTab === 'schedule' && critiques && critiques.length > 0 && protocolId && (
+          <View style={styles.critiquesContainerTop}>
+            <CritiquesSection
+              critiques={critiques}
+              protocolId={protocolId}
+              verified={verified}
+              onCritiquesUpdated={onCritiquesUpdated}
+              onProtocolUpdated={onProtocolUpdated}
+            />
+          </View>
+        )}
         {renderContent()}
-        {critiques && critiques.length > 0 && protocolId && (
+        {/* Show critiques below content on other tabs */}
+        {activeTab !== 'schedule' && critiques && critiques.length > 0 && protocolId && (
           <View style={styles.critiquesContainer}>
             <CritiquesSection
               critiques={critiques}
@@ -263,6 +276,9 @@ const styles = StyleSheet.create({
   },
   saveButtonWrapper: {
     flex: 1,
+  },
+  critiquesContainerTop: {
+    marginBottom: 16,
   },
   critiquesContainer: {
     marginTop: 16,

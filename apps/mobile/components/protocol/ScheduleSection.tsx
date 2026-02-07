@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from 'react-native';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock } from 'lucide-react-native';
 import type { DailyProtocol, ScheduleVariant, OtherEvent, DayOfWeek } from '@protocol/shared/schemas';
 import {
@@ -34,6 +34,109 @@ const EMPTY_OTHER_EVENT: OtherEvent = {
   requirement_satisfied: null,
 };
 
+// Timeline constants
+const HOUR_HEIGHT = 48;
+const MIN_BLOCK_HEIGHT = 32;
+const MIN_BLOCK_DURATION = Math.ceil((MIN_BLOCK_HEIGHT / HOUR_HEIGHT) * 60);
+const HOUR_MARKER_WIDTH = 40;
+
+/** Convert "HH:MM" to total minutes from midnight */
+function toMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/** Format hour to "HH:00" */
+function toHourLabel(hour: number): string {
+  return `${String(hour).padStart(2, '0')}:00`;
+}
+
+interface BlockLayout {
+  columnIndex: number;
+  totalColumns: number;
+}
+
+/** Compute column layout for overlapping events */
+function computeBlockLayout(
+  blocks: { start_time: string; end_time: string }[],
+  minDuration: number
+): BlockLayout[] {
+  const n = blocks.length;
+  if (n === 0) return [];
+
+  const indexed = blocks.map((b, i) => {
+    const start = toMinutes(b.start_time);
+    const end = toMinutes(b.end_time);
+    return { i, start, end, effectiveEnd: Math.max(end, start + minDuration) };
+  });
+
+  const sorted = [...indexed].sort((a, b) => a.start - b.start || a.effectiveEnd - b.effectiveEnd);
+
+  const columnEnds: number[] = [];
+  const columnIndex = new Array<number>(n).fill(0);
+
+  for (const block of sorted) {
+    let placed = false;
+    for (let c = 0; c < columnEnds.length; c++) {
+      if (columnEnds[c] <= block.start) {
+        columnIndex[block.i] = c;
+        columnEnds[c] = block.effectiveEnd;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      columnIndex[block.i] = columnEnds.length;
+      columnEnds.push(block.effectiveEnd);
+    }
+  }
+
+  const parent = Array.from({ length: n }, (_, i) => i);
+  function find(x: number): number {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+  function union(a: number, b: number) {
+    parent[find(a)] = find(b);
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const a = indexed[i],
+        b = indexed[j];
+      if (a.start < b.effectiveEnd && b.start < a.effectiveEnd) union(i, j);
+    }
+  }
+
+  const groupMaxCol = new Map<number, number>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    groupMaxCol.set(root, Math.max(groupMaxCol.get(root) ?? 0, columnIndex[i] + 1));
+  }
+
+  return blocks.map((_, i) => ({
+    columnIndex: columnIndex[i],
+    totalColumns: groupMaxCol.get(find(i)) ?? 1,
+  }));
+}
+
+/** Get styling for event block based on source type */
+function getEventBlockStyle(source: ScheduleEventSource) {
+  switch (source) {
+    case 'meal':
+      return { backgroundColor: 'rgba(45, 90, 45, 0.15)', borderLeftColor: '#2d5a2d' };
+    case 'supplement':
+      return { backgroundColor: 'rgba(2, 132, 199, 0.1)', borderLeftColor: '#0284c7' };
+    case 'workout':
+      return { backgroundColor: 'rgba(217, 119, 6, 0.1)', borderLeftColor: '#d97706' };
+    case 'other':
+      return { backgroundColor: 'rgba(102, 102, 102, 0.1)', borderLeftColor: '#666' };
+  }
+}
+
 function SourceIcon({ source }: { source: ScheduleEventSource }) {
   const iconProps = { size: 14 };
   switch (source) {
@@ -53,8 +156,34 @@ export function ScheduleSection({
   editable = false,
   onChange,
 }: Props) {
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek>('monday');
+  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => {
+    const dayIndex: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return dayIndex[new Date().getDay()];
+  });
   const [editingEventIndex, setEditingEventIndex] = useState<number | null>(null);
+  const [currentTimeMin, setCurrentTimeMin] = useState<number>(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  });
+
+  // Get today's day of week
+  const today = useMemo(() => {
+    const dayIndex: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return dayIndex[new Date().getDay()];
+  }, []);
+
+  // Update current time every minute
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTimeMin(now.getHours() * 60 + now.getMinutes());
+    };
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check if selected day is today
+  const isToday = selectedDay === today;
 
   const variantIndex = useMemo(
     () => getVariantIndexForDay(protocol.schedules, selectedDay),
@@ -65,6 +194,39 @@ export function ScheduleSection({
   const events = useMemo(
     () => computeScheduleEvents(protocol, selectedDay),
     [protocol, selectedDay]
+  );
+
+  // Timeline range computation
+  const { firstHour, lastHour, hours, rangeStartMin, totalHeight } = useMemo(() => {
+    if (events.length === 0) {
+      const defaultHours = Array.from({ length: 17 }, (_, i) => i + 6);
+      return {
+        firstHour: 6,
+        lastHour: 22,
+        hours: defaultHours,
+        rangeStartMin: 360,
+        totalHeight: 16 * HOUR_HEIGHT,
+      };
+    }
+    const allStarts = events.map((e) => toMinutes(e.start_time));
+    const allEnds = events.map((e) => toMinutes(e.end_time));
+    const first = Math.floor(Math.min(...allStarts) / 60);
+    const last = Math.ceil(Math.max(...allEnds) / 60);
+    const hoursArray: number[] = [];
+    for (let h = first; h <= last; h++) hoursArray.push(h);
+    return {
+      firstHour: first,
+      lastHour: last,
+      hours: hoursArray,
+      rangeStartMin: first * 60,
+      totalHeight: (last - first) * HOUR_HEIGHT,
+    };
+  }, [events]);
+
+  // Block layout for overlapping events
+  const blockLayout = useMemo(
+    () => computeBlockLayout(events, MIN_BLOCK_DURATION),
+    [events]
   );
 
   const updateProtocol = useCallback(
@@ -208,134 +370,11 @@ export function ScheduleSection({
     setEditingEventIndex(events.length);
   }, [protocol, variantIndex, events.length, updateProtocol]);
 
-  const renderEvent = (event: ScheduleEvent, eventIndex: number) => {
-    const isEditing = editingEventIndex === eventIndex;
-    const canEditActivity = event.source === 'other';
-
-    if (isEditing && editable) {
-      return (
-        <View key={eventIndex} style={styles.eventEdit}>
-          <View style={styles.editHeader}>
-            <View style={styles.editHeaderLeft}>
-              <SourceIcon source={event.source} />
-              <Text style={styles.editLabel}>{event.activity}</Text>
-            </View>
-            <View style={styles.editActions}>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => handleDeleteEvent(event)}
-              >
-                <Trash2 size={18} color="#c62828" />
-              </Pressable>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => setEditingEventIndex(null)}
-              >
-                <X size={18} color="#666" />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.editFieldRow}>
-            <View style={[styles.editField, { flex: 1 }]}>
-              <Text style={styles.fieldLabel}>Start</Text>
-              <EditableField
-                value={event.start_time}
-                onChange={(start_time) => handleUpdateEventTime(event, start_time)}
-                type="time"
-                editable
-                mono
-              />
-            </View>
-            <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>End</Text>
-              <EditableField
-                value={event.end_time}
-                onChange={(end_time) => handleUpdateEventTime(event, event.start_time, end_time)}
-                type="time"
-                editable={event.source === 'other'}
-                mono
-              />
-            </View>
-          </View>
-
-          {canEditActivity && (
-            <View style={styles.editField}>
-              <Text style={styles.fieldLabel}>Activity</Text>
-              <EditableField
-                value={event.activity}
-                onChange={(activity) => handleUpdateOtherEventActivity(event, activity)}
-                editable
-              />
-            </View>
-          )}
-        </View>
-      );
-    }
-
-    return (
-      <Pressable
-        key={eventIndex}
-        style={styles.event}
-        onPress={() => {
-          if (editable) {
-            setEditingEventIndex(eventIndex);
-          }
-        }}
-      >
-        <View style={styles.eventTime}>
-          <Text style={styles.eventTimeText}>
-            {event.start_time}
-          </Text>
-        </View>
-        <View style={styles.eventContent}>
-          <View style={styles.eventRow}>
-            <SourceIcon source={event.source} />
-            <Text style={styles.eventActivity}>{event.activity}</Text>
-          </View>
-        </View>
-      </Pressable>
-    );
-  };
-
   if (!selectedVariant) return null;
 
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Schedule</Text>
-
-      {/* Day selector */}
-      {protocol.schedules.length > 1 && (
-        <View style={styles.daySelector}>
-          {DAYS.map((day) => {
-            const isSelected = day === selectedDay;
-            const dayVariantIndex = getVariantIndexForDay(protocol.schedules, day);
-            const isSameVariant = dayVariantIndex === variantIndex;
-
-            return (
-              <Pressable
-                key={day}
-                style={[
-                  styles.dayButton,
-                  isSelected && styles.dayButtonSelected,
-                  !isSelected && isSameVariant && styles.dayButtonSameVariant,
-                ]}
-                onPress={() => setSelectedDay(day)}
-              >
-                <Text
-                  style={[
-                    styles.dayButtonText,
-                    isSelected && styles.dayButtonTextSelected,
-                    !isSelected && isSameVariant && styles.dayButtonTextSameVariant,
-                  ]}
-                >
-                  {DAY_ABBR[day]}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
 
       <View style={styles.card}>
         {selectedVariant.label && (
@@ -419,24 +458,218 @@ export function ScheduleSection({
           </View>
         </View>
 
-        <View style={styles.timeline}>
-          {events.map((event, index) => renderEvent(event, index))}
+        {/* Visual Timeline */}
+        {events.length > 0 ? (
+          <Pressable
+            style={styles.timelineContainer}
+            onPress={() => {
+              if (editingEventIndex !== null) {
+                setEditingEventIndex(null);
+              }
+            }}
+          >
+            <View style={[styles.timelineGrid, { height: totalHeight }]}>
+              {/* Hour markers column */}
+              <View style={styles.hourMarkersColumn}>
+                {hours.map((h) => (
+                  <Text
+                    key={h}
+                    style={[
+                      styles.hourMarker,
+                      { top: (h - firstHour) * HOUR_HEIGHT - 6 },
+                    ]}
+                  >
+                    {toHourLabel(h)}
+                  </Text>
+                ))}
+              </View>
 
-          {events.length === 0 && (
+              {/* Events column */}
+              <View style={styles.eventsColumn}>
+                {/* Hour divider lines */}
+                {hours.map((h) => (
+                  <View
+                    key={h}
+                    style={[
+                      styles.hourLine,
+                      { top: (h - firstHour) * HOUR_HEIGHT },
+                    ]}
+                  />
+                ))}
+
+                  {/* Event blocks */}
+                  {events.map((event, index) => {
+                    const startMin = toMinutes(event.start_time);
+                    const endMin = toMinutes(event.end_time);
+                    const durationMin = endMin - startMin;
+                    const top = ((startMin - rangeStartMin) / 60) * HOUR_HEIGHT;
+                    const naturalHeight = (durationMin / 60) * HOUR_HEIGHT;
+                    const height = Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
+                    const { columnIndex, totalColumns } = blockLayout[index] || { columnIndex: 0, totalColumns: 1 };
+                    const isShort = durationMin <= 30;
+
+                    return (
+                      <Pressable
+                        key={index}
+                        style={[
+                          styles.eventBlock,
+                          getEventBlockStyle(event.source),
+                          {
+                            top,
+                            height,
+                            left: `${(columnIndex / totalColumns) * 100}%`,
+                            width: `${(1 / totalColumns) * 100}%`,
+                          },
+                        ]}
+                        onPress={() => editable && setEditingEventIndex(index)}
+                      >
+                        {isShort ? (
+                          <View style={styles.eventBlockContentShort}>
+                            <SourceIcon source={event.source} />
+                            <Text style={styles.eventBlockName} numberOfLines={1}>
+                              {event.activity}
+                            </Text>
+                            <Text style={styles.eventBlockTime}>{event.start_time}</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.eventBlockContentStandard}>
+                            <View style={styles.eventBlockHeader}>
+                              <SourceIcon source={event.source} />
+                              <Text style={styles.eventBlockName} numberOfLines={1}>
+                                {event.activity}
+                              </Text>
+                            </View>
+                            <Text style={styles.eventBlockTimeRange}>
+                              {event.start_time} – {event.end_time}
+                            </Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+              {/* Current time indicator */}
+              {isToday && currentTimeMin >= rangeStartMin && currentTimeMin <= lastHour * 60 && (
+                <View
+                  style={[
+                    styles.nowLine,
+                    { top: ((currentTimeMin - rangeStartMin) / 60) * HOUR_HEIGHT },
+                  ]}
+                >
+                  <View style={styles.nowDot} />
+                  <View style={styles.nowLineBar} />
+                </View>
+              )}
+            </View>
+
+            {editable && (
+              <Pressable style={styles.addButton} onPress={handleAddOtherEvent}>
+                <Plus size={16} color="#2d5a2d" />
+                <Text style={styles.addButtonText}>Add other event</Text>
+              </Pressable>
+            )}
+          </Pressable>
+        ) : (
+          <View style={styles.emptyTimeline}>
             <Text style={styles.noEvents}>No events scheduled for this day</Text>
-          )}
-
-          {editable && (
-            <Pressable
-              style={styles.addButton}
-              onPress={handleAddOtherEvent}
-            >
-              <Plus size={16} color="#2d5a2d" />
-              <Text style={styles.addButtonText}>Add other event</Text>
-            </Pressable>
-          )}
-        </View>
+            {editable && (
+              <Pressable style={styles.addButton} onPress={handleAddOtherEvent}>
+                <Plus size={16} color="#2d5a2d" />
+                <Text style={styles.addButtonText}>Add other event</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
       </View>
+
+      {/* Edit Event Modal */}
+      <Modal
+        visible={editingEventIndex !== null && editingEventIndex >= 0}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingEventIndex(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setEditingEventIndex(null)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {editingEventIndex !== null && editingEventIndex >= 0 && events[editingEventIndex] && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderLeft}>
+                    <SourceIcon source={events[editingEventIndex].source} />
+                    <Text style={styles.modalTitle}>
+                      {events[editingEventIndex].activity}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={styles.modalCloseButton}
+                    onPress={() => setEditingEventIndex(null)}
+                  >
+                    <X size={20} color="#666" />
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalBody}>
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Start time</Text>
+                    <EditableField
+                      value={events[editingEventIndex].start_time}
+                      onChange={(t) => handleUpdateEventTime(events[editingEventIndex], t)}
+                      type="time"
+                      editable
+                      mono
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>End time</Text>
+                    <EditableField
+                      value={events[editingEventIndex].end_time}
+                      onChange={(t) =>
+                        handleUpdateEventTime(
+                          events[editingEventIndex],
+                          events[editingEventIndex].start_time,
+                          t
+                        )
+                      }
+                      type="time"
+                      editable={events[editingEventIndex].source === 'other'}
+                      mono
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  {events[editingEventIndex].source === 'other' && (
+                    <View style={styles.modalField}>
+                      <Text style={styles.modalFieldLabel}>Activity</Text>
+                      <EditableField
+                        value={events[editingEventIndex].activity}
+                        onChange={(a) =>
+                          handleUpdateOtherEventActivity(events[editingEventIndex], a)
+                        }
+                        editable
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                  )}
+                </View>
+
+                <Pressable
+                  style={styles.modalDeleteButton}
+                  onPress={() => handleDeleteEvent(events[editingEventIndex])}
+                >
+                  <Trash2 size={16} color="#c62828" />
+                  <Text style={styles.modalDeleteText}>Delete event</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -453,35 +686,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
     marginLeft: 4,
-  },
-  daySelector: {
-    flexDirection: 'row',
-    gap: 4,
-    marginBottom: 12,
-  },
-  dayButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 4,
-    backgroundColor: '#f0f0f0',
-  },
-  dayButtonSelected: {
-    backgroundColor: '#2d5a2d',
-  },
-  dayButtonSameVariant: {
-    backgroundColor: 'rgba(45, 90, 45, 0.2)',
-  },
-  dayButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#666',
-    fontVariant: ['tabular-nums'],
-  },
-  dayButtonTextSelected: {
-    color: '#fff',
-  },
-  dayButtonTextSameVariant: {
-    color: '#2d5a2d',
   },
   card: {
     backgroundColor: '#fff',
@@ -554,77 +758,107 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
   },
-  timeline: {
-    paddingTop: 4,
+
+  // Timeline grid
+  timelineContainer: {
+    marginTop: 12,
   },
-  event: {
+  timelineGrid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    position: 'relative',
   },
-  eventTime: {
-    width: 50,
+  hourMarkersColumn: {
+    width: HOUR_MARKER_WIDTH,
+    position: 'relative',
   },
-  eventTimeText: {
+  hourMarker: {
+    position: 'absolute',
+    left: 0,
+    fontSize: 10,
+    color: '#999',
+    fontVariant: ['tabular-nums'],
+  },
+  eventsColumn: {
+    flex: 1,
+    position: 'relative',
+    borderLeftWidth: 1,
+    borderLeftColor: '#e5e5e5',
+  },
+  hourLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: '#f0f0f0',
+  },
+  nowLine: {
+    position: 'absolute',
+    left: HOUR_MARKER_WIDTH - 4,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  nowDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+  },
+  nowLineBar: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#ef4444',
+  },
+  emptyTimeline: {
+    paddingTop: 12,
+  },
+
+  // Event blocks
+  eventBlock: {
+    position: 'absolute',
+    borderLeftWidth: 3,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 4,
+    marginRight: 4,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  eventBlockContentShort: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  eventBlockContentStandard: {
+    flex: 1,
+  },
+  eventBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  eventBlockName: {
     fontSize: 12,
+    fontWeight: '500',
+    color: '#1a2e1a',
+    flex: 1,
+  },
+  eventBlockTime: {
+    fontSize: 10,
     color: '#666',
     fontVariant: ['tabular-nums'],
   },
-  eventContent: {
-    flex: 1,
+  eventBlockTimeRange: {
+    fontSize: 10,
+    color: '#666',
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
   },
-  eventRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  eventActivity: {
-    fontSize: 14,
-    color: '#1a2e1a',
-  },
-  eventEdit: {
-    backgroundColor: '#f9f9f7',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  editHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  editHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  editLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2d5a2d',
-  },
-  editActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+
   iconButton: {
     padding: 6,
-  },
-  editField: {
-    marginBottom: 12,
-  },
-  editFieldRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
   },
   noEvents: {
     textAlign: 'center',
@@ -644,5 +878,76 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#2d5a2d',
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 340,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a2e1a',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalBody: {
+    gap: 16,
+  },
+  modalField: {
+    gap: 6,
+  },
+  modalFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modalFieldInput: {
+    fontSize: 16,
+    backgroundColor: '#f5f5f0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  modalDeleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  modalDeleteText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#c62828',
   },
 });

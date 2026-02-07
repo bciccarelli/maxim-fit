@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { NotificationSettingsCard } from '@/components/settings/NotificationSettingsCard';
+import { PreferencesCard } from '@/components/settings/PreferencesCard';
 import { useUserConfig, type UserConfig } from '@/hooks/useUserConfig';
 import { PersonalInfoStep } from '@/components/protocol/wizard/PersonalInfoStep';
 import { GoalsStep } from '@/components/protocol/wizard/GoalsStep';
@@ -345,6 +346,9 @@ export default function SettingsScreen() {
           )}
         </View>
       ) : null}
+
+      {/* Preferences */}
+      <PreferencesCard />
 
       {/* Feedback */}
       <View style={styles.card}>

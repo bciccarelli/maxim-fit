@@ -45,7 +45,8 @@ function toTime(minutes: number): string {
 }
 
 const HOUR_HEIGHT = 56;
-const MIN_BLOCK_DURATION = 15;
+const MIN_BLOCK_HEIGHT = 28;
+const MIN_BLOCK_DURATION = Math.ceil((MIN_BLOCK_HEIGHT / HOUR_HEIGHT) * 60);
 const EDIT_MIN_HEIGHT = 88;
 
 interface BlockLayout {
@@ -444,9 +445,11 @@ export function ScheduleView({ protocol, editable = false, onChange }: ScheduleV
                 const endMin = toMinutes(event.end_time);
                 const durationMin = endMin - startMin;
                 const top = ((startMin - rangeStartMin) / 60) * HOUR_HEIGHT;
-                const naturalHeight = (Math.max(durationMin, MIN_BLOCK_DURATION) / 60) * HOUR_HEIGHT;
+                const naturalHeight = (durationMin / 60) * HOUR_HEIGHT;
                 const isEditing = editingEventIndex === index && editable;
-                const height = isEditing ? Math.max(naturalHeight, EDIT_MIN_HEIGHT) : naturalHeight;
+                const height = isEditing
+                  ? Math.max(naturalHeight, EDIT_MIN_HEIGHT)
+                  : Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
                 const isShort = durationMin <= 30;
                 const { columnIndex, totalColumns } = layout[index];
                 const leftPct = (columnIndex / totalColumns) * 100;
@@ -541,9 +544,6 @@ export function ScheduleView({ protocol, editable = false, onChange }: ScheduleV
                           </div>
                           <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">{event.start_time} – {event.end_time}</span>
                         </div>
-                        {event.requirement_satisfied && (
-                          <p className="text-xs text-success mt-0.5">Satisfies: {event.requirement_satisfied}</p>
-                        )}
                       </>
                     )}
                   </div>
