@@ -3,41 +3,71 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import {
+  Clock,
+  Utensils,
+  Dumbbell,
+  Pill,
+  BarChart3,
+  MessageSquare,
+  type LucideIcon
+} from 'lucide-react';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { ProtocolWizard } from '@/components/forms/ProtocolWizard';
 import { ProtocolDisplay } from '@/components/protocol/ProtocolDisplay';
 import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
-import { GenerationModal, type GenerationStage } from '@/components/protocol/GenerationModal';
-import { buttonVariants } from '@/components/ui/button';
+import {
+  GenerationModal,
+  type GenerationStage
+} from '@/components/protocol/GenerationModal';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { setPendingProtocol } from '@/lib/hooks/useClaimPendingProtocol';
+import {
+  HeroDataPreview,
+  CredibilityStrip,
+  MobileAppSection,
+  HowItWorks
+} from '@/components/landing';
 import type { DailyProtocol } from '@/lib/schemas/protocol';
 import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
 
-const FEATURES = [
+interface Feature {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}
+
+const FEATURES: Feature[] = [
   {
+    icon: Clock,
     title: 'Schedule',
-    description: 'Wake-to-sleep time blocks. Every hour accounted for.',
+    description: 'Wake-to-sleep time blocks. Every hour accounted for.'
   },
   {
+    icon: Utensils,
     title: 'Diet',
-    description: 'Macro targets, meals, hydration. Calorie-precise.',
+    description: 'Macro targets, meals, hydration. Calorie-precise.'
   },
   {
+    icon: Dumbbell,
     title: 'Training',
-    description: 'Programmed workouts with sets, reps, and rest periods.',
+    description: 'Programmed workouts with sets, reps, and rest periods.'
   },
   {
+    icon: Pill,
     title: 'Supplements',
-    description: 'Evidence-based stack with dosages and timing.',
+    description: 'Evidence-based stack with dosages and timing.'
   },
   {
+    icon: BarChart3,
     title: 'Evaluation',
-    description: 'Goal and viability scores. Requirement adherence.',
+    description: 'Goal and viability scores. Requirement adherence.'
   },
   {
+    icon: MessageSquare,
     title: 'Modification',
-    description: 'Push back on any decision. AI researches and adapts.',
-  },
+    description: 'Push back on any decision. AI researches and adapts.'
+  }
 ];
 
 export default function HomePage() {
@@ -47,12 +77,23 @@ export default function HomePage() {
     weighted_goal_score?: number;
     viability_score?: number;
   } | null>(null);
-  const [generationStage, setGenerationStage] = useState<GenerationStage | null>(null);
+  const [generationStage, setGenerationStage] =
+    useState<GenerationStage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const wizardRef = useRef<HTMLDivElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
+  const appRef = useRef<HTMLDivElement>(null);
 
   const scrollToWizard = () => {
     wizardRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToFeatures = () => {
+    featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToApp = () => {
+    appRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleGenerate = async (config: {
@@ -71,7 +112,7 @@ export default function HomePage() {
       const response = await fetch('/api/protocol/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(config)
       });
 
       clearTimeout(evaluatingTimer);
@@ -86,11 +127,15 @@ export default function HomePage() {
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       setProtocol(data.protocol);
-      setScores(data.evaluation ? {
-        requirements_met: data.evaluation.requirements_met,
-        weighted_goal_score: data.evaluation.weighted_goal_score,
-        viability_score: data.evaluation.viability_score,
-      } : null);
+      setScores(
+        data.evaluation
+          ? {
+              requirements_met: data.evaluation.requirements_met,
+              weighted_goal_score: data.evaluation.weighted_goal_score,
+              viability_score: data.evaluation.viability_score
+            }
+          : null
+      );
 
       // Store protocol ID for claiming after sign-up
       if (data.id) {
@@ -116,7 +161,26 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Image src="/logo.png" alt="Protocol" width={32} height={32} />
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="Maxim" width={32} height={32} />
+            <span className="text-base font-semibold tracking-tight">
+              Maxim
+            </span>
+          </div>
+          <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
+            <button
+              onClick={scrollToFeatures}
+              className="hover:text-foreground transition-colors duration-150"
+            >
+              Features
+            </button>
+            <button
+              onClick={scrollToApp}
+              className="hover:text-foreground transition-colors duration-150"
+            >
+              Mobile App
+            </button>
+          </nav>
           <AuthButton />
         </div>
       </header>
@@ -125,26 +189,36 @@ export default function HomePage() {
         {!protocol ? (
           <>
             {/* Hero */}
-            <section className="container mx-auto px-4 pt-4 pb-8 text-center">
-              <h1 className="text-3xl font-bold tracking-tight mb-2">
-                Optimize your protocol
-              </h1>
-              <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
-                Based on your requirements and goals
-              </h1>
-              <h2 className="text-1xl font-bold tracking-tight text-primary mb-4">
-                No cost to sign up
-              </h2>
-              
-              <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-                Evidence-based daily routines — schedule, diet, supplements,
-                training — tailored to your goals. Scored, verifiable,
-                challengeable.
+            <section className="container mx-auto px-4 pt-12 pb-8 text-center">
+              <p className="text-xs font-medium uppercase tracking-widest text-primary mb-4">
+                Evidence-based health optimization
               </p>
+              <h1 className="text-3xl font-bold tracking-tight mb-3">
+                Your daily protocol, precisely engineered
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+                Schedule. Diet. Supplements. Training.{' '}
+                <span className="text-foreground font-medium">
+                  Scored, verifiable, challengeable.
+                </span>
+              </p>
+
+              {/* Data preview */}
+              <div className="mb-8">
+                <HeroDataPreview />
+              </div>
+
+              {/* CTA */}
+              <Button size="lg" onClick={scrollToWizard}>
+                Generate your protocol
+              </Button>
             </section>
 
+            {/* Credibility Strip */}
+            <CredibilityStrip />
+
             {/* Wizard */}
-            <section ref={wizardRef} className="container mx-auto px-4 py-8">
+            <section ref={wizardRef} className="container mx-auto px-4 py-12">
               <div className="max-w-xl mx-auto">
                 {error && !generationStage && (
                   <div className="border-l-2 border-l-destructive pl-4 py-2 mb-6">
@@ -163,31 +237,55 @@ export default function HomePage() {
               </div>
             </section>
 
+            {/* Mobile App Section */}
+            <div ref={appRef}>
+              <MobileAppSection />
+            </div>
+
             {/* Features */}
-            <section className="container mx-auto px-4 py-8">
+            <section
+              ref={featuresRef}
+              className="container mx-auto px-4 py-12"
+            >
               <div className="max-w-4xl mx-auto">
-                <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-6">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
                   What you get
+                </p>
+                <h2 className="text-lg font-semibold tracking-tight mb-8">
+                  A complete daily system
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {FEATURES.map((feature) => (
                     <div
                       key={feature.title}
                       className="border-l-2 border-l-primary pl-4 py-3"
                     >
-                      <h3 className="text-sm font-semibold mb-1">{feature.title}</h3>
-                      <p className="text-xs text-muted-foreground">{feature.description}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <feature.icon className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-semibold">
+                          {feature.title}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {feature.description}
+                      </p>
                     </div>
                   ))}
                 </div>
               </div>
             </section>
+
+            {/* How It Works */}
+            <HowItWorks />
           </>
         ) : (
           <div className="container mx-auto px-4 py-8 max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
-                <h2 className="text-lg font-semibold tracking-tight">Your protocol</h2>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Your protocol
+                </h2>
                 {scores && (
                   <EvaluationSummary
                     requirementsMet={scores.requirements_met}
@@ -213,13 +311,17 @@ export default function HomePage() {
             <div className="border-l-2 border-l-primary pl-4 py-3 mt-6 bg-muted/50 rounded-r-lg">
               <p className="text-sm font-medium">Save this protocol?</p>
               <p className="text-xs text-muted-foreground mb-3">
-                Sign up to keep it permanently and unlock AI-powered modifications.
+                Sign up to keep it permanently and unlock AI-powered
+                modifications.
               </p>
               <div className="flex gap-2">
                 <Link href="/signup" className={buttonVariants({ size: 'sm' })}>
                   Sign up free
                 </Link>
-                <Link href="/login" className={buttonVariants({ size: 'sm', variant: 'ghost' })}>
+                <Link
+                  href="/login"
+                  className={buttonVariants({ size: 'sm', variant: 'ghost' })}
+                >
                   Sign in
                 </Link>
               </div>
@@ -230,8 +332,35 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t mt-12">
-        <div className="container mx-auto px-4 py-6 text-center text-xs text-muted-foreground">
-          Maxim — Evidence-based health optimization
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Brand */}
+            <div className="flex items-center gap-2">
+              <Image src="/logo.png" alt="Maxim" width={24} height={24} />
+              <span className="text-sm font-medium">Maxim</span>
+            </div>
+
+            {/* Tagline */}
+            <p className="text-xs text-muted-foreground">
+              Evidence-based health optimization
+            </p>
+
+            {/* Links */}
+            <div className="flex gap-4 text-xs text-muted-foreground">
+              <Link
+                href="/privacy"
+                className="hover:text-foreground transition-colors duration-150"
+              >
+                Privacy
+              </Link>
+              <Link
+                href="/terms"
+                className="hover:text-foreground transition-colors duration-150"
+              >
+                Terms
+              </Link>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

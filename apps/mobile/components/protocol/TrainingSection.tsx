@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import { useState, useCallback } from 'react';
-import { Plus, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Plus, Trash2, X, ChevronDown, ChevronUp, Dumbbell } from 'lucide-react-native';
 import type { TrainingProgram, Workout, Exercise } from '@protocol/shared/schemas';
 import { EditableField } from './EditableField';
 
@@ -161,87 +161,6 @@ export function TrainingSection({
     exerciseIndex: number,
     workoutIndex: number
   ) => {
-    const isEditing =
-      editingWorkoutIndex === workoutIndex && editingExerciseIndex === exerciseIndex;
-
-    if (isEditing && editable) {
-      return (
-        <View key={exerciseIndex} style={styles.exerciseEdit}>
-          <View style={styles.editHeader}>
-            <Text style={styles.editLabel}>Edit Exercise</Text>
-            <View style={styles.editActions}>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => removeExercise(workoutIndex, exerciseIndex)}
-              >
-                <Trash2 size={18} color="#c62828" />
-              </Pressable>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => setEditingExerciseIndex(null)}
-              >
-                <X size={18} color="#666" />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Name</Text>
-            <EditableField
-              value={exercise.name}
-              onChange={(name) => updateExercise(workoutIndex, exerciseIndex, { name })}
-              editable
-            />
-          </View>
-
-          <View style={styles.editFieldRow}>
-            <View style={[styles.editField, { flex: 1 }]}>
-              <Text style={styles.fieldLabel}>Sets</Text>
-              <EditableField
-                value={exercise.sets ? String(exercise.sets) : ''}
-                onChange={(v) =>
-                  updateExercise(workoutIndex, exerciseIndex, {
-                    sets: v ? parseInt(v) : null,
-                  })
-                }
-                type="number"
-                editable
-                mono
-                placeholder="—"
-              />
-            </View>
-            <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>Reps</Text>
-              <EditableField
-                value={exercise.reps || ''}
-                onChange={(reps) =>
-                  updateExercise(workoutIndex, exerciseIndex, { reps: reps || null })
-                }
-                editable
-                mono
-                placeholder="—"
-              />
-            </View>
-            <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>Rest (s)</Text>
-              <EditableField
-                value={exercise.rest_sec ? String(exercise.rest_sec) : ''}
-                onChange={(v) =>
-                  updateExercise(workoutIndex, exerciseIndex, {
-                    rest_sec: v ? parseInt(v) : null,
-                  })
-                }
-                type="number"
-                editable
-                mono
-                placeholder="—"
-              />
-            </View>
-          </View>
-        </View>
-      );
-    }
-
     return (
       <Pressable
         key={exerciseIndex}
@@ -274,19 +193,31 @@ export function TrainingSection({
     );
   };
 
+  // Get the currently editing exercise
+  const editingExercise = editingWorkoutIndex !== null && editingExerciseIndex !== null && editingExerciseIndex >= 0
+    ? training.workouts[editingWorkoutIndex]?.exercises[editingExerciseIndex]
+    : null;
+
   const renderWorkout = (workout: Workout, workoutIndex: number) => {
     const isExpanded = expandedWorkoutIndex === workoutIndex;
-    const isEditingHeader = editingWorkoutIndex === workoutIndex && editingExerciseIndex === -1;
 
     const toggleExpand = () => {
       setExpandedWorkoutIndex(isExpanded ? null : workoutIndex);
-      setEditingWorkoutIndex(null);
-      setEditingExerciseIndex(null);
+    };
+
+    const handleWorkoutHeaderPress = () => {
+      if (editable && isExpanded) {
+        // Open workout edit modal
+        setEditingWorkoutIndex(workoutIndex);
+        setEditingExerciseIndex(-1); // -1 means editing workout header, not an exercise
+      } else {
+        toggleExpand();
+      }
     };
 
     return (
       <View key={workoutIndex} style={styles.workout}>
-        <Pressable style={styles.workoutHeader} onPress={toggleExpand}>
+        <Pressable style={styles.workoutHeader} onPress={handleWorkoutHeaderPress}>
           <View style={styles.workoutHeaderLeft}>
             <Text style={styles.workoutName}>{workout.name}</Text>
             <Text style={styles.workoutDay}>{workout.day}</Text>
@@ -303,60 +234,6 @@ export function TrainingSection({
 
         {isExpanded && (
           <>
-            {isEditingHeader && editable ? (
-              <View style={styles.workoutEditCard}>
-                <View style={styles.editHeader}>
-                  <Text style={styles.editLabel}>Edit Workout</Text>
-                  <View style={styles.editActions}>
-                    <Pressable
-                      style={styles.iconButton}
-                      onPress={() => removeWorkout(workoutIndex)}
-                    >
-                      <Trash2 size={18} color="#c62828" />
-                    </Pressable>
-                    <Pressable
-                      style={styles.iconButton}
-                      onPress={() => setEditingWorkoutIndex(null)}
-                    >
-                      <X size={18} color="#666" />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={styles.editFieldRow}>
-                  <View style={[styles.editField, { flex: 2 }]}>
-                    <Text style={styles.fieldLabel}>Name</Text>
-                    <EditableField
-                      value={workout.name}
-                      onChange={(name) => updateWorkout(workoutIndex, { name })}
-                      editable
-                    />
-                  </View>
-                  <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
-                    <Text style={styles.fieldLabel}>Duration</Text>
-                    <EditableField
-                      value={String(workout.duration_min)}
-                      onChange={(v) =>
-                        updateWorkout(workoutIndex, { duration_min: parseInt(v) || 0 })
-                      }
-                      type="number"
-                      editable
-                      mono
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.editField}>
-                  <Text style={styles.fieldLabel}>Day</Text>
-                  <EditableField
-                    value={workout.day}
-                    onChange={(day) => updateWorkout(workoutIndex, { day })}
-                    editable
-                  />
-                </View>
-              </View>
-            ) : null}
-
             <View style={styles.warmupCooldown}>
               <Text style={styles.wcLabel}>Warmup:</Text>
               <Text style={styles.wcText}>{workout.warmup}</Text>
@@ -387,6 +264,11 @@ export function TrainingSection({
       </View>
     );
   };
+
+  // Get the currently editing workout (for workout header modal)
+  const editingWorkout = editingWorkoutIndex !== null && editingExerciseIndex === -1
+    ? training.workouts[editingWorkoutIndex]
+    : null;
 
   return (
     <View style={styles.section}>
@@ -429,6 +311,237 @@ export function TrainingSection({
           </View>
         )}
       </View>
+
+      {/* Edit Workout Modal */}
+      <Modal
+        visible={editingWorkout !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setEditingWorkoutIndex(null);
+          setEditingExerciseIndex(null);
+        }}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => {
+            setEditingWorkoutIndex(null);
+            setEditingExerciseIndex(null);
+          }}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {editingWorkout && editingWorkoutIndex !== null && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderLeft}>
+                    <Dumbbell size={16} color="#d97706" />
+                    <Text style={styles.modalTitle}>{editingWorkout.name}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.modalCloseButton}
+                    onPress={() => {
+                      setEditingWorkoutIndex(null);
+                      setEditingExerciseIndex(null);
+                    }}
+                  >
+                    <X size={20} color="#666" />
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalBody}>
+                  <View style={styles.modalFieldRow}>
+                    <View style={[styles.modalField, { flex: 2 }]}>
+                      <Text style={styles.modalFieldLabel}>Name</Text>
+                      <EditableField
+                        value={editingWorkout.name}
+                        onChange={(name) => updateWorkout(editingWorkoutIndex, { name })}
+                        editable
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                    <View style={[styles.modalField, { flex: 1, marginLeft: 12 }]}>
+                      <Text style={styles.modalFieldLabel}>Duration</Text>
+                      <EditableField
+                        value={String(editingWorkout.duration_min)}
+                        onChange={(v) => updateWorkout(editingWorkoutIndex, { duration_min: parseInt(v) || 0 })}
+                        type="number"
+                        editable
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.modalFieldRow}>
+                    <View style={[styles.modalField, { flex: 1 }]}>
+                      <Text style={styles.modalFieldLabel}>Day</Text>
+                      <EditableField
+                        value={editingWorkout.day}
+                        onChange={(day) => updateWorkout(editingWorkoutIndex, { day })}
+                        editable
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                    <View style={[styles.modalField, { flex: 1, marginLeft: 12 }]}>
+                      <Text style={styles.modalFieldLabel}>Time</Text>
+                      <EditableField
+                        value={editingWorkout.time}
+                        onChange={(time) => updateWorkout(editingWorkoutIndex, { time })}
+                        type="time"
+                        editable
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Warmup</Text>
+                    <EditableField
+                      value={editingWorkout.warmup}
+                      onChange={(warmup) => updateWorkout(editingWorkoutIndex, { warmup })}
+                      editable
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Cooldown</Text>
+                    <EditableField
+                      value={editingWorkout.cooldown}
+                      onChange={(cooldown) => updateWorkout(editingWorkoutIndex, { cooldown })}
+                      editable
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={styles.modalDeleteButton}
+                  onPress={() => removeWorkout(editingWorkoutIndex)}
+                >
+                  <Trash2 size={16} color="#c62828" />
+                  <Text style={styles.modalDeleteText}>Delete workout</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Edit Exercise Modal */}
+      <Modal
+        visible={editingExercise !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingExerciseIndex(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setEditingExerciseIndex(null)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {editingExercise && editingWorkoutIndex !== null && editingExerciseIndex !== null && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderLeft}>
+                    <Dumbbell size={16} color="#d97706" />
+                    <Text style={styles.modalTitle}>{editingExercise.name}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.modalCloseButton}
+                    onPress={() => setEditingExerciseIndex(null)}
+                  >
+                    <X size={20} color="#666" />
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalBody}>
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Name</Text>
+                    <EditableField
+                      value={editingExercise.name}
+                      onChange={(name) => updateExercise(editingWorkoutIndex, editingExerciseIndex, { name })}
+                      editable
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalFieldRow}>
+                    <View style={[styles.modalField, { flex: 1 }]}>
+                      <Text style={styles.modalFieldLabel}>Sets</Text>
+                      <EditableField
+                        value={editingExercise.sets ? String(editingExercise.sets) : ''}
+                        onChange={(v) => updateExercise(editingWorkoutIndex, editingExerciseIndex, { sets: v ? parseInt(v) : null })}
+                        type="number"
+                        editable
+                        mono
+                        placeholder="—"
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                    <View style={[styles.modalField, { flex: 1, marginLeft: 12 }]}>
+                      <Text style={styles.modalFieldLabel}>Reps</Text>
+                      <EditableField
+                        value={editingExercise.reps || ''}
+                        onChange={(reps) => updateExercise(editingWorkoutIndex, editingExerciseIndex, { reps: reps || null })}
+                        editable
+                        mono
+                        placeholder="—"
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                    <View style={[styles.modalField, { flex: 1, marginLeft: 12 }]}>
+                      <Text style={styles.modalFieldLabel}>Rest (s)</Text>
+                      <EditableField
+                        value={editingExercise.rest_sec ? String(editingExercise.rest_sec) : ''}
+                        onChange={(v) => updateExercise(editingWorkoutIndex, editingExerciseIndex, { rest_sec: v ? parseInt(v) : null })}
+                        type="number"
+                        editable
+                        mono
+                        placeholder="—"
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Duration (min)</Text>
+                    <EditableField
+                      value={editingExercise.duration_min ? String(editingExercise.duration_min) : ''}
+                      onChange={(v) => updateExercise(editingWorkoutIndex, editingExerciseIndex, { duration_min: v ? parseInt(v) : null })}
+                      type="number"
+                      editable
+                      mono
+                      placeholder="—"
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Notes</Text>
+                    <EditableField
+                      value={editingExercise.notes || ''}
+                      onChange={(notes) => updateExercise(editingWorkoutIndex, editingExerciseIndex, { notes: notes || null })}
+                      editable
+                      placeholder="Optional"
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={styles.modalDeleteButton}
+                  onPress={() => removeExercise(editingWorkoutIndex, editingExerciseIndex)}
+                >
+                  <Trash2 size={16} color="#c62828" />
+                  <Text style={styles.modalDeleteText}>Delete exercise</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -681,5 +794,80 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#2d5a2d',
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 340,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a2e1a',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalBody: {
+    gap: 12,
+  },
+  modalFieldRow: {
+    flexDirection: 'row',
+  },
+  modalField: {
+    marginBottom: 4,
+  },
+  modalFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  modalFieldInput: {
+    fontSize: 16,
+    backgroundColor: '#f5f5f0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  modalDeleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  modalDeleteText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#c62828',
   },
 });

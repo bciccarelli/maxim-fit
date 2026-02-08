@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import { useState, useCallback } from 'react';
-import { Plus, Trash2, X } from 'lucide-react-native';
+import { Plus, Trash2, X, Pill } from 'lucide-react-native';
 import type { SupplementationPlan, Supplement } from '@protocol/shared/schemas';
 import { EditableField } from './EditableField';
 import { DosageInput } from './DosageInput';
@@ -54,88 +54,7 @@ export function SupplementsSection({
   );
 
   const renderSupplement = (supplement: Supplement, index: number) => {
-    const isEditing = editingIndex === index;
     const isLast = index === supplementation.supplements.length - 1;
-
-    if (isEditing && editable) {
-      return (
-        <View
-          key={index}
-          style={[styles.supplementItem, !isLast && styles.supplementItemBorder]}
-        >
-          <View style={styles.editHeader}>
-            <Text style={styles.editLabel}>Edit Supplement</Text>
-            <View style={styles.editActions}>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => removeSupplement(index)}
-              >
-                <Trash2 size={18} color="#c62828" />
-              </Pressable>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => setEditingIndex(null)}
-              >
-                <X size={18} color="#666" />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Name</Text>
-            <EditableField
-              value={supplement.name}
-              onChange={(name) => updateSupplement(index, { name })}
-              editable
-              style={styles.fieldValue}
-            />
-          </View>
-
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Dosage</Text>
-            <DosageInput
-              amount={supplement.dosage_amount}
-              unit={supplement.dosage_unit}
-              notes={supplement.dosage_notes}
-              onAmountChange={(dosage_amount) => updateSupplement(index, { dosage_amount })}
-              onUnitChange={(dosage_unit) => updateSupplement(index, { dosage_unit })}
-              onNotesChange={(dosage_notes) => updateSupplement(index, { dosage_notes })}
-            />
-          </View>
-
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Timing</Text>
-            <EditableField
-              value={supplement.timing}
-              onChange={(timing) => updateSupplement(index, { timing })}
-              editable
-              style={styles.fieldValue}
-            />
-          </View>
-
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Purpose</Text>
-            <EditableField
-              value={supplement.purpose}
-              onChange={(purpose) => updateSupplement(index, { purpose })}
-              editable
-              style={styles.fieldValue}
-            />
-          </View>
-
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Notes</Text>
-            <EditableField
-              value={supplement.notes || ''}
-              onChange={(notes) => updateSupplement(index, { notes: notes || null })}
-              editable
-              style={styles.fieldValue}
-              placeholder="Optional"
-            />
-          </View>
-        </View>
-      );
-    }
 
     const dosageDisplay = supplement.dosage_amount
       ? `${supplement.dosage_amount} ${supplement.dosage_unit}`
@@ -165,6 +84,8 @@ export function SupplementsSection({
     );
   };
 
+  const editingSupplement = editingIndex !== null ? supplementation.supplements[editingIndex] : null;
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Supplements</Text>
@@ -190,6 +111,101 @@ export function SupplementsSection({
           </View>
         )}
       </View>
+
+      {/* Edit Supplement Modal */}
+      <Modal
+        visible={editingSupplement !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingIndex(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setEditingIndex(null)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {editingSupplement && editingIndex !== null && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderLeft}>
+                    <Pill size={16} color="#0284c7" />
+                    <Text style={styles.modalTitle}>{editingSupplement.name}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.modalCloseButton}
+                    onPress={() => setEditingIndex(null)}
+                  >
+                    <X size={20} color="#666" />
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalBody}>
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Name</Text>
+                    <EditableField
+                      value={editingSupplement.name}
+                      onChange={(name) => updateSupplement(editingIndex, { name })}
+                      editable
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Dosage</Text>
+                    <DosageInput
+                      amount={editingSupplement.dosage_amount}
+                      unit={editingSupplement.dosage_unit}
+                      notes={editingSupplement.dosage_notes}
+                      onAmountChange={(dosage_amount) => updateSupplement(editingIndex, { dosage_amount })}
+                      onUnitChange={(dosage_unit) => updateSupplement(editingIndex, { dosage_unit })}
+                      onNotesChange={(dosage_notes) => updateSupplement(editingIndex, { dosage_notes })}
+                    />
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Timing</Text>
+                    <EditableField
+                      value={editingSupplement.timing}
+                      onChange={(timing) => updateSupplement(editingIndex, { timing })}
+                      editable
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Purpose</Text>
+                    <EditableField
+                      value={editingSupplement.purpose}
+                      onChange={(purpose) => updateSupplement(editingIndex, { purpose })}
+                      editable
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Notes</Text>
+                    <EditableField
+                      value={editingSupplement.notes || ''}
+                      onChange={(notes) => updateSupplement(editingIndex, { notes: notes || null })}
+                      editable
+                      style={styles.modalFieldInput}
+                      placeholder="Optional"
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={styles.modalDeleteButton}
+                  onPress={() => removeSupplement(editingIndex)}
+                >
+                  <Trash2 size={16} color="#c62828" />
+                  <Text style={styles.modalDeleteText}>Delete supplement</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -325,5 +341,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#2d5a2d',
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 340,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a2e1a',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalBody: {
+    gap: 12,
+  },
+  modalField: {
+    marginBottom: 4,
+  },
+  modalFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  modalFieldInput: {
+    fontSize: 16,
+    backgroundColor: '#f5f5f0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  modalDeleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  modalDeleteText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#c62828',
   },
 });

@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import { useState, useCallback } from 'react';
-import { Plus, Trash2, X } from 'lucide-react-native';
+import { Plus, Trash2, X, Utensils } from 'lucide-react-native';
 import type { DietPlan, Meal } from '@protocol/shared/schemas';
 import { EditableField } from './EditableField';
 
@@ -166,108 +166,11 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
   };
 
   const renderMeal = (meal: Meal, index: number) => {
-    const isEditing = editingMealIndex === index;
-
-    if (isEditing && editable) {
-      return (
-        <View key={index} style={styles.mealItem}>
-          <View style={styles.editHeader}>
-            <Text style={styles.editLabel}>Edit Meal</Text>
-            <View style={styles.editActions}>
-              <Pressable style={styles.iconButton} onPress={() => removeMeal(index)}>
-                <Trash2 size={18} color="#c62828" />
-              </Pressable>
-              <Pressable style={styles.iconButton} onPress={() => setEditingMealIndex(null)}>
-                <X size={18} color="#666" />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.editFieldRow}>
-            <View style={[styles.editField, { flex: 1 }]}>
-              <Text style={styles.fieldLabel}>Time</Text>
-              <EditableField
-                value={meal.time}
-                onChange={(time) => updateMeal(index, { time })}
-                type="time"
-                editable
-                mono
-              />
-            </View>
-            <View style={[styles.editField, { flex: 2, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>Name</Text>
-              <EditableField
-                value={meal.name}
-                onChange={(name) => updateMeal(index, { name })}
-                editable
-              />
-            </View>
-          </View>
-
-          <View style={styles.editFieldRow}>
-            <View style={[styles.editField, { flex: 1 }]}>
-              <Text style={styles.fieldLabel}>Calories</Text>
-              <EditableField
-                value={String(meal.calories)}
-                onChange={(v) => updateMeal(index, { calories: parseInt(v) || 0 })}
-                type="number"
-                editable
-                mono
-              />
-            </View>
-            <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>Protein</Text>
-              <EditableField
-                value={String(meal.protein_g)}
-                onChange={(v) => updateMeal(index, { protein_g: parseInt(v) || 0 })}
-                type="number"
-                editable
-                mono
-              />
-            </View>
-          </View>
-
-          <View style={styles.editFieldRow}>
-            <View style={[styles.editField, { flex: 1 }]}>
-              <Text style={styles.fieldLabel}>Carbs</Text>
-              <EditableField
-                value={String(meal.carbs_g)}
-                onChange={(v) => updateMeal(index, { carbs_g: parseInt(v) || 0 })}
-                type="number"
-                editable
-                mono
-              />
-            </View>
-            <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>Fat</Text>
-              <EditableField
-                value={String(meal.fat_g)}
-                onChange={(v) => updateMeal(index, { fat_g: parseInt(v) || 0 })}
-                type="number"
-                editable
-                mono
-              />
-            </View>
-          </View>
-
-          <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Foods (comma-separated)</Text>
-            <EditableField
-              value={meal.foods.join(', ')}
-              onChange={(v) => updateMeal(index, { foods: v.split(',').map((f) => f.trim()).filter(Boolean) })}
-              editable
-              multiline
-            />
-          </View>
-        </View>
-      );
-    }
-
     const isExpanded = expandedMealIndex === index;
 
     const handleMealPress = () => {
-      if (isExpanded && editable) {
-        // If already expanded and editable, enter edit mode
+      if (editable) {
+        // Open edit modal
         setEditingMealIndex(index);
       } else {
         // Toggle expand
@@ -291,7 +194,7 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
             P {meal.protein_g}g · C {meal.carbs_g}g · F {meal.fat_g}g
           </Text>
         </View>
-        {isExpanded && meal.foods.length > 0 && (
+        {(isExpanded || !editable) && meal.foods.length > 0 && (
           <View style={styles.foodsList}>
             {meal.foods.map((food, foodIndex) => (
               <Text key={foodIndex} style={styles.foodItem}>
@@ -303,6 +206,8 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
       </Pressable>
     );
   };
+
+  const editingMeal = editingMealIndex !== null ? diet.meals[editingMealIndex] : null;
 
   return (
     <View style={styles.section}>
@@ -333,6 +238,132 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
           </View>
         )}
       </View>
+
+      {/* Edit Meal Modal */}
+      <Modal
+        visible={editingMeal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingMealIndex(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setEditingMealIndex(null)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {editingMeal && editingMealIndex !== null && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderLeft}>
+                    <Utensils size={16} color="#2d5a2d" />
+                    <Text style={styles.modalTitle}>{editingMeal.name}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.modalCloseButton}
+                    onPress={() => setEditingMealIndex(null)}
+                  >
+                    <X size={20} color="#666" />
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalBody}>
+                  <View style={styles.modalFieldRow}>
+                    <View style={[styles.modalField, { flex: 1 }]}>
+                      <Text style={styles.modalFieldLabel}>Time</Text>
+                      <EditableField
+                        value={editingMeal.time}
+                        onChange={(time) => updateMeal(editingMealIndex, { time })}
+                        type="time"
+                        editable
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                    <View style={[styles.modalField, { flex: 2, marginLeft: 12 }]}>
+                      <Text style={styles.modalFieldLabel}>Name</Text>
+                      <EditableField
+                        value={editingMeal.name}
+                        onChange={(name) => updateMeal(editingMealIndex, { name })}
+                        editable
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.modalFieldRow}>
+                    <View style={[styles.modalField, { flex: 1 }]}>
+                      <Text style={styles.modalFieldLabel}>Calories</Text>
+                      <EditableField
+                        value={String(editingMeal.calories)}
+                        onChange={(v) => updateMeal(editingMealIndex, { calories: parseInt(v) || 0 })}
+                        type="number"
+                        editable
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                    <View style={[styles.modalField, { flex: 1, marginLeft: 12 }]}>
+                      <Text style={styles.modalFieldLabel}>Protein (g)</Text>
+                      <EditableField
+                        value={String(editingMeal.protein_g)}
+                        onChange={(v) => updateMeal(editingMealIndex, { protein_g: parseInt(v) || 0 })}
+                        type="number"
+                        editable
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.modalFieldRow}>
+                    <View style={[styles.modalField, { flex: 1 }]}>
+                      <Text style={styles.modalFieldLabel}>Carbs (g)</Text>
+                      <EditableField
+                        value={String(editingMeal.carbs_g)}
+                        onChange={(v) => updateMeal(editingMealIndex, { carbs_g: parseInt(v) || 0 })}
+                        type="number"
+                        editable
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                    <View style={[styles.modalField, { flex: 1, marginLeft: 12 }]}>
+                      <Text style={styles.modalFieldLabel}>Fat (g)</Text>
+                      <EditableField
+                        value={String(editingMeal.fat_g)}
+                        onChange={(v) => updateMeal(editingMealIndex, { fat_g: parseInt(v) || 0 })}
+                        type="number"
+                        editable
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Foods (comma-separated)</Text>
+                    <EditableField
+                      value={editingMeal.foods.join(', ')}
+                      onChange={(v) => updateMeal(editingMealIndex, { foods: v.split(',').map((f) => f.trim()).filter(Boolean) })}
+                      editable
+                      multiline
+                      style={styles.modalFieldInput}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={styles.modalDeleteButton}
+                  onPress={() => removeMeal(editingMealIndex)}
+                >
+                  <Trash2 size={16} color="#c62828" />
+                  <Text style={styles.modalDeleteText}>Delete meal</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -527,5 +558,80 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#2d5a2d',
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 340,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a2e1a',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalBody: {
+    gap: 12,
+  },
+  modalFieldRow: {
+    flexDirection: 'row',
+  },
+  modalField: {
+    marginBottom: 4,
+  },
+  modalFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  modalFieldInput: {
+    fontSize: 16,
+    backgroundColor: '#f5f5f0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  modalDeleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  modalDeleteText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#c62828',
   },
 });

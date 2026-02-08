@@ -151,6 +151,13 @@ function SourceIcon({ source }: { source: ScheduleEventSource }) {
   }
 }
 
+// Stable event identifier to track which event is being edited
+// Using source + sourceIndex because array indices change when events are re-sorted by time
+type EditingEventId = {
+  source: ScheduleEventSource;
+  sourceIndex: number;
+} | null;
+
 export function ScheduleSection({
   protocol,
   editable = false,
@@ -160,7 +167,8 @@ export function ScheduleSection({
     const dayIndex: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     return dayIndex[new Date().getDay()];
   });
-  const [editingEventIndex, setEditingEventIndex] = useState<number | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EditingEventId>(null);
+  const [editingWakeSleep, setEditingWakeSleep] = useState(false);
   const [currentTimeMin, setCurrentTimeMin] = useState<number>(() => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
@@ -195,6 +203,14 @@ export function ScheduleSection({
     () => computeScheduleEvents(protocol, selectedDay),
     [protocol, selectedDay]
   );
+
+  // Find the current event being edited by stable ID (source + sourceIndex)
+  const editingEventData = useMemo(() => {
+    if (!editingEvent) return null;
+    return events.find(
+      (e) => e.source === editingEvent.source && e.sourceIndex === editingEvent.sourceIndex
+    ) ?? null;
+  }, [events, editingEvent]);
 
   // Timeline range computation
   const { firstHour, lastHour, hours, rangeStartMin, totalHeight } = useMemo(() => {
@@ -352,7 +368,7 @@ export function ScheduleSection({
       }
 
       updateProtocol(updated);
-      setEditingEventIndex(null);
+      setEditingEvent(null);
     },
     [protocol, variantIndex, updateProtocol]
   );
@@ -361,20 +377,46 @@ export function ScheduleSection({
     const newSchedules = [...protocol.schedules];
     const variant = newSchedules[variantIndex];
     if (variant) {
+      const newOtherEventIndex = variant.other_events.length; // Index of new event in other_events array
       newSchedules[variantIndex] = {
         ...variant,
         other_events: [...variant.other_events, { ...EMPTY_OTHER_EVENT }],
       };
+      updateProtocol({ ...protocol, schedules: newSchedules });
+      // Use stable identifier for the new event
+      setEditingEvent({ source: 'other', sourceIndex: newOtherEventIndex });
     }
-    updateProtocol({ ...protocol, schedules: newSchedules });
-    setEditingEventIndex(events.length);
-  }, [protocol, variantIndex, events.length, updateProtocol]);
+  }, [protocol, variantIndex, updateProtocol]);
 
   if (!selectedVariant) return null;
 
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Schedule</Text>
+
+      {/* Day Selector */}
+      <View style={styles.daySelector}>
+        {DAYS.map((day) => (
+          <Pressable
+            key={day}
+            style={[
+              styles.daySelectorButton,
+              selectedDay === day && styles.daySelectorButtonActive,
+            ]}
+            onPress={() => setSelectedDay(day)}
+          >
+            <Text
+              style={[
+                styles.daySelectorText,
+                selectedDay === day && styles.daySelectorTextActive,
+              ]}
+            >
+              {DAY_ABBR[day]}
+            </Text>
+            {day === today && <View style={styles.todayDot} />}
+          </Pressable>
+        ))}
+      </View>
 
       <View style={styles.card}>
         {selectedVariant.label && (
@@ -384,14 +426,14 @@ export function ScheduleSection({
         <Pressable
           onPress={() => {
             if (editable) {
-              setEditingEventIndex(-1);
+              setEditingWakeSleep(true);
             }
           }}
         >
           <View style={styles.timesRow}>
             <View style={styles.timeItem}>
               <Text style={styles.timeLabel}>Wake</Text>
-              {editable && editingEventIndex === -1 ? (
+              {editable && editingWakeSleep ? (
                 <EditableField
                   value={selectedVariant.wake_time}
                   onChange={(wake_time) => handleUpdateVariant({ wake_time })}
@@ -406,7 +448,7 @@ export function ScheduleSection({
             </View>
             <View style={styles.timeItem}>
               <Text style={styles.timeLabel}>Sleep</Text>
-              {editable && editingEventIndex === -1 ? (
+              {editable && editingWakeSleep ? (
                 <EditableField
                   value={selectedVariant.sleep_time}
                   onChange={(sleep_time) => handleUpdateVariant({ sleep_time })}
@@ -419,10 +461,10 @@ export function ScheduleSection({
                 <Text style={styles.timeValue}>{selectedVariant.sleep_time}</Text>
               )}
             </View>
-            {editable && editingEventIndex === -1 && (
+            {editable && editingWakeSleep && (
               <Pressable
                 style={styles.iconButton}
-                onPress={() => setEditingEventIndex(null)}
+                onPress={() => setEditingWakeSleep(false)}
               >
                 <X size={18} color="#666" />
               </Pressable>
@@ -463,8 +505,8 @@ export function ScheduleSection({
           <Pressable
             style={styles.timelineContainer}
             onPress={() => {
-              if (editingEventIndex !== null) {
-                setEditingEventIndex(null);
+              if (editingEvent !== null) {
+                setEditingEvent(null);
               }
             }}
           >
@@ -521,7 +563,7 @@ export function ScheduleSection({
                             width: `${(1 / totalColumns) * 100}%`,
                           },
                         ]}
-                        onPress={() => editable && setEditingEventIndex(index)}
+                        onPress={() => editable && setEditingEvent({ source: event.source, sourceIndex: event.sourceIndex })}
                       >
                         {isShort ? (
                           <View style={styles.eventBlockContentShort}>
@@ -585,28 +627,28 @@ export function ScheduleSection({
 
       {/* Edit Event Modal */}
       <Modal
-        visible={editingEventIndex !== null && editingEventIndex >= 0}
+        visible={editingEventData !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setEditingEventIndex(null)}
+        onRequestClose={() => setEditingEvent(null)}
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setEditingEventIndex(null)}
+          onPress={() => setEditingEvent(null)}
         >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            {editingEventIndex !== null && editingEventIndex >= 0 && events[editingEventIndex] && (
+            {editingEventData && (
               <>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalHeaderLeft}>
-                    <SourceIcon source={events[editingEventIndex].source} />
+                    <SourceIcon source={editingEventData.source} />
                     <Text style={styles.modalTitle}>
-                      {events[editingEventIndex].activity}
+                      {editingEventData.activity}
                     </Text>
                   </View>
                   <Pressable
                     style={styles.modalCloseButton}
-                    onPress={() => setEditingEventIndex(null)}
+                    onPress={() => setEditingEvent(null)}
                   >
                     <X size={20} color="#666" />
                   </Pressable>
@@ -616,8 +658,8 @@ export function ScheduleSection({
                   <View style={styles.modalField}>
                     <Text style={styles.modalFieldLabel}>Start time</Text>
                     <EditableField
-                      value={events[editingEventIndex].start_time}
-                      onChange={(t) => handleUpdateEventTime(events[editingEventIndex], t)}
+                      value={editingEventData.start_time}
+                      onChange={(t) => handleUpdateEventTime(editingEventData, t)}
                       type="time"
                       editable
                       mono
@@ -628,28 +670,28 @@ export function ScheduleSection({
                   <View style={styles.modalField}>
                     <Text style={styles.modalFieldLabel}>End time</Text>
                     <EditableField
-                      value={events[editingEventIndex].end_time}
+                      value={editingEventData.end_time}
                       onChange={(t) =>
                         handleUpdateEventTime(
-                          events[editingEventIndex],
-                          events[editingEventIndex].start_time,
+                          editingEventData,
+                          editingEventData.start_time,
                           t
                         )
                       }
                       type="time"
-                      editable={events[editingEventIndex].source === 'other'}
+                      editable={editingEventData.source === 'other'}
                       mono
                       style={styles.modalFieldInput}
                     />
                   </View>
 
-                  {events[editingEventIndex].source === 'other' && (
+                  {editingEventData.source === 'other' && (
                     <View style={styles.modalField}>
                       <Text style={styles.modalFieldLabel}>Activity</Text>
                       <EditableField
-                        value={events[editingEventIndex].activity}
+                        value={editingEventData.activity}
                         onChange={(a) =>
-                          handleUpdateOtherEventActivity(events[editingEventIndex], a)
+                          handleUpdateOtherEventActivity(editingEventData, a)
                         }
                         editable
                         style={styles.modalFieldInput}
@@ -660,7 +702,7 @@ export function ScheduleSection({
 
                 <Pressable
                   style={styles.modalDeleteButton}
-                  onPress={() => handleDeleteEvent(events[editingEventIndex])}
+                  onPress={() => handleDeleteEvent(editingEventData)}
                 >
                   <Trash2 size={16} color="#c62828" />
                   <Text style={styles.modalDeleteText}>Delete event</Text>
@@ -686,6 +728,38 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
     marginLeft: 4,
+  },
+  daySelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  daySelectorButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  daySelectorButtonActive: {
+    backgroundColor: '#2d5a2d',
+  },
+  daySelectorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  daySelectorTextActive: {
+    color: '#fff',
+  },
+  todayDot: {
+    position: 'absolute',
+    bottom: 2,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#2d5a2d',
   },
   card: {
     backgroundColor: '#fff',
