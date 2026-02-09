@@ -549,6 +549,7 @@ export function ScheduleSection({
                     const height = Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
                     const { columnIndex, totalColumns } = blockLayout[index] || { columnIndex: 0, totalColumns: 1 };
                     const isShort = durationMin <= 30;
+                    const isNarrow = totalColumns >= 3;
 
                     return (
                       <Pressable
@@ -562,10 +563,15 @@ export function ScheduleSection({
                             left: `${(columnIndex / totalColumns) * 100}%`,
                             width: `${(1 / totalColumns) * 100}%`,
                           },
+                          isNarrow && styles.eventBlockNarrow,
                         ]}
                         onPress={() => editable && setEditingEvent({ source: event.source, sourceIndex: event.sourceIndex })}
                       >
-                        {isShort ? (
+                        {isNarrow ? (
+                          <View style={styles.eventBlockContentNarrow}>
+                            <SourceIcon source={event.source} />
+                          </View>
+                        ) : isShort ? (
                           <View style={styles.eventBlockContentShort}>
                             <SourceIcon source={event.source} />
                             <Text style={styles.eventBlockName} numberOfLines={1}>
@@ -899,6 +905,14 @@ const styles = StyleSheet.create({
     marginRight: 4,
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  eventBlockNarrow: {
+    paddingHorizontal: 4,
+  },
+  eventBlockContentNarrow: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   eventBlockContentShort: {
     flexDirection: 'row',

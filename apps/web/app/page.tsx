@@ -23,7 +23,6 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { setPendingProtocol } from '@/lib/hooks/useClaimPendingProtocol';
 import {
-  HeroDataPreview,
   CredibilityStrip,
   MobileAppSection,
   HowItWorks
@@ -66,7 +65,7 @@ const FEATURES: Feature[] = [
   {
     icon: MessageSquare,
     title: 'Modification',
-    description: 'Push back on any decision. AI researches and adapts.'
+    description: 'Push back on any decision. Maxim researches and adapts.'
   }
 ];
 
@@ -196,51 +195,45 @@ export default function HomePage() {
               <h1 className="text-3xl font-bold tracking-tight mb-3">
                 Your daily protocol, precisely engineered
               </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Schedule. Diet. Supplements. Training.{' '}
                 <span className="text-foreground font-medium">
                   Scored, verifiable, challengeable.
                 </span>
               </p>
-
-              {/* Data preview */}
-              <div className="mb-8">
-                <HeroDataPreview />
-              </div>
-
-              {/* CTA */}
-              <Button size="lg" onClick={scrollToWizard}>
-                Generate your protocol
-              </Button>
             </section>
 
             {/* Credibility Strip */}
-            <CredibilityStrip />
+            {/* <CredibilityStrip /> */}
 
-            {/* Wizard */}
+            {/* Wizard + Mobile App Side by Side */}
             <section ref={wizardRef} className="container mx-auto px-4 py-12">
-              <div className="max-w-xl mx-auto">
-                {error && !generationStage && (
-                  <div className="border-l-2 border-l-destructive pl-4 py-2 mb-6">
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                )}
+              <div
+                ref={appRef}
+                className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-32 items-start"
+              >
+                {/* Wizard - hidden on mobile */}
+                <div className="hidden md:block">
+                  {error && !generationStage && (
+                    <div className="border-l-2 border-l-destructive pl-4 py-2 mb-6">
+                      <p className="text-sm text-destructive">{error}</p>
+                    </div>
+                  )}
 
-                <ProtocolWizard
-                  onGenerate={handleGenerate}
-                  isLoading={!!generationStage}
-                />
+                  <ProtocolWizard
+                    onGenerate={handleGenerate}
+                    isLoading={!!generationStage}
+                  />
 
-                <p className="text-center text-xs text-muted-foreground mt-6">
-                  Sign in to save protocols and unlock AI modifications.
-                </p>
+                  <p className="text-center text-xs text-muted-foreground mt-6">
+                    Sign in to save protocols and unlock modifications.
+                  </p>
+                </div>
+
+                {/* Mobile App */}
+                <MobileAppSection inline />
               </div>
             </section>
-
-            {/* Mobile App Section */}
-            <div ref={appRef}>
-              <MobileAppSection />
-            </div>
 
             {/* Features */}
             <section

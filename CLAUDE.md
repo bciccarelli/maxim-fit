@@ -36,7 +36,7 @@ Protocols follow a **version chain** model. Every change creates a new row in th
 Five user-facing actions replace the old optimize/feedback loop:
 
 - **Verify** — AI scores the protocol using Google Search grounding. Updates the current row in-place (sets `verified=true`, stores scores). No new version created.
-- **Modify** — AI-assisted changes. User describes what to change, AI researches and proposes a modified protocol with score comparison. User reviews and accepts/rejects. Accepted proposals create a new version with `change_source='ai_modify'`.
+- **Modify** — AI-assisted changes. User describes what to change, Maxim researches and proposes a modified protocol with score comparison. User reviews and accepts/rejects. Accepted proposals create a new version with `change_source='ai_modify'`.
 - **Ask** — Saved Q&A about the protocol. Uses search grounding. Doesn't modify protocol data. History persisted in `protocol_questions` table.
 - **Direct Edit** — Inline editing of protocol fields (schedule, diet, supplements, training). Each section has a "Save changes" button. Creates a new version with `change_source='direct_edit'` and `verified=false`.
 - **Version History** — Slide-out drawer showing all versions in a chain. Non-current versions can be reverted (creates new version with `change_source='revert'`).

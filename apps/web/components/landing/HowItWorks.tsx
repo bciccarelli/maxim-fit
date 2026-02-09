@@ -13,7 +13,7 @@ export function HowItWorks() {
     {
       number: 3,
       title: 'Generate',
-      description: 'AI creates a scored, verifiable daily protocol.'
+      description: 'Maxim creates a scored, verifiable daily protocol.'
     }
   ];
 

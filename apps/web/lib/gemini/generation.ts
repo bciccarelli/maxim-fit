@@ -47,7 +47,7 @@ export const dailyProtocolGeminiSchema = {
           sleep_time: { type: 'string', description: 'Sleep time in HH:MM 24-hour format, e.g. "22:00"' },
           other_events: {
             type: 'array',
-            description: 'Events that are NOT meals, supplements, or workouts. Includes activities like morning routine, commute, wind down, meditation, work, etc.',
+            description: 'Events that are NOT meals, supplements, or workouts. Includes: morning routine, commute, work, wind down, meditation, AND food prep events (e.g., "Prep: Overnight oats", "Marinate chicken").',
             items: {
               type: 'object',
               properties: {
@@ -104,7 +104,7 @@ export const dailyProtocolGeminiSchema = {
               dosage_amount: { type: 'string', description: 'Numeric amount only, e.g. "500", "2000", "1"' },
               dosage_unit: { type: 'string', description: 'Unit of measurement, e.g. "mg", "g", "mcg", "IU", "capsules"' },
               dosage_notes: { type: 'string', description: 'Optional notes about the dosage, e.g. "standardized to 3%", "elemental magnesium"' },
-              time: { type: 'string', description: 'Specific time to take the supplement in HH:MM 24-hour format, e.g. "07:00", "12:00", "21:30"' },
+              time: { type: 'string', description: 'Time in HH:MM 24-hour format. IMPORTANT: If taken with a meal, use EXACTLY the same time as that meal (e.g., if breakfast is at "07:30", set this to "07:30")' },
               timing: { type: 'string', description: 'Context for when to take the supplement, e.g. "Morning with breakfast", "Before bed", "Post-workout"' },
               purpose: { type: 'string' },
               notes: { type: 'string' },
@@ -282,6 +282,44 @@ Analyze the user's requirements to determine if different schedules are needed f
 
 Each schedule variant must specify which days it applies to via the "days" array. All 7 days (monday through sunday) must be covered exactly once across all variants.
 
+## Supplement Timing Rules
+
+When a supplement should be taken WITH a meal:
+1. Set the supplement's "time" field to EXACTLY match the meal's time (e.g., if breakfast is at "07:30", vitamin D taken with breakfast should also be "07:30")
+2. Use the "timing" field to document the relationship (e.g., "With breakfast")
+
+Common meal-associated supplements (should match meal times):
+- Fat-soluble vitamins (A, D, E, K) → take with a meal containing fat
+- Omega-3 / Fish oil → take with a meal
+- Digestive enzymes → take WITH meals
+
+Standalone supplement timing (separate from meals):
+- Magnesium → often before bed
+- Melatonin → 30-60 min before sleep
+- Pre-workout supplements → before training
+- Post-workout supplements (creatine, protein) → after training
+- Iron on empty stomach → separate time from meals
+
+IMPORTANT: When supplement timing matches a meal, use EXACTLY the same time. Do NOT create times that differ by only a few minutes.
+
+## Food Preparation Events
+
+When the diet includes foods requiring advance preparation, create prep events in "other_events":
+
+**Overnight prep (evening before):**
+- Overnight oats → "Prep: Overnight oats" at ~21:00 the night before
+- Marinating 12+ hours → start evening before
+- Slow cooker overnight → start before bed
+
+**Same-day prep:**
+- Marinating 1-4 hours → 2-4 hours before the meal
+- Defrosting frozen items → 4-8 hours before
+- Slow cooker (8 hours) → morning prep for dinner
+
+Format for prep events:
+- Activity: "Prep: [food name]" (e.g., "Prep: Overnight oats for tomorrow")
+- Duration: 5-15 min for simple prep
+
 IMPORTANT: This is a general wellness protocol, not medical advice. Do not diagnose conditions or recommend treatments for diseases.
 
 Generate the protocol now.`;
@@ -446,6 +484,31 @@ ${userMessage}
 3. If a suggestion conflicts with evidence, adapt it to the closest evidence-based alternative.
 4. Maintain the parts of the protocol that work well and aren't affected by the changes.
 5. Provide clear reasoning explaining what you changed and why.
+
+## Supplement Timing Rules
+
+When a supplement should be taken WITH a meal:
+1. Set the supplement's "time" field to EXACTLY match the meal's time
+2. Use the "timing" field to document the relationship (e.g., "With breakfast")
+
+Common meal-associated supplements (should match meal times):
+- Fat-soluble vitamins (A, D, E, K), Omega-3/Fish oil, Digestive enzymes
+
+Standalone supplements (separate times):
+- Magnesium → before bed
+- Melatonin → 30-60 min before sleep
+- Pre/post-workout supplements → around training
+- Iron on empty stomach → separate time from meals
+
+IMPORTANT: When supplement timing matches a meal, use EXACTLY the same time. Do NOT create times that differ by only a few minutes.
+
+## Food Preparation Events
+
+When adding or modifying foods that require advance prep, create prep events in "other_events":
+
+- Overnight oats → "Prep: Overnight oats" at ~21:00 the night before
+- Marinating → "Prep: Marinate [food]" hours before the meal
+- Slow cooker meals → "Prep: Start slow cooker" in the morning for dinner
 
 Generate the modified protocol with reasoning now.`;
 
@@ -771,6 +834,31 @@ ${userMessage}
 4. Maintain the parts of the protocol that work well and aren't affected by the changes.
 5. Provide clear reasoning explaining what you changed and why.
 
+## Supplement Timing Rules
+
+When a supplement should be taken WITH a meal:
+1. Set the supplement's "time" field to EXACTLY match the meal's time
+2. Use the "timing" field to document the relationship (e.g., "With breakfast")
+
+Common meal-associated supplements (should match meal times):
+- Fat-soluble vitamins (A, D, E, K), Omega-3/Fish oil, Digestive enzymes
+
+Standalone supplements (separate times):
+- Magnesium → before bed
+- Melatonin → 30-60 min before sleep
+- Pre/post-workout supplements → around training
+- Iron on empty stomach → separate time from meals
+
+IMPORTANT: When supplement timing matches a meal, use EXACTLY the same time. Do NOT create times that differ by only a few minutes.
+
+## Food Preparation Events
+
+When adding or modifying foods that require advance prep, create prep events in "other_events":
+
+- Overnight oats → "Prep: Overnight oats" at ~21:00 the night before
+- Marinating → "Prep: Marinate [food]" hours before the meal
+- Slow cooker meals → "Prep: Start slow cooker" in the morning for dinner
+
 Generate the modified protocol with reasoning now.`;
 
   const stream = await client.models.generateContentStream({
@@ -1055,6 +1143,8 @@ ${suggestionsText}
 2. Only change the parts of the protocol that the suggestions specifically address.
 3. For training exercises: preserve all existing values for sets, reps, duration_min, rest_sec, and notes unless the suggestion explicitly asks to change them.
 4. Keep everything else EXACTLY the same - copy values directly from the input.
+5. When adding supplements taken with meals, set the supplement's "time" to EXACTLY match the meal's time.
+6. When adding foods requiring advance prep (overnight oats, marinating), add a prep event in "other_events".
 
 Return the updated protocol now.`;
 
