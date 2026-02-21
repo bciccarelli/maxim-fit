@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Send, ChevronDown, Plus, Wand2, Lock, MessageSquare } from 'lucide-react-native';
@@ -77,6 +77,18 @@ export default function ChatScreen() {
   const [showModifySheet, setShowModifySheet] = useState(false);
   const [modifyContext, setModifyContext] = useState<string | undefined>(undefined);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+
+  // Keyboard visibility for input padding
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Fetch conversations when protocol changes
   useEffect(() => {
@@ -424,8 +436,8 @@ export default function ChatScreen() {
         )}
       </ScrollView>
 
-      {/* Input Area - extra padding for tab bar */}
-      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 72 }]}>
+      {/* Input Area - extra padding for tab bar when keyboard is hidden */}
+      <View style={[styles.inputContainer, { paddingBottom: keyboardVisible ? 12 : insets.bottom + 72 }]}>
         <TextInput
           style={styles.input}
           value={question}

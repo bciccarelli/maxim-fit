@@ -182,7 +182,7 @@ export default function ProtocolsScreen() {
   };
 
   const handleVerify = async () => {
-    if (!selectedVersion || isVerifying) return;
+    if (!selectedVersion || isVerifying || selectedVersion.verified) return;
 
     setIsVerifying(true);
     try {
@@ -477,7 +477,7 @@ export default function ProtocolsScreen() {
           {/* Actions */}
           <View style={styles.actionsRow}>
             {/* Verified Button */}
-            <ProFeatureButton feature="verify" onPress={handleVerify}>
+            <ProFeatureButton feature="verify" onPress={handleVerify} disabled={selectedVersion.verified}>
               <View
                 style={[
                   styles.verifyButton,

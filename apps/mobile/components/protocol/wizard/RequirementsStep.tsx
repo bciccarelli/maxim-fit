@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, Platform } from 'react-native';
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react-native';
 import type { RequirementsStepProps } from './types';
 import { EXAMPLE_REQUIREMENTS } from './types';
+import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
 
 export function RequirementsStep({ requirements, onChange }: RequirementsStepProps) {
   const [newReqText, setNewReqText] = useState('');
@@ -62,6 +63,7 @@ export function RequirementsStep({ requirements, onChange }: RequirementsStepPro
           placeholderTextColor="#999"
           onSubmitEditing={() => addRequirement(newReqText)}
           returnKeyType="done"
+          inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
         />
         <Pressable
           style={[styles.addButton, !newReqText.trim() && styles.addButtonDisabled]}

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Keyboard } from 'react-native';
 import { useState, useCallback } from 'react';
 import { Plus, Trash2, X, Utensils } from 'lucide-react-native';
 import type { DietPlan, Meal } from '@protocol/shared/schemas';
@@ -248,7 +248,10 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setEditingMealIndex(null)}
+          onPress={() => {
+            Keyboard.dismiss();
+            setEditingMealIndex(null);
+          }}
         >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {editingMeal && editingMealIndex !== null && (

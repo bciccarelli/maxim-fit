@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, Platform } from 'react-native';
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { PersonalInfoStepProps } from './types';
+import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
 
 type Sex = 'male' | 'female' | 'other';
 type FitnessLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -82,6 +83,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
           placeholderTextColor="#999"
           keyboardType="numeric"
           maxLength={3}
+          returnKeyType="done"
+          inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
         />
       </View>
 
@@ -140,6 +143,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             placeholderTextColor="#999"
             keyboardType="numeric"
             maxLength={3}
+            returnKeyType="done"
+            inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
           />
         ) : (
           <TextInput
@@ -153,6 +158,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             placeholderTextColor="#999"
             keyboardType="numeric"
             maxLength={3}
+            returnKeyType="done"
+            inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
           />
         )}
       </View>
@@ -186,6 +193,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             placeholderTextColor="#999"
             keyboardType="numeric"
             maxLength={3}
+            returnKeyType="done"
+            inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
           />
         ) : (
           <View style={styles.heightRow}>
@@ -201,6 +210,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
                 placeholderTextColor="#999"
                 keyboardType="numeric"
                 maxLength={1}
+                returnKeyType="done"
+                inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
               />
               <Text style={styles.heightUnit}>ft</Text>
             </View>
@@ -216,6 +227,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
                 placeholderTextColor="#999"
                 keyboardType="numeric"
                 maxLength={2}
+                returnKeyType="done"
+                inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
               />
               <Text style={styles.heightUnit}>in</Text>
             </View>
@@ -277,6 +290,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               placeholder="e.g., office worker, frequent travel"
               placeholderTextColor="#999"
               multiline
+              inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
             />
           </View>
 
@@ -292,6 +306,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               placeholder="e.g., vegetarian, gluten-free, nut allergy"
               placeholderTextColor="#999"
               multiline
+              inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
             />
           </View>
         </View>

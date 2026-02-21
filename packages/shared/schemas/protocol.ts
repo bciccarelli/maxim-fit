@@ -147,8 +147,7 @@ export const workoutSchema = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
   duration_min: z.number().int().positive(),
   exercises: z.array(exerciseSchema),
-  warmup: z.string(),
-  cooldown: z.string(),
+  // Note: warmup/cooldown string fields removed - these are now regular exercises
 });
 
 export type Workout = z.infer<typeof workoutSchema>;
@@ -470,6 +469,15 @@ function migrateSupplementTime(supplement: Record<string, unknown>, wakeTime?: s
 }
 
 /**
+ * Strip legacy warmup/cooldown string fields from workout.
+ * These are now regular exercises - the text is simply discarded.
+ */
+function migrateWorkoutWarmupCooldown(workout: Record<string, unknown>): Record<string, unknown> {
+  const { warmup, cooldown, ...rest } = workout;
+  return rest;
+}
+
+/**
  * Add time field to workout if missing.
  * Tries to find matching time from legacy schedule events.
  */
@@ -643,13 +651,16 @@ export function normalizeProtocol(data: unknown): DailyProtocol {
     }
   }
 
-  // Add time field to workouts (using legacy schedule blocks for time inference)
+  // Add time field to workouts and strip legacy warmup/cooldown strings
   if (converted.training && typeof converted.training === 'object') {
     const training = converted.training as Record<string, unknown>;
     if (Array.isArray(training.workouts)) {
-      const migratedWorkouts = training.workouts.map((w: unknown, index: number) =>
-        migrateWorkoutTime(w as Record<string, unknown>, legacyScheduleBlocks, index)
-      );
+      const migratedWorkouts = training.workouts.map((w: unknown, index: number) => {
+        let workout = w as Record<string, unknown>;
+        workout = migrateWorkoutTime(workout, legacyScheduleBlocks, index);
+        workout = migrateWorkoutWarmupCooldown(workout);
+        return workout;
+      });
       converted.training = {
         ...training,
         workouts: migratedWorkouts,
@@ -743,6 +754,12 @@ export function isLegacyProtocol(data: unknown): boolean {
     if (Array.isArray(training.workouts)) {
       const hasMissingTime = training.workouts.some(w => !('time' in w));
       if (hasMissingTime) return true;
+
+      // Check for legacy warmup/cooldown string fields
+      const hasLegacyWarmupCooldown = training.workouts.some(
+        w => 'warmup' in w || 'cooldown' in w
+      );
+      if (hasLegacyWarmupCooldown) return true;
     }
   }
 

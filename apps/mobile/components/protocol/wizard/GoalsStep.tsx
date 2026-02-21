@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, TextInput, Pressable, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, LayoutChangeEvent, Platform } from 'react-native';
 import { useState, useRef } from 'react';
 import { Plus, Trash2 } from 'lucide-react-native';
 import type { GoalsStepProps } from './types';
 import { EXAMPLE_GOALS } from './types';
+import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
 
 interface WeightSliderProps {
   value: number; // 0-1
@@ -114,6 +115,7 @@ export function GoalsStep({ goals, onChange }: GoalsStepProps) {
           placeholderTextColor="#999"
           onSubmitEditing={() => addGoal(newGoalText)}
           returnKeyType="done"
+          inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
         />
         <Pressable
           style={[styles.addButton, !newGoalText.trim() && styles.addButtonDisabled]}

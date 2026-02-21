@@ -101,41 +101,72 @@ export async function POST(request: NextRequest) {
     const config = buildConfig(protocol.user_configs);
     const modifyConfig = config?.success ? config.data : fallbackConfig;
 
-    const currentScores = {
-      weighted_goal_score: protocol.weighted_goal_score,
-      viability_score: protocol.viability_score,
-      requirements_met: protocol.requirements_met,
+    // Build current scores, falling back to the last verified version if current has no scores
+    let currentScores = {
+      weighted_goal_score: protocol.weighted_goal_score as number | null,
+      viability_score: protocol.viability_score as number | null,
+      requirements_met: protocol.requirements_met as boolean | null,
     };
+
+    if (currentScores.weighted_goal_score == null && protocol.version_chain_id) {
+      const { data: lastVerified } = await supabase
+        .from('protocols')
+        .select('weighted_goal_score, viability_score, requirements_met')
+        .eq('version_chain_id', protocol.version_chain_id)
+        .eq('verified', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastVerified) {
+        currentScores = {
+          weighted_goal_score: lastVerified.weighted_goal_score,
+          viability_score: lastVerified.viability_score,
+          requirements_met: lastVerified.requirements_met,
+        };
+      }
+    }
 
     if (useStreaming) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            // Stream modification generation
+            // Stream modification generation with two-phase approach
+            // Generator yields: { stage: string } | string (text chunks)
             const generator = modifyProtocolStream(protocolData, modifyConfig, userMessage);
-            let genResult: IteratorResult<string, { protocol: DailyProtocol; reasoning: string }>;
+            let genResult: IteratorResult<string | { stage: string }, { protocol: DailyProtocol; reasoning: string; citations: Citation[] }>;
             do {
               genResult = await generator.next();
               if (!genResult.done && genResult.value) {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ chunk: genResult.value })}\n\n`)
-                );
+                // Check if it's a stage indicator or a text chunk
+                if (typeof genResult.value === 'object' && 'stage' in genResult.value) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ stage: genResult.value.stage })}\n\n`)
+                  );
+                } else {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: genResult.value })}\n\n`)
+                  );
+                }
               }
             } while (!genResult.done);
 
-            const { protocol: modifiedProtocol, reasoning } = genResult.value;
+            const { protocol: modifiedProtocol, reasoning, citations: modifyCitations } = genResult.value;
 
-            // Verify the modified protocol (now returns citations)
+            // Verify the modified protocol (returns verification citations)
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ stage: 'verifying' })}\n\n`)
             );
             const { verification, citations: verifyCitations } = await verifyProtocol(modifiedProtocol, modifyConfig);
 
-            // Save proposal with citations included in proposed_scores
+            // Merge citations from modify research and verify operations
+            const allCitations = mergeCitations(modifyCitations, verifyCitations);
+
+            // Save proposal with merged citations
             const proposedScoresWithCitations = {
               ...verification,
-              citations: verifyCitations,
+              citations: allCitations,
             };
 
             const { data: modification } = await supabase
@@ -161,7 +192,7 @@ export async function POST(request: NextRequest) {
                 done: true,
                 result: {
                   modificationId: modification?.id,
-                  proposal: { protocol: modifiedProtocol, reasoning, verification, citations: verifyCitations },
+                  proposal: { protocol: modifiedProtocol, reasoning, verification, citations: allCitations },
                   currentScores,
                 },
               })}\n\n`)

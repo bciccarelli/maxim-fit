@@ -2,6 +2,7 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ProtocolProvider } from '@/contexts/ProtocolContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
@@ -12,6 +13,8 @@ import {
   setupNotificationResponseListener,
   setupNotificationReceivedListener,
 } from '@/lib/notifications/handlers';
+import { setupPushNotifications } from '@/lib/notifications/pushToken';
+import { KeyboardAccessoryProvider } from '@/components/shared/KeyboardAccessoryProvider';
 import type { EventSubscription } from 'expo-notifications';
 
 function RootLayoutNav() {
@@ -43,6 +46,13 @@ function RootLayoutNav() {
     trackAppOpen();
   }, [trackAppOpen]);
 
+  // Register push token when user is authenticated
+  useEffect(() => {
+    if (session?.user) {
+      setupPushNotifications();
+    }
+  }, [session?.user?.id]);
+
   useEffect(() => {
     if (isLoading) return;
 
@@ -68,17 +78,21 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <ProtocolProvider>
-          <SubscriptionProvider>
-            <RatingPromptProvider>
-              <RootLayoutNav />
-              <GlobalUpgradeModal />
-            </RatingPromptProvider>
-          </SubscriptionProvider>
-        </ProtocolProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <ProtocolProvider>
+            <SubscriptionProvider>
+              <RatingPromptProvider>
+                <KeyboardAccessoryProvider>
+                  <RootLayoutNav />
+                  <GlobalUpgradeModal />
+                </KeyboardAccessoryProvider>
+              </RatingPromptProvider>
+            </SubscriptionProvider>
+          </ProtocolProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

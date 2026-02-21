@@ -4,14 +4,96 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dumbbell, Calendar, Plus, Trash2, Save, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { Dumbbell, Calendar, Plus, Trash2, Save, ChevronDown, ChevronRight, Pencil, GripVertical } from 'lucide-react';
 import { InlineEditField } from './InlineEditField';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { TrainingProgram, Workout, Exercise } from '@/lib/schemas/protocol';
 
 interface TrainingViewProps {
   training: TrainingProgram;
   editable?: boolean;
   onChange?: (training: TrainingProgram) => void;
+}
+
+interface SortableExerciseProps {
+  id: string;
+  exercise: Exercise;
+  isEditing: boolean;
+  onUpdate: (field: keyof Exercise, value: unknown) => void;
+  onRemove: () => void;
+}
+
+function SortableExercise({ id, exercise, isEditing, onUpdate, onRemove }: SortableExerciseProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: !isEditing });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2 py-2.5">
+      {isEditing && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground mt-1"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      )}
+      <div className="flex-1">
+        {isEditing ? (
+          <div className="space-y-1">
+            <Input value={exercise.name} onChange={(e) => onUpdate('name', e.target.value)} className="text-sm h-7" />
+            <div className="flex gap-2">
+              <Input type="number" value={exercise.sets ?? ''} onChange={(e) => onUpdate('sets', parseInt(e.target.value) || null)} placeholder="Sets" className="w-16 font-mono text-sm h-7" />
+              <Input value={exercise.reps ?? ''} onChange={(e) => onUpdate('reps', e.target.value || null)} placeholder="Reps" className="w-20 font-mono text-sm h-7" />
+              <Input type="number" value={exercise.rest_sec ?? ''} onChange={(e) => onUpdate('rest_sec', parseInt(e.target.value) || null)} placeholder="Rest (s)" className="w-20 font-mono text-sm h-7" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={onRemove} aria-label="Remove exercise"><Trash2 className="h-3 w-3" /></Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="font-medium text-sm">{exercise.name}</p>
+            {exercise.notes && <p className="text-xs text-muted-foreground mt-0.5">{exercise.notes}</p>}
+          </>
+        )}
+      </div>
+      {!isEditing && (
+        <div className="text-right font-mono text-sm text-muted-foreground tabular-nums">
+          {exercise.sets && exercise.reps && <p>{exercise.sets} x {exercise.reps}</p>}
+          {exercise.duration_min && <p>{exercise.duration_min}<span className="text-xs ml-0.5">min</span></p>}
+          {exercise.rest_sec && <p className="text-xs">Rest: {exercise.rest_sec}<span className="ml-0.5">s</span></p>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function TrainingView({ training, editable = false, onChange }: TrainingViewProps) {
@@ -21,6 +103,13 @@ export function TrainingView({ training, editable = false, onChange }: TrainingV
   const [editingWorkout, setEditingWorkout] = useState<number | null>(null);
 
   const display = dirty ? draft : training;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const updateDraft = (updated: TrainingProgram) => {
     setDraft(updated);
@@ -52,9 +141,28 @@ export function TrainingView({ training, editable = false, onChange }: TrainingV
     updateDraft({ ...draft, workouts });
   };
 
+  const handleDragEnd = (event: DragEndEvent, wIdx: number) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const workouts = [...draft.workouts];
+    const exercises = [...workouts[wIdx].exercises];
+
+    const oldIndex = exercises.findIndex((_, i) => `exercise-${wIdx}-${i}` === active.id);
+    const newIndex = exercises.findIndex((_, i) => `exercise-${wIdx}-${i}` === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      workouts[wIdx] = {
+        ...workouts[wIdx],
+        exercises: arrayMove(exercises, oldIndex, newIndex),
+      };
+      updateDraft({ ...draft, workouts });
+    }
+  };
+
   const handleAddWorkout = () => {
     const newIndex = draft.workouts.length;
-    updateDraft({ ...draft, workouts: [...draft.workouts, { name: 'New workout', day: 'Day ' + (draft.workouts.length + 1), time: '06:00', duration_min: 60, exercises: [], warmup: '5 min general warmup', cooldown: '5 min stretching' }] });
+    updateDraft({ ...draft, workouts: [...draft.workouts, { name: 'New workout', day: 'Day ' + (draft.workouts.length + 1), time: '06:00', duration_min: 60, exercises: [] }] });
     setExpandedWorkout(newIndex);
     setEditingWorkout(newIndex);
   };
@@ -106,6 +214,8 @@ export function TrainingView({ training, editable = false, onChange }: TrainingV
           {display.workouts.map((workout, wIdx) => {
             const expanded = isWorkoutExpanded(wIdx);
             const isEditing = editingWorkout === wIdx;
+            const exerciseIds = workout.exercises.map((_, i) => `exercise-${wIdx}-${i}`);
+
             return (
               <div key={wIdx} className="border rounded-lg overflow-hidden">
                 <div className="p-4 bg-muted/50 flex items-center justify-between">
@@ -137,42 +247,26 @@ export function TrainingView({ training, editable = false, onChange }: TrainingV
 
                 {expanded && (
                   <div className="p-4 space-y-4">
-                    <div className="border-l-2 border-l-warning pl-3 py-1">
-                      <span className="text-xs font-medium uppercase tracking-widest text-warning">Warmup</span>
-                      <p className="text-sm text-muted-foreground mt-0.5">{workout.warmup}</p>
-                    </div>
-
-                    <div className="divide-y divide-border">
-                      {workout.exercises.map((exercise, eIdx) => (
-                        <div key={eIdx} className="flex items-start justify-between py-2.5">
-                          <div className="flex-1">
-                            {isEditing ? (
-                              <div className="space-y-1">
-                                <Input value={exercise.name} onChange={(e) => handleUpdateExercise(wIdx, eIdx, 'name', e.target.value)} className="text-sm h-7" />
-                                <div className="flex gap-2">
-                                  <Input type="number" value={exercise.sets ?? ''} onChange={(e) => handleUpdateExercise(wIdx, eIdx, 'sets', parseInt(e.target.value) || null)} placeholder="Sets" className="w-16 font-mono text-sm h-7" />
-                                  <Input value={exercise.reps ?? ''} onChange={(e) => handleUpdateExercise(wIdx, eIdx, 'reps', e.target.value || null)} placeholder="Reps" className="w-20 font-mono text-sm h-7" />
-                                  <Input type="number" value={exercise.rest_sec ?? ''} onChange={(e) => handleUpdateExercise(wIdx, eIdx, 'rest_sec', parseInt(e.target.value) || null)} placeholder="Rest (s)" className="w-20 font-mono text-sm h-7" />
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveExercise(wIdx, eIdx)} aria-label="Remove exercise"><Trash2 className="h-3 w-3" /></Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <p className="font-medium text-sm">{exercise.name}</p>
-                                {exercise.notes && <p className="text-xs text-muted-foreground mt-0.5">{exercise.notes}</p>}
-                              </>
-                            )}
-                          </div>
-                          {!isEditing && (
-                            <div className="text-right font-mono text-sm text-muted-foreground tabular-nums">
-                              {exercise.sets && exercise.reps && <p>{exercise.sets} x {exercise.reps}</p>}
-                              {exercise.duration_min && <p>{exercise.duration_min}<span className="text-xs ml-0.5">min</span></p>}
-                              {exercise.rest_sec && <p className="text-xs">Rest: {exercise.rest_sec}<span className="ml-0.5">s</span></p>}
-                            </div>
-                          )}
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleDragEnd(event, wIdx)}
+                    >
+                      <SortableContext items={exerciseIds} strategy={verticalListSortingStrategy}>
+                        <div className="divide-y divide-border">
+                          {workout.exercises.map((exercise, eIdx) => (
+                            <SortableExercise
+                              key={`exercise-${wIdx}-${eIdx}`}
+                              id={`exercise-${wIdx}-${eIdx}`}
+                              exercise={exercise}
+                              isEditing={isEditing}
+                              onUpdate={(field, value) => handleUpdateExercise(wIdx, eIdx, field, value)}
+                              onRemove={() => handleRemoveExercise(wIdx, eIdx)}
+                            />
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
 
                     {isEditing && (
                       <div className="flex items-center gap-2">
@@ -181,11 +275,6 @@ export function TrainingView({ training, editable = false, onChange }: TrainingV
                         <Button variant="ghost" size="sm" onClick={() => handleRemoveWorkout(wIdx)} className="text-destructive hover:text-destructive"><Trash2 className="h-3 w-3 mr-1" />Remove workout</Button>
                       </div>
                     )}
-
-                    <div className="border-l-2 border-l-info pl-3 py-1">
-                      <span className="text-xs font-medium uppercase tracking-widest text-info">Cooldown</span>
-                      <p className="text-sm text-muted-foreground mt-0.5">{workout.cooldown}</p>
-                    </div>
                   </div>
                 )}
               </div>

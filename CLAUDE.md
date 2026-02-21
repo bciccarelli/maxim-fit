@@ -11,7 +11,18 @@ Generate a personalized, evidence-based daily health protocol. The protocol must
 
 ## Gemini API
 
-- **Model for grounding + structured output**: `gemini-3-flash-preview` is the only model compatible with both Google Search grounding and structured output. Do not change this model name.
+**Model Configuration:**
+- `MODEL_FAST` (`gemini-2.5-flash-lite`): Initial protocol generation, no grounding needed
+- `MODEL_GROUNDED` (`gemini-3-flash-preview`): Verification, Ask, and other grounded + structured output tasks
+- `MODEL_RESEARCH` (`gemini-3-flash-preview`): Phase 1 of Modify - research with grounding, no structured output
+- `MODEL_STRUCTURED` (`gemini-3-pro-preview`): Phase 2 of Modify - structured output with Pro model, no grounding
+
+**Two-Phase Modify Architecture:**
+The Modify feature uses a two-phase approach for better research quality and structured output:
+1. **Phase 1 (Research)**: Uses `MODEL_RESEARCH` with Google Search grounding to research the user's request. Returns free-form prose with citations.
+2. **Phase 2 (Apply)**: Uses `MODEL_STRUCTURED` (Pro model) with structured output to apply the research findings and generate the modified protocol JSON.
+
+This separation allows Phase 1 to focus on evidence gathering without JSON formatting constraints, while Phase 2 uses Pro's superior reasoning for complex structured output.
 
 ## Project Structure
 

@@ -250,37 +250,17 @@ export function ModifyModal({ open, onOpenChange, protocolId, onAccepted, initia
             <div className="grid grid-cols-2 gap-3">
               <div className="p-4 rounded-lg bg-muted text-center">
                 <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Current</p>
-                <div className="flex items-center justify-center gap-4">
-                  <div>
-                    <p className="font-mono text-lg font-semibold tabular-nums">
-                      {formatScore(proposal.currentScores.weighted_goal_score)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Goal</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-lg font-semibold tabular-nums">
-                      {formatScore(proposal.currentScores.viability_score)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Viability</p>
-                  </div>
-                </div>
+                <p className="font-mono text-lg font-semibold tabular-nums">
+                  {formatScore(proposal.currentScores.weighted_goal_score)}
+                </p>
+                <p className="text-xs text-muted-foreground">Goal score</p>
               </div>
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 text-center">
                 <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Proposed</p>
-                <div className="flex items-center justify-center gap-4">
-                  <div>
-                    <p className="font-mono text-lg font-semibold tabular-nums">
-                      {formatScore(proposal.proposedScores.weighted_goal_score)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Goal</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-lg font-semibold tabular-nums">
-                      {formatScore(proposal.proposedScores.viability_score)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Viability</p>
-                  </div>
-                </div>
+                <p className="font-mono text-lg font-semibold tabular-nums">
+                  {formatScore(proposal.proposedScores.weighted_goal_score)}
+                </p>
+                <p className="text-xs text-muted-foreground">Goal score</p>
               </div>
             </div>
 

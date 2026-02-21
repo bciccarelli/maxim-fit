@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Keyboard } from 'react-native';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock } from 'lucide-react-native';
 import type { DailyProtocol, ScheduleVariant, OtherEvent, DayOfWeek } from '@protocol/shared/schemas';
@@ -392,7 +392,6 @@ export function ScheduleSection({
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Schedule</Text>
 
       {/* Day Selector */}
       <View style={styles.daySelector}>
@@ -640,7 +639,10 @@ export function ScheduleSection({
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setEditingEvent(null)}
+          onPress={() => {
+            Keyboard.dismiss();
+            setEditingEvent(null);
+          }}
         >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {editingEventData && (

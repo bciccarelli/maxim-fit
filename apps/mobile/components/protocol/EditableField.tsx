@@ -5,10 +5,12 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
+  Platform,
   type TextStyle,
   type StyleProp,
   type KeyboardTypeOptions,
 } from 'react-native';
+import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
 
 interface EditableFieldProps {
   value: string;
@@ -107,6 +109,7 @@ export function EditableField({
         multiline={multiline}
         blurOnSubmit={!multiline}
         returnKeyType={multiline ? 'default' : 'done'}
+        inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
       />
     </View>
   );

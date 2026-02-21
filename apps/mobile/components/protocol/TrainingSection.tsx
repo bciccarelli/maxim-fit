@@ -1,6 +1,7 @@
-import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Keyboard } from 'react-native';
 import { useState, useCallback } from 'react';
-import { Plus, Trash2, X, ChevronDown, ChevronUp, Dumbbell } from 'lucide-react-native';
+import { Plus, Trash2, X, Dumbbell, GripVertical } from 'lucide-react-native';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import type { TrainingProgram, Workout, Exercise } from '@protocol/shared/schemas';
 import { EditableField } from './EditableField';
 
@@ -24,9 +25,26 @@ const EMPTY_WORKOUT: Workout = {
   day: 'Day 1',
   time: '06:00',
   duration_min: 45,
-  exercises: [{ ...EMPTY_EXERCISE }],
-  warmup: '5 min cardio',
-  cooldown: '5 min stretching',
+  exercises: [],
+};
+
+// Format exercise data as "3 x 10 · 60s" or "45 min"
+const formatExerciseData = (exercise: Exercise): string => {
+  const parts: string[] = [];
+
+  if (exercise.duration_min && !exercise.sets) {
+    return `${exercise.duration_min} min`;
+  }
+
+  if (exercise.sets && exercise.reps) {
+    parts.push(`${exercise.sets} x ${exercise.reps}`);
+  }
+
+  if (exercise.rest_sec) {
+    parts.push(`${exercise.rest_sec}s`);
+  }
+
+  return parts.join(' · ');
 };
 
 export function TrainingSection({
@@ -35,7 +53,7 @@ export function TrainingSection({
   onChange,
 }: Props) {
   const [editingProgramHeader, setEditingProgramHeader] = useState(false);
-  const [expandedWorkoutIndex, setExpandedWorkoutIndex] = useState<number | null>(0);
+  const [selectedWorkoutIndex, setSelectedWorkoutIndex] = useState(0);
   const [editingWorkoutIndex, setEditingWorkoutIndex] = useState<number | null>(null);
   const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
 
@@ -69,7 +87,7 @@ export function TrainingSection({
   const addWorkout = useCallback(() => {
     const newWorkouts = [...training.workouts, { ...EMPTY_WORKOUT }];
     onChange?.({ ...training, workouts: newWorkouts });
-    setExpandedWorkoutIndex(newWorkouts.length - 1);
+    setSelectedWorkoutIndex(newWorkouts.length - 1);
     setEditingWorkoutIndex(newWorkouts.length - 1);
   }, [training, onChange]);
 
@@ -78,7 +96,10 @@ export function TrainingSection({
       const newWorkouts = training.workouts.filter((_, i) => i !== workoutIndex);
       onChange?.({ ...training, workouts: newWorkouts });
       setEditingWorkoutIndex(null);
-      setExpandedWorkoutIndex(null);
+      // Select the previous workout or first one if available
+      if (newWorkouts.length > 0) {
+        setSelectedWorkoutIndex(Math.min(workoutIndex, newWorkouts.length - 1));
+      }
     },
     [training, onChange]
   );
@@ -104,6 +125,15 @@ export function TrainingSection({
       newWorkouts[workoutIndex] = { ...newWorkouts[workoutIndex], exercises: newExercises };
       onChange?.({ ...training, workouts: newWorkouts });
       setEditingExerciseIndex(null);
+    },
+    [training, onChange]
+  );
+
+  const handleDragEnd = useCallback(
+    (workoutIndex: number, data: Exercise[]) => {
+      const newWorkouts = [...training.workouts];
+      newWorkouts[workoutIndex] = { ...newWorkouts[workoutIndex], exercises: data };
+      onChange?.({ ...training, workouts: newWorkouts });
     },
     [training, onChange]
   );
@@ -156,40 +186,37 @@ export function TrainingSection({
     );
   };
 
-  const renderExercise = (
-    exercise: Exercise,
-    exerciseIndex: number,
-    workoutIndex: number
-  ) => {
+  const renderExerciseItem = ({ item, drag, isActive, getIndex }: RenderItemParams<Exercise>) => {
+    const exerciseIndex = getIndex() ?? 0;
+    const exerciseData = formatExerciseData(item);
+
     return (
-      <Pressable
-        key={exerciseIndex}
-        style={styles.exerciseItem}
-        onPress={() => {
-          if (editable) {
-            setEditingWorkoutIndex(workoutIndex);
-            setEditingExerciseIndex(exerciseIndex);
-          }
-        }}
-      >
-        <View style={styles.exerciseRow}>
-          <Text style={styles.exerciseName}>{exercise.name}</Text>
-        </View>
-        <View style={styles.exerciseDetails}>
-          {exercise.sets && exercise.reps && (
-            <Text style={styles.exerciseSetsReps}>
-              {exercise.sets} × {exercise.reps}
-            </Text>
+      <ScaleDecorator>
+        <Pressable
+          style={[
+            styles.exerciseRow,
+            isActive && styles.exerciseRowDragging,
+          ]}
+          onPress={() => {
+            if (editable) {
+              setEditingWorkoutIndex(selectedWorkoutIndex);
+              setEditingExerciseIndex(exerciseIndex);
+            }
+          }}
+          onLongPress={editable ? drag : undefined}
+          delayLongPress={150}
+        >
+          {editable && (
+            <View style={styles.dragHandle}>
+              <GripVertical size={16} color="#999" />
+            </View>
           )}
-          {exercise.duration_min && (
-            <Text style={styles.exerciseSetsReps}>{exercise.duration_min} min</Text>
-          )}
-          {exercise.rest_sec && (
-            <Text style={styles.exerciseRest}>Rest: {exercise.rest_sec}s</Text>
-          )}
-        </View>
-        {exercise.notes && <Text style={styles.exerciseNotes}>{exercise.notes}</Text>}
-      </Pressable>
+          <Text style={[styles.exerciseName, editable && styles.exerciseNameWithHandle]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {exerciseData && <Text style={styles.exerciseData}>{exerciseData}</Text>}
+        </Pressable>
+      </ScaleDecorator>
     );
   };
 
@@ -198,69 +225,56 @@ export function TrainingSection({
     ? training.workouts[editingWorkoutIndex]?.exercises[editingExerciseIndex]
     : null;
 
-  const renderWorkout = (workout: Workout, workoutIndex: number) => {
-    const isExpanded = expandedWorkoutIndex === workoutIndex;
+  const renderSelectedWorkout = () => {
+    if (training.workouts.length === 0) {
+      return null;
+    }
 
-    const toggleExpand = () => {
-      setExpandedWorkoutIndex(isExpanded ? null : workoutIndex);
-    };
-
-    const handleWorkoutHeaderPress = () => {
-      if (editable && isExpanded) {
-        // Open workout edit modal
-        setEditingWorkoutIndex(workoutIndex);
-        setEditingExerciseIndex(-1); // -1 means editing workout header, not an exercise
-      } else {
-        toggleExpand();
-      }
-    };
+    const workout = training.workouts[selectedWorkoutIndex];
+    if (!workout) return null;
 
     return (
-      <View key={workoutIndex} style={styles.workout}>
-        <Pressable style={styles.workoutHeader} onPress={handleWorkoutHeaderPress}>
+      <View style={styles.workoutContent}>
+        {/* Workout header - tappable to edit */}
+        <Pressable
+          style={styles.workoutHeader}
+          onPress={() => {
+            if (editable) {
+              setEditingWorkoutIndex(selectedWorkoutIndex);
+              setEditingExerciseIndex(-1);
+            }
+          }}
+        >
           <View style={styles.workoutHeaderLeft}>
             <Text style={styles.workoutName}>{workout.name}</Text>
             <Text style={styles.workoutDay}>{workout.day}</Text>
           </View>
           <View style={styles.workoutHeaderRight}>
             <Text style={styles.workoutDuration}>{workout.duration_min} min</Text>
-            {isExpanded ? (
-              <ChevronUp size={20} color="#666" />
-            ) : (
-              <ChevronDown size={20} color="#666" />
-            )}
+            <Text style={styles.workoutTime}>{workout.time}</Text>
           </View>
         </Pressable>
 
-        {isExpanded && (
-          <>
-            <View style={styles.warmupCooldown}>
-              <Text style={styles.wcLabel}>Warmup:</Text>
-              <Text style={styles.wcText}>{workout.warmup}</Text>
-            </View>
+        {/* Exercises - draggable list */}
+        <View style={styles.exercisesList}>
+          <DraggableFlatList
+            data={workout.exercises}
+            keyExtractor={(_, index) => `exercise-${index}`}
+            renderItem={renderExerciseItem}
+            onDragEnd={({ data }) => handleDragEnd(selectedWorkoutIndex, data)}
+            scrollEnabled={false}
+          />
 
-            <View style={styles.exercises}>
-              {workout.exercises.map((exercise, exIndex) =>
-                renderExercise(exercise, exIndex, workoutIndex)
-              )}
-
-              {editable && (
-                <Pressable
-                  style={styles.addExerciseButton}
-                  onPress={() => addExercise(workoutIndex)}
-                >
-                  <Plus size={14} color="#2d5a2d" />
-                  <Text style={styles.addButtonText}>Add exercise</Text>
-                </Pressable>
-              )}
-            </View>
-
-            <View style={styles.warmupCooldown}>
-              <Text style={styles.wcLabel}>Cooldown:</Text>
-              <Text style={styles.wcText}>{workout.cooldown}</Text>
-            </View>
-          </>
-        )}
+          {editable && (
+            <Pressable
+              style={styles.addExerciseButton}
+              onPress={() => addExercise(selectedWorkoutIndex)}
+            >
+              <Plus size={14} color="#2d5a2d" />
+              <Text style={styles.addButtonText}>Add exercise</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     );
   };
@@ -277,7 +291,37 @@ export function TrainingSection({
       <View style={styles.card}>
         {renderProgramHeader()}
 
-        {training.workouts.map(renderWorkout)}
+        {/* Workout selector chips */}
+        {training.workouts.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.workoutSelector}
+            contentContainerStyle={styles.workoutSelectorContent}
+          >
+            {training.workouts.map((workout, index) => (
+              <Pressable
+                key={index}
+                style={[
+                  styles.workoutChip,
+                  selectedWorkoutIndex === index && styles.workoutChipActive,
+                ]}
+                onPress={() => setSelectedWorkoutIndex(index)}
+              >
+                <Text
+                  style={[
+                    styles.workoutChipText,
+                    selectedWorkoutIndex === index && styles.workoutChipTextActive,
+                  ]}
+                >
+                  {workout.day}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
+        {renderSelectedWorkout()}
 
         {editable && (
           <Pressable style={styles.addButton} onPress={addWorkout}>
@@ -325,6 +369,7 @@ export function TrainingSection({
         <Pressable
           style={styles.modalOverlay}
           onPress={() => {
+            Keyboard.dismiss();
             setEditingWorkoutIndex(null);
             setEditingExerciseIndex(null);
           }}
@@ -394,26 +439,6 @@ export function TrainingSection({
                       />
                     </View>
                   </View>
-
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalFieldLabel}>Warmup</Text>
-                    <EditableField
-                      value={editingWorkout.warmup}
-                      onChange={(warmup) => updateWorkout(editingWorkoutIndex, { warmup })}
-                      editable
-                      style={styles.modalFieldInput}
-                    />
-                  </View>
-
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalFieldLabel}>Cooldown</Text>
-                    <EditableField
-                      value={editingWorkout.cooldown}
-                      onChange={(cooldown) => updateWorkout(editingWorkoutIndex, { cooldown })}
-                      editable
-                      style={styles.modalFieldInput}
-                    />
-                  </View>
                 </View>
 
                 <Pressable
@@ -438,7 +463,10 @@ export function TrainingSection({
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setEditingExerciseIndex(null)}
+          onPress={() => {
+            Keyboard.dismiss();
+            setEditingExerciseIndex(null);
+          }}
         >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {editingExercise && editingWorkoutIndex !== null && editingExerciseIndex !== null && (
@@ -570,7 +598,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -585,6 +613,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#2d5a2d',
     fontWeight: '500',
+    fontVariant: ['tabular-nums'],
   },
   programHeaderEdit: {
     backgroundColor: '#f9f9f7',
@@ -592,24 +621,49 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
   },
-  workout: {
+
+  // Workout selector chips
+  workoutSelector: {
+    marginBottom: 12,
+    marginHorizontal: -4,
+  },
+  workoutSelectorContent: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  workoutChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+  },
+  workoutChipActive: {
+    backgroundColor: '#2d5a2d',
+  },
+  workoutChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666',
+  },
+  workoutChipTextActive: {
+    color: '#fff',
+  },
+
+  // Selected workout content
+  workoutContent: {
     marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   workoutHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 12,
   },
   workoutHeaderLeft: {
     flex: 1,
   },
   workoutHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'flex-end',
   },
   workoutName: {
     fontSize: 15,
@@ -624,77 +678,59 @@ const styles = StyleSheet.create({
   workoutDuration: {
     fontSize: 13,
     color: '#666',
+    fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
-  workoutEditCard: {
-    backgroundColor: '#f9f9f7',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-    marginBottom: 12,
+  workoutTime: {
+    fontSize: 12,
+    color: '#888',
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
   },
-  warmupCooldown: {
-    backgroundColor: '#f5f5f0',
-    padding: 10,
-    borderRadius: 6,
-    marginTop: 12,
-  },
-  wcLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  wcText: {
-    fontSize: 13,
-    color: '#444',
-  },
-  exercises: {
-    marginTop: 12,
-  },
-  exerciseItem: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+
+  // Exercise list
+  exercisesList: {
+    marginTop: 4,
   },
   exerciseRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 10,
+    minHeight: 44,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+    backgroundColor: '#fff',
+  },
+  exerciseRowDragging: {
+    backgroundColor: '#f9f9f7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dragHandle: {
+    paddingRight: 8,
+    paddingLeft: 2,
   },
   exerciseName: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#1a2e1a',
     flex: 1,
+    marginRight: 12,
   },
-  exerciseDetails: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
+  exerciseNameWithHandle: {
+    marginLeft: 0,
   },
-  exerciseSetsReps: {
+  exerciseData: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#2d5a2d',
     fontVariant: ['tabular-nums'],
-  },
-  exerciseRest: {
-    fontSize: 12,
-    color: '#888',
-  },
-  exerciseNotes: {
-    fontSize: 12,
     color: '#666',
-    fontStyle: 'italic',
-    marginTop: 4,
+    textAlign: 'right',
   },
-  exerciseEdit: {
-    backgroundColor: '#f9f9f7',
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 8,
-  },
+
   addExerciseButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -702,6 +738,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 6,
   },
+
+  // Rest days, progression, notes
   restDays: {
     marginBottom: 12,
   },
@@ -747,6 +785,8 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
   },
+
+  // Edit header
   editHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

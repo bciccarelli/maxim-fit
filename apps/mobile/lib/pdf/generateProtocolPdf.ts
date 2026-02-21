@@ -217,11 +217,9 @@ function buildWorkoutHtml(workout: Workout): string {
         <span class="workout-name">${escapeHtml(workout.name)}</span>
         <span class="workout-meta mono">${escapeHtml(workout.day)} · ${workout.duration_min} min</span>
       </div>
-      ${workout.warmup ? `<div class="workout-section"><span class="workout-section-label">Warmup:</span> ${escapeHtml(workout.warmup)}</div>` : ''}
       <div class="exercises-list">
         ${workout.exercises.map(buildExerciseHtml).join('')}
       </div>
-      ${workout.cooldown ? `<div class="workout-section"><span class="workout-section-label">Cooldown:</span> ${escapeHtml(workout.cooldown)}</div>` : ''}
     </div>
   `;
 }

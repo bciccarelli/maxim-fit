@@ -1,4 +1,4 @@
-import { getGeminiClient, MODEL_GROUNDED, MODEL_FAST } from './client';
+import { getGeminiClient, MODEL_GROUNDED, MODEL_FAST, MODEL_RESEARCH, MODEL_STRUCTURED } from './client';
 import { dailyProtocolSchema, normalizeProtocol, type DailyProtocol, type VerificationResult, type Citation } from '../schemas/protocol';
 import type { UserConfig, AnonymousUserConfig } from '../schemas/user-config';
 import { goalSchema, type Goal } from '../schemas/user-config';
@@ -132,6 +132,7 @@ export const dailyProtocolGeminiSchema = {
               duration_min: { type: 'integer', minimum: 1 },
               exercises: {
                 type: 'array',
+                description: 'All exercises in order. Include warmup exercises first (e.g., "Dynamic stretching", 5 min), main workout exercises, then cooldown exercises last (e.g., "Static stretching", 5 min). Warmup/cooldown exercises typically have duration_min instead of sets/reps.',
                 items: {
                   type: 'object',
                   properties: {
@@ -145,10 +146,8 @@ export const dailyProtocolGeminiSchema = {
                   required: ['name'],
                 },
               },
-              warmup: { type: 'string' },
-              cooldown: { type: 'string' },
             },
-            required: ['name', 'day', 'time', 'duration_min', 'exercises', 'warmup', 'cooldown'],
+            required: ['name', 'day', 'time', 'duration_min', 'exercises'],
           },
         },
         rest_days: { type: 'array', items: { type: 'string' } },
@@ -320,6 +319,15 @@ Format for prep events:
 - Activity: "Prep: [food name]" (e.g., "Prep: Overnight oats for tomorrow")
 - Duration: 5-15 min for simple prep
 
+## Exercise Structure
+
+Each workout's exercises array should include ALL exercises in order:
+1. **Warmup exercises FIRST** (e.g., "Dynamic stretching", "Light cardio") - typically duration-based (duration_min: 5)
+2. **Main workout exercises** - typically sets/reps-based (sets: 3, reps: "8-12")
+3. **Cooldown exercises LAST** (e.g., "Static stretching", "Foam rolling") - typically duration-based (duration_min: 5)
+
+Do NOT use separate warmup/cooldown fields. All exercises go in the exercises array.
+
 IMPORTANT: This is a general wellness protocol, not medical advice. Do not diagnose conditions or recommend treatments for diseases.
 
 Generate the protocol now.`;
@@ -455,18 +463,65 @@ const modifyResultSchema = {
   required: [...dailyProtocolGeminiSchema.required, 'reasoning'],
 } as const;
 
+// ---------------------------------------------------------------------------
+// Two-Phase Modification: Research + Apply
+// ---------------------------------------------------------------------------
+
 /**
- * Modify a protocol based on user suggestions, using Google Search grounding.
- * Returns modified protocol, reasoning, and citations from grounding.
+ * Build prompt for Phase 1: Research the user's modification request.
+ * Uses Google Search grounding, returns free-form prose (no structured output).
  */
-export async function modifyProtocol(
+function buildResearchPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   userMessage: string
-): Promise<{ protocol: DailyProtocol; reasoning: string; citations: Citation[] }> {
-  const client = getGeminiClient();
+): string {
+  return `You are a health research specialist. Research the user's protocol modification request using Google Search.
 
-  const prompt = `You are an expert health protocol modifier. The user wants to change their protocol. Research their suggestions using current evidence and generate a modified protocol.
+## User Configuration
+${JSON.stringify(config, null, 2)}
+
+## Current Protocol Summary
+- Wake: ${protocol.schedules[0]?.wake_time || 'N/A'}, Sleep: ${protocol.schedules[0]?.sleep_time || 'N/A'}
+- Daily calories: ${protocol.diet.daily_calories}, Protein: ${protocol.diet.protein_target_g}g
+- Training: ${protocol.training.program_name} (${protocol.training.days_per_week}x/week)
+- Supplements: ${protocol.supplementation.supplements.map(s => s.name).join(', ') || 'None'}
+
+## User's Requested Changes
+${userMessage}
+
+## Instructions
+
+Use Google Search to research the user's request. Provide:
+
+**Research Findings**:
+- Current evidence-based recommendations for their request
+- Relevant dosages, timings, or protocols from studies
+- Any conflicts with their existing protocol
+
+**Implementation Recommendations**:
+- Specific changes to make based on the evidence
+- Adjustments to other protocol areas if needed
+- Timing or interaction considerations
+
+**Cautions**:
+- Potential risks or contraindications
+- What to monitor or avoid
+
+Write clear, organized prose. Do NOT output JSON.`;
+}
+
+/**
+ * Build prompt for Phase 2: Apply research findings to modify the protocol.
+ * Uses structured output, no grounding (relies on Phase 1 research).
+ */
+function buildApplyPrompt(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  userMessage: string,
+  researchText: string
+): string {
+  return `You are an expert health protocol modifier. Apply the research findings to modify the user's protocol.
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
@@ -477,13 +532,15 @@ ${JSON.stringify(protocol, null, 2)}
 ## User's Requested Changes
 ${userMessage}
 
+## Research Findings (from evidence-based search)
+${researchText}
+
 ## Instructions
 
-1. Use Google Search to research the user's suggestions and find evidence-based approaches.
-2. Modify the protocol to incorporate the user's changes where supported by evidence.
-3. If a suggestion conflicts with evidence, adapt it to the closest evidence-based alternative.
-4. Maintain the parts of the protocol that work well and aren't affected by the changes.
-5. Provide clear reasoning explaining what you changed and why.
+1. Modify the protocol incorporating the research findings above.
+2. If research suggests adjustments to the user's request, implement the evidence-based version.
+3. Maintain unaffected parts of the protocol exactly as they are.
+4. Provide clear reasoning explaining what you changed and why, referencing the research.
 
 ## Supplement Timing Rules
 
@@ -511,34 +568,101 @@ When adding or modifying foods that require advance prep, create prep events in 
 - Slow cooker meals → "Prep: Start slow cooker" in the morning for dinner
 
 Generate the modified protocol with reasoning now.`;
+}
+
+/**
+ * Phase 1: Research the user's modification request using Google Search grounding.
+ * Returns unstructured research text with citations.
+ */
+async function researchModification(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  userMessage: string
+): Promise<{ researchText: string; citations: Citation[] }> {
+  const client = getGeminiClient();
+
+  const prompt = buildResearchPrompt(protocol, config, userMessage);
 
   const response = await client.models.generateContent({
-    model: MODEL_GROUNDED,
+    model: MODEL_RESEARCH,
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
+      // NO responseMimeType or responseSchema - free-form text output
+    },
+  });
+
+  const researchText = response.text || '';
+  if (!researchText) {
+    throw new Error('No response from Gemini during research phase');
+  }
+
+  // Extract citations from grounding metadata
+  const groundingMetadata = getGroundingMetadata(response);
+  const citations = extractCitations(groundingMetadata, 'modify');
+
+  return { researchText, citations };
+}
+
+/**
+ * Phase 2: Apply research findings to generate structured protocol modification.
+ * Uses structured output with Pro model, no grounding.
+ */
+async function applyResearchToProtocol(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  userMessage: string,
+  researchText: string
+): Promise<{ protocol: DailyProtocol; reasoning: string }> {
+  const client = getGeminiClient();
+
+  const prompt = buildApplyPrompt(protocol, config, userMessage, researchText);
+
+  const response = await client.models.generateContent({
+    model: MODEL_STRUCTURED,
+    contents: prompt,
+    config: {
       responseMimeType: 'application/json',
       responseSchema: modifyResultSchema as any,
+      // NO tools - no grounding in this phase
     },
   });
 
   const text = response.text;
   if (!text) {
-    throw new Error('No response from Gemini when modifying protocol');
+    throw new Error('No response from Gemini when applying research to protocol');
   }
 
   const parsed = JSON.parse(text);
   validateExerciseData(parsed);
   const protocolData = dailyProtocolSchema.parse(parsed);
 
-  // Extract citations from grounding metadata
-  const groundingMetadata = getGroundingMetadata(response);
-  const citations = extractCitations(groundingMetadata, 'modify');
-
   return {
     protocol: protocolData,
-    reasoning: parsed.reasoning || 'Protocol modified based on your suggestions.',
-    citations,
+    reasoning: parsed.reasoning || 'Protocol modified based on research.',
+  };
+}
+
+/**
+ * Modify a protocol based on user suggestions using two-phase approach:
+ * Phase 1: Research with Google Search grounding (citations)
+ * Phase 2: Apply research with structured output (Pro model)
+ * Returns modified protocol, reasoning, and citations from grounding.
+ */
+export async function modifyProtocol(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  userMessage: string
+): Promise<{ protocol: DailyProtocol; reasoning: string; citations: Citation[] }> {
+  // Phase 1: Research with grounding
+  const research = await researchModification(protocol, config, userMessage);
+
+  // Phase 2: Apply research with structured output
+  const result = await applyResearchToProtocol(protocol, config, userMessage, research.researchText);
+
+  return {
+    ...result,
+    citations: research.citations,
   };
 }
 
@@ -570,7 +694,7 @@ ${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n'
 
 IMPORTANT: Use Google Search to verify any health claims, supplement recommendations, exercise science, or nutritional guidance. Ground your response in current research and cite your sources.
 
-Keep your answer to 2-4 sentences. Be direct and conversational — no bullet points or formal structure unless specifically asked. If the question suggests a protocol change, briefly note the trade-off and suggest they use the Modify feature to make changes.
+Keep your answer to 2-4 sentences. Be direct and conversational — no bullet points or formal structure unless specifically asked. If the question suggests a protocol change, briefly note the trade-off but focus on answering the question directly.
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
@@ -806,68 +930,43 @@ export async function* generateProtocolStream(
 }
 
 /**
- * Stream protocol modification. Yields text chunks, returns modified protocol + reasoning.
+ * Stream protocol modification with two-phase approach.
+ * Yields stage indicators and text chunks, returns modified protocol + reasoning + citations.
+ *
+ * Phase 1 (Research): Uses non-streaming to get grounding metadata/citations, simulates streaming.
+ * Phase 2 (Apply): Uses true streaming since no grounding is needed.
  */
 export async function* modifyProtocolStream(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   userMessage: string
-): AsyncGenerator<string, { protocol: DailyProtocol; reasoning: string }, unknown> {
+): AsyncGenerator<string | { stage: string }, { protocol: DailyProtocol; reasoning: string; citations: Citation[] }, unknown> {
+  // === PHASE 1: Research with grounding ===
+  yield { stage: 'researching' };
+
+  // Non-streaming call to get citations (streaming API doesn't provide grounding metadata)
+  const research = await researchModification(protocol, config, userMessage);
+
+  // Simulate streaming the research text for UX
+  const researchChunkSize = 30;
+  for (let i = 0; i < research.researchText.length; i += researchChunkSize) {
+    yield research.researchText.slice(i, i + researchChunkSize);
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+
+  // === PHASE 2: Apply research with structured output (true streaming) ===
+  yield { stage: 'applying' };
+
   const client = getGeminiClient();
-
-  const prompt = `You are an expert health protocol modifier. The user wants to change their protocol. Research their suggestions using current evidence and generate a modified protocol.
-
-## User Configuration
-${JSON.stringify(config, null, 2)}
-
-## Current Protocol
-${JSON.stringify(protocol, null, 2)}
-
-## User's Requested Changes
-${userMessage}
-
-## Instructions
-
-1. Use Google Search to research the user's suggestions and find evidence-based approaches.
-2. Modify the protocol to incorporate the user's changes where supported by evidence.
-3. If a suggestion conflicts with evidence, adapt it to the closest evidence-based alternative.
-4. Maintain the parts of the protocol that work well and aren't affected by the changes.
-5. Provide clear reasoning explaining what you changed and why.
-
-## Supplement Timing Rules
-
-When a supplement should be taken WITH a meal:
-1. Set the supplement's "time" field to EXACTLY match the meal's time
-2. Use the "timing" field to document the relationship (e.g., "With breakfast")
-
-Common meal-associated supplements (should match meal times):
-- Fat-soluble vitamins (A, D, E, K), Omega-3/Fish oil, Digestive enzymes
-
-Standalone supplements (separate times):
-- Magnesium → before bed
-- Melatonin → 30-60 min before sleep
-- Pre/post-workout supplements → around training
-- Iron on empty stomach → separate time from meals
-
-IMPORTANT: When supplement timing matches a meal, use EXACTLY the same time. Do NOT create times that differ by only a few minutes.
-
-## Food Preparation Events
-
-When adding or modifying foods that require advance prep, create prep events in "other_events":
-
-- Overnight oats → "Prep: Overnight oats" at ~21:00 the night before
-- Marinating → "Prep: Marinate [food]" hours before the meal
-- Slow cooker meals → "Prep: Start slow cooker" in the morning for dinner
-
-Generate the modified protocol with reasoning now.`;
+  const applyPrompt = buildApplyPrompt(protocol, config, userMessage, research.researchText);
 
   const stream = await client.models.generateContentStream({
-    model: MODEL_GROUNDED,
-    contents: prompt,
+    model: MODEL_STRUCTURED,
+    contents: applyPrompt,
     config: {
-      tools: [{ googleSearch: {} }],
       responseMimeType: 'application/json',
       responseSchema: modifyResultSchema as any,
+      // NO tools - no grounding in this phase
     },
   });
 
@@ -880,13 +979,15 @@ Generate the modified protocol with reasoning now.`;
     }
   }
 
+  // Parse the final result
   const parsed = JSON.parse(fullText);
   validateExerciseData(parsed);
   const protocolData = dailyProtocolSchema.parse(parsed);
 
   return {
     protocol: protocolData,
-    reasoning: parsed.reasoning || 'Protocol modified based on your suggestions.',
+    reasoning: parsed.reasoning || 'Protocol modified based on research.',
+    citations: research.citations,
   };
 }
 

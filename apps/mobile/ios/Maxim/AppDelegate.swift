@@ -1,6 +1,6 @@
-import Expo
-import React
-import ReactAppDependencyProvider
+public import Expo
+public import React
+public import ReactAppDependencyProvider
 
 @main
 public class AppDelegate: ExpoAppDelegate {

@@ -1,6 +1,7 @@
-import { View, Text, TextInput, StyleSheet, Pressable, Modal } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Modal, Platform } from 'react-native';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react-native';
+import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
 
 const DOSAGE_UNITS = ['mg', 'g', 'mcg', 'IU', 'ml', 'drops', 'capsules', 'tablets'];
 
@@ -38,6 +39,8 @@ export function DosageInput({
           keyboardType="numeric"
           placeholder="0"
           placeholderTextColor="#999"
+          returnKeyType="done"
+          inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
         />
         <Pressable style={styles.unitButton} onPress={() => setShowUnitPicker(true)}>
           <Text style={styles.unitText}>{unit || 'mg'}</Text>
@@ -51,6 +54,8 @@ export function DosageInput({
         onChangeText={(text) => onNotesChange(text || null)}
         placeholder="Notes (e.g., standardized to 3%)"
         placeholderTextColor="#999"
+        returnKeyType="done"
+        inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
       />
 
       <Modal
