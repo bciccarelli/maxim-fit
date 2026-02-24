@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback } from 'react';
 import { Plus, Trash2, X, Dumbbell, GripVertical } from 'lucide-react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
@@ -366,14 +366,18 @@ export function TrainingSection({
           setEditingExerciseIndex(null);
         }}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => {
-            Keyboard.dismiss();
-            setEditingWorkoutIndex(null);
-            setEditingExerciseIndex(null);
-          }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              Keyboard.dismiss();
+              setEditingWorkoutIndex(null);
+              setEditingExerciseIndex(null);
+            }}
+          >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {editingWorkout && editingWorkoutIndex !== null && (
               <>
@@ -452,6 +456,7 @@ export function TrainingSection({
             )}
           </Pressable>
         </Pressable>
+      </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Exercise Modal */}
@@ -461,13 +466,17 @@ export function TrainingSection({
         animationType="fade"
         onRequestClose={() => setEditingExerciseIndex(null)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => {
-            Keyboard.dismiss();
-            setEditingExerciseIndex(null);
-          }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              Keyboard.dismiss();
+              setEditingExerciseIndex(null);
+            }}
+          >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {editingExercise && editingWorkoutIndex !== null && editingExerciseIndex !== null && (
               <>
@@ -569,6 +578,7 @@ export function TrainingSection({
             )}
           </Pressable>
         </Pressable>
+      </KeyboardAvoidingView>
       </Modal>
     </View>
   );

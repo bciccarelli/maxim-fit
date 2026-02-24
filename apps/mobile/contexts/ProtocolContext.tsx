@@ -21,6 +21,7 @@ export type ProtocolVersion = {
   version_chain_id: string;
   created_at: string;
   change_source: string | null;
+  change_note: string | null;
   critiques: Critique[] | null;
 };
 
@@ -117,7 +118,7 @@ export function ProtocolProvider({ children }: { children: ReactNode }) {
 
     const { data, error } = await supabase
       .from('protocols')
-      .select('id, version, name, protocol_data, verified, weighted_goal_score, viability_score, version_chain_id, created_at, change_source, critiques')
+      .select('id, version, name, protocol_data, verified, weighted_goal_score, viability_score, version_chain_id, created_at, change_source, change_note, critiques')
       .eq('version_chain_id', selectedChain.version_chain_id)
       .order('version', { ascending: false });
 

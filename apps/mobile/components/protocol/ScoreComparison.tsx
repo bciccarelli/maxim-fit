@@ -3,7 +3,6 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
 
 interface Scores {
   weighted_goal_score?: number | null;
-  viability_score?: number | null;
 }
 
 interface ScoreComparisonProps {
@@ -47,7 +46,7 @@ export function ScoreComparison({ currentScores, proposedScores }: ScoreComparis
       <Text style={styles.title}>Score Comparison</Text>
 
       <View style={styles.row}>
-        {/* Current Scores */}
+        {/* Current Score */}
         <View style={styles.column}>
           <Text style={styles.columnLabel}>Current</Text>
           <View style={styles.scoreCard}>
@@ -55,18 +54,12 @@ export function ScoreComparison({ currentScores, proposedScores }: ScoreComparis
               <Text style={styles.scoreValue}>
                 {currentScores.weighted_goal_score?.toFixed(1) ?? '-'}
               </Text>
-              <Text style={styles.scoreLabel}>Goal</Text>
-            </View>
-            <View style={styles.scoreItem}>
-              <Text style={styles.scoreValue}>
-                {currentScores.viability_score?.toFixed(1) ?? '-'}
-              </Text>
-              <Text style={styles.scoreLabel}>Viability</Text>
+              <Text style={styles.scoreLabel}>Goal Score</Text>
             </View>
           </View>
         </View>
 
-        {/* Proposed Scores */}
+        {/* Proposed Score */}
         <View style={styles.column}>
           <Text style={styles.columnLabel}>Proposed</Text>
           <View style={[styles.scoreCard, styles.scoreCardProposed]}>
@@ -74,20 +67,10 @@ export function ScoreComparison({ currentScores, proposedScores }: ScoreComparis
               <Text style={[styles.scoreValue, styles.scoreValueProposed]}>
                 {proposedScores.weighted_goal_score?.toFixed(1) ?? '-'}
               </Text>
-              <Text style={styles.scoreLabel}>Goal</Text>
+              <Text style={styles.scoreLabel}>Goal Score</Text>
               {renderScoreChange(
                 currentScores.weighted_goal_score,
                 proposedScores.weighted_goal_score
-              )}
-            </View>
-            <View style={styles.scoreItem}>
-              <Text style={[styles.scoreValue, styles.scoreValueProposed]}>
-                {proposedScores.viability_score?.toFixed(1) ?? '-'}
-              </Text>
-              <Text style={styles.scoreLabel}>Viability</Text>
-              {renderScoreChange(
-                currentScores.viability_score,
-                proposedScores.viability_score
               )}
             </View>
           </View>

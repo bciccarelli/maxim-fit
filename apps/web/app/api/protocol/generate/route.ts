@@ -31,7 +31,6 @@ function getPlaceholderVerification(config: UserConfig | AnonymousUserConfig) {
       critiques: [],
       requirements_met: true,
       weighted_goal_score: 85,
-      viability_score: 82,
     },
     citations: [],
   };
@@ -82,7 +81,6 @@ async function saveProtocol(
     config_id: configId,
     name,
     weighted_goal_score: verification.weighted_goal_score,
-    viability_score: verification.viability_score,
     requirements_met: verification.requirements_met,
     iteration: 0,
     requirement_scores: verification.requirement_scores,
@@ -233,7 +231,6 @@ export async function POST(request: NextRequest) {
                     critiques: verificationData.critiques,
                     requirements_met: verificationData.requirements_met,
                     weighted_goal_score: verificationData.weighted_goal_score,
-                    viability_score: verificationData.viability_score,
                   },
                   citations,
                 },
@@ -284,7 +281,6 @@ export async function POST(request: NextRequest) {
         critiques: verification.critiques,
         requirements_met: verification.requirements_met,
         weighted_goal_score: verification.weighted_goal_score,
-        viability_score: verification.viability_score,
       },
       citations,
     });

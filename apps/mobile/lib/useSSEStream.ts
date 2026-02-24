@@ -1,5 +1,14 @@
 import { useState, useCallback, useRef } from 'react';
 import EventSource from 'react-native-sse';
+import type { ClarifyingQuestion, Citation } from '@protocol/shared/schemas';
+
+/** Questions data returned when the modify flow needs clarification */
+export interface QuestionsData {
+  questions: ClarifyingQuestion[];
+  citations: Citation[];
+  researchSummary: string;
+  sessionId: string;
+}
 
 export interface UseSSEStreamReturn<T> {
   /** Accumulated text from stream chunks */
@@ -12,7 +21,9 @@ export interface UseSSEStreamReturn<T> {
   isStreaming: boolean;
   /** Current stage from server (e.g., 'researching') */
   stage: string | null;
-  /** Start a new stream */
+  /** Questions data if the modify flow needs clarification (check this if result is null) */
+  questionsData: QuestionsData | null;
+  /** Start a new stream - returns result or null. For modify flow, check questionsData if null. */
   startStream: (url: string, options?: RequestInit) => Promise<T | null>;
   /** Reset state and abort any active stream */
   reset: () => void;
@@ -38,6 +49,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
+  const [questionsData, setQuestionsData] = useState<QuestionsData | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const reset = useCallback(() => {
@@ -52,6 +64,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     setError(null);
     setIsStreaming(false);
     setStage(null);
+    setQuestionsData(null);
   }, []);
 
   const startStream = useCallback(async (url: string, options?: RequestInit): Promise<T | null> => {
@@ -62,6 +75,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     setError(null);
     setIsStreaming(true);
     setStage(null);
+    setQuestionsData(null);
 
     return new Promise((resolve) => {
       let finalResult: T | null = null;
@@ -116,6 +130,21 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
             // Stage update (e.g., 'researching', 'verifying')
             console.log('[SSE] Stage:', message.stage);
             setStage(message.stage);
+          } else if ('questions' in message && Array.isArray(message.questions)) {
+            // Questions from modify flow - needs user clarification
+            // Note: We resolve with null here, caller should check questionsData state
+            console.log('[SSE] Questions received:', message.questions.length);
+            const qData: QuestionsData = {
+              questions: message.questions,
+              citations: message.citations || [],
+              researchSummary: message.researchSummary || '',
+              sessionId: message.sessionId || '',
+            };
+            setQuestionsData(qData);
+            setIsStreaming(false);
+            es.close();
+            eventSourceRef.current = null;
+            resolve(null);  // Caller checks questionsData separately
           }
         } catch (parseError) {
           // Skip JSON parse errors
@@ -157,6 +186,7 @@ export function useSSEStream<T = unknown>(): UseSSEStreamReturn<T> {
     error,
     isStreaming,
     stage,
+    questionsData,
     startStream,
     reset,
   };

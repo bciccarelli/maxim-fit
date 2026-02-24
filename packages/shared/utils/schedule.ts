@@ -2,13 +2,25 @@ import type {
   DailyProtocol,
   ScheduleVariant,
   OtherEvent,
+  RoutineEvent,
+  RoutineSubEvent,
   Meal,
   Supplement,
   Workout,
   DayOfWeek,
 } from '../schemas/protocol';
 
-export type ScheduleEventSource = 'meal' | 'supplement' | 'workout' | 'other';
+export type ScheduleEventSource = 'meal' | 'supplement' | 'workout' | 'other' | 'routine';
+
+export interface ComputedSubEvent {
+  type: 'activity' | 'supplement' | 'meal';
+  start_time: string;
+  end_time: string;
+  duration_min: number;
+  activity: string;
+  supplement_index?: number | null;
+  meal_index?: number | null;
+}
 
 export interface ScheduleEvent {
   start_time: string;
@@ -17,6 +29,9 @@ export interface ScheduleEvent {
   source: ScheduleEventSource;
   sourceIndex: number;
   requirement_satisfied?: string | null;
+  // Routine-specific fields
+  isRoutine?: boolean;
+  subEvents?: ComputedSubEvent[];
 }
 
 // Default durations for computed events (in minutes)
@@ -43,8 +58,18 @@ function toMinutes(time: string): number {
 }
 
 /**
+ * Convert minutes back to HH:MM format.
+ */
+function fromMinutes(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
  * Compute schedule events for a specific day from protocol data.
- * Aggregates meals, supplements, workouts, and other events.
+ * Aggregates meals, supplements, workouts, routines, and other events.
+ * Supplements/meals referenced by routines are hidden from standalone slots.
  */
 export function computeScheduleEvents(
   protocol: DailyProtocol,
@@ -56,8 +81,25 @@ export function computeScheduleEvents(
   const variant = protocol.schedules.find((v) => v.days.includes(day));
   if (!variant) return events;
 
-  // Add meals
+  // First pass: collect supplement/meal indices that are referenced by routines
+  const routineSupplementIndices = new Set<number>();
+  const routineMealIndices = new Set<number>();
+  const routineEvents = variant.routine_events ?? [];
+
+  for (const routine of routineEvents) {
+    for (const subEvent of routine.sub_events) {
+      if (subEvent.type === 'supplement' && subEvent.supplement_index != null) {
+        routineSupplementIndices.add(subEvent.supplement_index);
+      }
+      if (subEvent.type === 'meal' && subEvent.meal_index != null) {
+        routineMealIndices.add(subEvent.meal_index);
+      }
+    }
+  }
+
+  // Add meals (skip those in routines)
   protocol.diet.meals.forEach((meal, index) => {
+    if (routineMealIndices.has(index)) return; // Skip - will appear in routine
     events.push({
       start_time: meal.time,
       end_time: addMinutes(meal.time, MEAL_DURATION_MIN),
@@ -67,8 +109,9 @@ export function computeScheduleEvents(
     });
   });
 
-  // Add supplements
+  // Add supplements (skip those in routines)
   protocol.supplementation.supplements.forEach((supplement, index) => {
+    if (routineSupplementIndices.has(index)) return; // Skip - will appear in routine
     events.push({
       start_time: supplement.time,
       end_time: addMinutes(supplement.time, SUPPLEMENT_DURATION_MIN),
@@ -101,6 +144,56 @@ export function computeScheduleEvents(
       source: 'other',
       sourceIndex: index,
       requirement_satisfied: event.requirement_satisfied,
+    });
+  });
+
+  // Add routines with computed sub-event times
+  routineEvents.forEach((routine, index) => {
+    // Sort sub-events by order
+    const sortedSubEvents = [...routine.sub_events].sort((a, b) => a.order - b.order);
+
+    // Compute sub-event times based on routine start time + cumulative duration
+    let currentTimeMinutes = toMinutes(routine.start_time);
+    const computedSubEvents: ComputedSubEvent[] = sortedSubEvents.map((subEvent) => {
+      const startTime = fromMinutes(currentTimeMinutes);
+      const endTime = fromMinutes(currentTimeMinutes + subEvent.duration_min);
+
+      // Resolve activity name based on type
+      let activityName = subEvent.activity ?? 'Activity';
+      if (subEvent.type === 'supplement' && subEvent.supplement_index != null) {
+        const supp = protocol.supplementation.supplements[subEvent.supplement_index];
+        activityName = supp ? `Take ${supp.name}` : 'Supplement';
+      } else if (subEvent.type === 'meal' && subEvent.meal_index != null) {
+        const meal = protocol.diet.meals[subEvent.meal_index];
+        activityName = meal?.name ?? 'Meal';
+      }
+
+      const computed: ComputedSubEvent = {
+        type: subEvent.type,
+        start_time: startTime,
+        end_time: endTime,
+        duration_min: subEvent.duration_min,
+        activity: activityName,
+        supplement_index: subEvent.supplement_index,
+        meal_index: subEvent.meal_index,
+      };
+
+      currentTimeMinutes += subEvent.duration_min;
+      return computed;
+    });
+
+    // Calculate total routine duration
+    const totalDuration = sortedSubEvents.reduce((sum, se) => sum + se.duration_min, 0);
+
+    events.push({
+      start_time: routine.start_time,
+      end_time: fromMinutes(toMinutes(routine.start_time) + totalDuration),
+      activity: routine.name,
+      source: 'routine',
+      sourceIndex: index,
+      requirement_satisfied: routine.requirement_satisfied,
+      isRoutine: true,
+      subEvents: computedSubEvents,
     });
   });
 
@@ -302,6 +395,8 @@ export function deleteScheduleEvent(
       return deleteWorkout(protocol, event.sourceIndex);
     case 'other':
       return deleteOtherEvent(protocol, variantIndex, event.sourceIndex);
+    case 'routine':
+      return deleteRoutineEvent(protocol, variantIndex, event.sourceIndex);
   }
 }
 
@@ -327,5 +422,164 @@ export function updateScheduleEventTime(
         start_time: newStartTime,
         ...(newEndTime && { end_time: newEndTime }),
       });
+    case 'routine':
+      return updateRoutineEvent(protocol, variantIndex, event.sourceIndex, {
+        start_time: newStartTime,
+      });
   }
+}
+
+// =============================================================================
+// Routine Event Helpers
+// =============================================================================
+
+/**
+ * Add a routine event to a schedule variant.
+ */
+export function addRoutineEvent(
+  protocol: DailyProtocol,
+  variantIndex: number,
+  routine: RoutineEvent
+): DailyProtocol {
+  const newSchedules = [...protocol.schedules];
+  const variant = newSchedules[variantIndex];
+  if (variant) {
+    const routineEvents = variant.routine_events ?? [];
+    newSchedules[variantIndex] = {
+      ...variant,
+      routine_events: [...routineEvents, routine],
+    };
+  }
+  return {
+    ...protocol,
+    schedules: newSchedules,
+  };
+}
+
+/**
+ * Update a routine event in a schedule variant.
+ */
+export function updateRoutineEvent(
+  protocol: DailyProtocol,
+  variantIndex: number,
+  routineIndex: number,
+  updates: Partial<RoutineEvent>
+): DailyProtocol {
+  const newSchedules = [...protocol.schedules];
+  const variant = newSchedules[variantIndex];
+  if (variant) {
+    const routineEvents = [...(variant.routine_events ?? [])];
+    if (routineEvents[routineIndex]) {
+      routineEvents[routineIndex] = { ...routineEvents[routineIndex], ...updates };
+    }
+    newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+  }
+  return {
+    ...protocol,
+    schedules: newSchedules,
+  };
+}
+
+/**
+ * Delete a routine event from a schedule variant.
+ */
+export function deleteRoutineEvent(
+  protocol: DailyProtocol,
+  variantIndex: number,
+  routineIndex: number
+): DailyProtocol {
+  const newSchedules = [...protocol.schedules];
+  const variant = newSchedules[variantIndex];
+  if (variant) {
+    const routineEvents = (variant.routine_events ?? []).filter((_, i) => i !== routineIndex);
+    newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+  }
+  return {
+    ...protocol,
+    schedules: newSchedules,
+  };
+}
+
+/**
+ * Update a sub-event within a routine.
+ */
+export function updateRoutineSubEvent(
+  protocol: DailyProtocol,
+  variantIndex: number,
+  routineIndex: number,
+  subEventIndex: number,
+  updates: Partial<RoutineSubEvent>
+): DailyProtocol {
+  const newSchedules = [...protocol.schedules];
+  const variant = newSchedules[variantIndex];
+  if (variant) {
+    const routineEvents = [...(variant.routine_events ?? [])];
+    const routine = routineEvents[routineIndex];
+    if (routine) {
+      const newSubEvents = [...routine.sub_events];
+      if (newSubEvents[subEventIndex]) {
+        newSubEvents[subEventIndex] = { ...newSubEvents[subEventIndex], ...updates };
+      }
+      routineEvents[routineIndex] = { ...routine, sub_events: newSubEvents };
+    }
+    newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+  }
+  return {
+    ...protocol,
+    schedules: newSchedules,
+  };
+}
+
+/**
+ * Add a sub-event to a routine.
+ */
+export function addRoutineSubEvent(
+  protocol: DailyProtocol,
+  variantIndex: number,
+  routineIndex: number,
+  subEvent: RoutineSubEvent
+): DailyProtocol {
+  const newSchedules = [...protocol.schedules];
+  const variant = newSchedules[variantIndex];
+  if (variant) {
+    const routineEvents = [...(variant.routine_events ?? [])];
+    const routine = routineEvents[routineIndex];
+    if (routine) {
+      routineEvents[routineIndex] = {
+        ...routine,
+        sub_events: [...routine.sub_events, subEvent],
+      };
+    }
+    newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+  }
+  return {
+    ...protocol,
+    schedules: newSchedules,
+  };
+}
+
+/**
+ * Delete a sub-event from a routine.
+ */
+export function deleteRoutineSubEvent(
+  protocol: DailyProtocol,
+  variantIndex: number,
+  routineIndex: number,
+  subEventIndex: number
+): DailyProtocol {
+  const newSchedules = [...protocol.schedules];
+  const variant = newSchedules[variantIndex];
+  if (variant) {
+    const routineEvents = [...(variant.routine_events ?? [])];
+    const routine = routineEvents[routineIndex];
+    if (routine) {
+      const newSubEvents = routine.sub_events.filter((_, i) => i !== subEventIndex);
+      routineEvents[routineIndex] = { ...routine, sub_events: newSubEvents };
+    }
+    newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+  }
+  return {
+    ...protocol,
+    schedules: newSchedules,
+  };
 }

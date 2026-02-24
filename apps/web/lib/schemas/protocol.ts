@@ -65,6 +65,16 @@ export {
   type Citation,
   type CitationOperation,
 
+  // Clarifying Questions (for Modify flow)
+  clarifyingQuestionOptionSchema,
+  type ClarifyingQuestionOption,
+  clarifyingQuestionSchema,
+  type ClarifyingQuestion,
+  questionAnswerSchema,
+  type QuestionAnswer,
+  questionsPhaseResultSchema,
+  type QuestionsPhaseResult,
+
   // Result types
   type VerificationResult,
   type ModifyProposal,

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Clock, Sun, Moon, Plus, Trash2, Save, Check, Utensils, Pill, Dumbbell } from 'lucide-react';
+import { Clock, Sun, Moon, Plus, Trash2, Save, Check, Utensils, Pill, Dumbbell, Layers, ChevronDown, ChevronRight } from 'lucide-react';
 import { InlineEditField } from './InlineEditField';
 import { cn } from '@/lib/utils';
 import type { DailyProtocol, ScheduleVariant, OtherEvent, DayOfWeek } from '@/lib/schemas/protocol';
@@ -13,6 +13,7 @@ import {
   getVariantIndexForDay,
   type ScheduleEvent,
   type ScheduleEventSource,
+  type ComputedSubEvent,
 } from '@protocol/shared';
 
 const DAYS: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -135,8 +136,22 @@ function SourceIcon({ source }: { source: ScheduleEventSource }) {
       return <Pill className="h-3 w-3 text-info" />;
     case 'workout':
       return <Dumbbell className="h-3 w-3 text-warning" />;
+    case 'routine':
+      return <Layers className="h-3 w-3 text-primary" />;
     case 'other':
       return <Clock className="h-3 w-3 text-muted-foreground" />;
+  }
+}
+
+/** Get icon for sub-event type */
+function SubEventIcon({ type }: { type: ComputedSubEvent['type'] }) {
+  switch (type) {
+    case 'meal':
+      return <Utensils className="h-2.5 w-2.5 text-primary" />;
+    case 'supplement':
+      return <Pill className="h-2.5 w-2.5 text-info" />;
+    case 'activity':
+      return <Clock className="h-2.5 w-2.5 text-muted-foreground" />;
   }
 }
 
@@ -185,7 +200,20 @@ function DaySelector({
 export function ScheduleView({ protocol, editable = false, onChange }: ScheduleViewProps) {
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>('monday');
   const [editingEventIndex, setEditingEventIndex] = useState<number | null>(null);
+  const [expandedRoutines, setExpandedRoutines] = useState<Set<number>>(new Set());
   const [dirty, setDirty] = useState(false);
+
+  const toggleRoutineExpanded = (index: number) => {
+    setExpandedRoutines((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
 
   const variantIndex = useMemo(
     () => getVariantIndexForDay(protocol.schedules, selectedDay),
@@ -248,6 +276,22 @@ export function ScheduleView({ protocol, editable = false, onChange }: ScheduleV
         updated = { ...protocol, schedules: newSchedules };
         break;
       }
+      case 'routine': {
+        const newSchedules = [...protocol.schedules];
+        const variant = newSchedules[variantIndex];
+        if (variant) {
+          const routineEvents = [...(variant.routine_events ?? [])];
+          if (routineEvents[event.sourceIndex]) {
+            routineEvents[event.sourceIndex] = {
+              ...routineEvents[event.sourceIndex],
+              start_time: newStartTime,
+            };
+          }
+          newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+        }
+        updated = { ...protocol, schedules: newSchedules };
+        break;
+      }
     }
 
     updateProtocol(updated);
@@ -281,6 +325,16 @@ export function ScheduleView({ protocol, editable = false, onChange }: ScheduleV
         if (variant) {
           const newOtherEvents = variant.other_events.filter((_, i) => i !== event.sourceIndex);
           newSchedules[variantIndex] = { ...variant, other_events: newOtherEvents };
+        }
+        updated = { ...protocol, schedules: newSchedules };
+        break;
+      }
+      case 'routine': {
+        const newSchedules = [...protocol.schedules];
+        const variant = newSchedules[variantIndex];
+        if (variant) {
+          const routineEvents = (variant.routine_events ?? []).filter((_, i) => i !== event.sourceIndex);
+          newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
         }
         updated = { ...protocol, schedules: newSchedules };
         break;
@@ -422,6 +476,10 @@ export function ScheduleView({ protocol, editable = false, onChange }: ScheduleV
             <span>Workout</span>
           </div>
           <div className="flex items-center gap-1">
+            <Layers className="h-3 w-3 text-primary" />
+            <span>Routine</span>
+          </div>
+          <div className="flex items-center gap-1">
             <Clock className="h-3 w-3 text-muted-foreground" />
             <span>Other</span>
           </div>
@@ -447,10 +505,16 @@ export function ScheduleView({ protocol, editable = false, onChange }: ScheduleV
                 const top = ((startMin - rangeStartMin) / 60) * HOUR_HEIGHT;
                 const naturalHeight = (durationMin / 60) * HOUR_HEIGHT;
                 const isEditing = editingEventIndex === index && editable;
+                const isExpandedRoutine = event.isRoutine && expandedRoutines.has(index);
+                const subEventCount = event.subEvents?.length ?? 0;
+                // Calculate height: expanded routines need space for sub-events
+                const expandedRoutineHeight = isExpandedRoutine ? 28 + (subEventCount * 20) : 0;
                 const height = isEditing
                   ? Math.max(naturalHeight, EDIT_MIN_HEIGHT)
-                  : Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
-                const isShort = durationMin <= 30;
+                  : isExpandedRoutine
+                    ? Math.max(naturalHeight, expandedRoutineHeight, MIN_BLOCK_HEIGHT)
+                    : Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
+                const isShort = durationMin <= 30 && !isExpandedRoutine;
                 const { columnIndex, totalColumns } = layout[index];
                 const leftPct = (columnIndex / totalColumns) * 100;
                 const widthPct = (1 / totalColumns) * 100;
@@ -526,6 +590,46 @@ export function ScheduleView({ protocol, editable = false, onChange }: ScheduleV
                             <Check className="h-3 w-3" />
                           </Button>
                         </div>
+                      </div>
+                    ) : event.isRoutine && event.subEvents ? (
+                      // Routine event - show with expandable sub-events
+                      <div className="h-full overflow-hidden">
+                        <div
+                          className="flex items-center justify-between gap-2 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRoutineExpanded(index);
+                          }}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {expandedRoutines.has(index) ? (
+                              <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            )}
+                            <SourceIcon source={event.source} />
+                            <p className="text-sm font-medium truncate">{event.activity}</p>
+                            <span className="text-xs text-muted-foreground">({event.subEvents.length})</span>
+                          </div>
+                          <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+                            {event.start_time} – {event.end_time}
+                          </span>
+                        </div>
+                        {expandedRoutines.has(index) && (
+                          <div className="mt-1.5 ml-4 space-y-0.5 border-l-2 border-primary/20 pl-2">
+                            {event.subEvents.map((subEvent, subIdx) => (
+                              <div key={subIdx} className="flex items-center justify-between gap-2 py-0.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <SubEventIcon type={subEvent.type} />
+                                  <span className="text-xs truncate">{subEvent.activity}</span>
+                                </div>
+                                <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+                                  {subEvent.start_time}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ) : isShort ? (
                       <div className="flex items-center justify-between gap-2">

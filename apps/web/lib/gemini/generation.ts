@@ -47,20 +47,51 @@ export const dailyProtocolGeminiSchema = {
           sleep_time: { type: 'string', description: 'Sleep time in HH:MM 24-hour format, e.g. "22:00"' },
           other_events: {
             type: 'array',
-            description: 'Events that are NOT meals, supplements, or workouts. Includes: morning routine, commute, work, wind down, meditation, AND food prep events (e.g., "Prep: Overnight oats", "Marinate chicken").',
+            description: 'Simple standalone events that are NOT meals, supplements, or workouts. For grouped activities (morning routine with multiple steps), use routine_events instead.',
             items: {
               type: 'object',
               properties: {
                 start_time: { type: 'string', description: 'Start time in HH:MM 24-hour format, e.g. "07:00"' },
                 end_time: { type: 'string', description: 'End time in HH:MM 24-hour format, e.g. "08:00"' },
-                activity: { type: 'string', description: 'Activity name, e.g. "Morning routine", "Commute", "Work", "Wind down"' },
+                activity: { type: 'string', description: 'Activity name, e.g. "Commute", "Work", "Reading"' },
                 requirement_satisfied: { type: 'string', description: 'Optional: name of requirement this activity satisfies' },
               },
               required: ['start_time', 'end_time', 'activity'],
             },
           },
+          routine_events: {
+            type: 'array',
+            description: 'Grouped activities that form a routine (e.g., Morning Routine, Evening Wind-down). Use routines to group related activities that naturally occur together. Supplements/meals in routines should still exist in their respective arrays - reference them by index.',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Routine name, e.g. "Morning Routine", "Evening Wind-down", "Post-Workout Recovery"' },
+                start_time: { type: 'string', description: 'Routine start time in HH:MM 24-hour format' },
+                sub_events: {
+                  type: 'array',
+                  description: 'Ordered list of activities within the routine. Each sub-event has a type, order, and duration.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      type: { type: 'string', enum: ['activity', 'supplement', 'meal'], description: 'Type of sub-event' },
+                      order: { type: 'integer', minimum: 0, description: 'Sequence order (0-based). Sub-events execute in this order.' },
+                      duration_min: { type: 'integer', minimum: 1, description: 'Duration in minutes' },
+                      activity: { type: 'string', description: 'Activity name (for type=activity), e.g. "Shower", "Meditate", "Journal"' },
+                      supplement_index: { type: 'integer', minimum: 0, description: 'Index into supplements array (for type=supplement). The supplement must exist in supplementation.supplements[].' },
+                      meal_index: { type: 'integer', minimum: 0, description: 'Index into meals array (for type=meal). The meal must exist in diet.meals[].' },
+                      notes: { type: 'string' },
+                    },
+                    required: ['type', 'order', 'duration_min'],
+                  },
+                },
+                notes: { type: 'string' },
+                requirement_satisfied: { type: 'string', description: 'Optional: name of requirement this routine satisfies' },
+              },
+              required: ['name', 'start_time', 'sub_events'],
+            },
+          },
         },
-        required: ['days', 'wake_time', 'sleep_time', 'other_events'],
+        required: ['days', 'wake_time', 'sleep_time', 'other_events', 'routine_events'],
       },
     },
     diet: {
@@ -262,14 +293,48 @@ The schedule is EVENT-DRIVEN. Timing information lives in the relevant section:
 - **Meals**: Each meal has a "time" field (e.g., breakfast at "07:30")
 - **Supplements**: Each supplement has a "time" field (e.g., vitamin D at "07:00")
 - **Workouts**: Each workout has a "time" field (e.g., strength training at "06:00")
-- **Other events**: Activities that aren't meals, supplements, or workouts go in "other_events" (e.g., morning routine, commute, work, wind down)
+- **Routines**: Grouped activities that naturally occur together (e.g., morning routine with shower, supplements, breakfast)
+- **Other events**: Simple standalone activities (e.g., commute, work block, reading)
 
-DO NOT duplicate meal, supplement, or workout times in other_events. Only include activities like:
-- Morning routine (e.g., "07:00" - "07:30")
+## Routine Architecture Rules
+
+Use ROUTINES to group related activities that naturally occur together. This creates a cleaner schedule.
+
+**When to use routines:**
+- Morning activities after waking (shower, skincare, morning supplements, breakfast)
+- Evening wind-down (meditation, journaling, evening supplements, prep for sleep)
+- Post-workout recovery (shower, protein shake, stretching)
+- Pre-bed routine (supplements, relaxation)
+
+**Structure:**
+- Routine has a "name" and "start_time"
+- Sub-events have "type", "order", and "duration_min"
+- For supplement sub-events: set type="supplement" and "supplement_index" matching the supplement's position in the supplements array (0-indexed)
+- For meal sub-events: set type="meal" and "meal_index" matching the meal's position in the meals array (0-indexed)
+- For activities: set type="activity" and provide "activity" name
+
+**IMPORTANT:**
+- Supplements/meals in routines MUST still exist in their respective arrays (single source of truth)
+- The "supplement_index" / "meal_index" references that item (0-indexed)
+- Items referenced by routines are hidden from standalone timeline slots (no duplication in display)
+- Sub-event times are computed from routine start_time + cumulative duration
+
+**Example Morning Routine:**
+{
+  "name": "Morning Routine",
+  "start_time": "06:30",
+  "sub_events": [
+    { "type": "activity", "order": 0, "duration_min": 10, "activity": "Shower & skincare" },
+    { "type": "supplement", "order": 1, "duration_min": 2, "supplement_index": 0 },
+    { "type": "supplement", "order": 2, "duration_min": 2, "supplement_index": 1 },
+    { "type": "meal", "order": 3, "duration_min": 20, "meal_index": 0 }
+  ]
+}
+
+**Use other_events only for:**
 - Commute (e.g., "08:00" - "08:30")
-- Work (e.g., "09:00" - "17:00")
-- Personal time, reading, etc.
-- Wind down / evening routine (e.g., "21:00" - "22:00")
+- Work block (e.g., "09:00" - "17:00")
+- Simple standalone activities (reading, errands)
 
 ## Schedule Variant Rules
 
@@ -378,9 +443,8 @@ const verificationSchema = {
     },
     requirements_met: { type: 'boolean' },
     weighted_goal_score: { type: 'number' },
-    viability_score: { type: 'number' },
   },
-  required: ['requirement_scores', 'goal_scores', 'critiques', 'requirements_met', 'weighted_goal_score', 'viability_score'],
+  required: ['requirement_scores', 'goal_scores', 'critiques', 'requirements_met', 'weighted_goal_score'],
 } as const;
 
 /**
@@ -425,7 +489,6 @@ ${formatTrainingSummary(protocol)}
 1. **Requirement Adherence**: For each requirement, score how well the protocol meets it (0-100%).
 2. **Goal Scores**: For each goal, score how well the protocol supports it (0-100) with reasoning based on current evidence.
 3. **Critiques**: Identify weaknesses, potential issues, and areas for improvement. Verify claims against current research.
-4. **Overall Viability**: Score how likely this protocol is to be followed long-term (0-100).
 
 Be thorough and honest. A protocol that won't be followed is worthless.`;
 
@@ -462,6 +525,45 @@ const modifyResultSchema = {
   },
   required: [...dailyProtocolGeminiSchema.required, 'reasoning'],
 } as const;
+
+// ---------------------------------------------------------------------------
+// Questions Analysis Schema (Phase 2 of new Modify flow)
+// ---------------------------------------------------------------------------
+
+const questionsAnalysisSchema = {
+  type: 'object',
+  properties: {
+    hasQuestions: { type: 'boolean', description: 'True if clarifying questions are needed before making the modification' },
+    questions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Unique identifier for this question' },
+          question: { type: 'string', description: 'The clarifying question to ask the user' },
+          context: { type: 'string', description: 'Why this question matters for the modification' },
+          options: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                value: { type: 'string', description: 'Value to store if selected' },
+                label: { type: 'string', description: 'Display label for this option' },
+              },
+              required: ['value', 'label'],
+            },
+          },
+          inputType: { type: 'string', enum: ['text', 'select'], description: 'Type of input: text for free-form, select for multiple choice' },
+        },
+        required: ['id', 'question', 'inputType'],
+      },
+    },
+    researchSummary: { type: 'string', description: 'Brief 1-2 sentence summary of what the research found' },
+  },
+  required: ['hasQuestions', 'questions', 'researchSummary'],
+} as const;
+
+import type { ClarifyingQuestion, QuestionAnswer } from '../schemas/protocol';
 
 // ---------------------------------------------------------------------------
 // Two-Phase Modification: Research + Apply
@@ -508,6 +610,15 @@ Use Google Search to research the user's request. Provide:
 - Potential risks or contraindications
 - What to monitor or avoid
 
+## Routine Research Guidance
+
+If the user mentions "routine", "collect", "group", "organize", "morning tasks", or "evening tasks":
+- Research how to structure morning/evening routines for health optimization
+- Consider what activities naturally group together (shower, skincare, supplements, meals)
+- Research optimal timing and sequencing for routine activities
+- Note: The protocol uses routine_events with sub_events that reference supplements/meals by index
+- Recommend which existing supplements/meals/activities should be grouped into which routine
+
 Write clear, organized prose. Do NOT output JSON.`;
 }
 
@@ -542,6 +653,35 @@ ${researchText}
 3. Maintain unaffected parts of the protocol exactly as they are.
 4. Provide clear reasoning explaining what you changed and why, referencing the research.
 
+## Routine Detection
+
+**CRITICAL:** If the user's request mentions ANY of these keywords:
+- "routine", "morning routine", "evening routine", "night routine"
+- "collect", "group", "organize", "combine", "bundle"
+- "morning tasks", "evening tasks", "night tasks"
+- "habit stack"
+
+Then you MUST:
+1. Create proper routine_events with sub_events (do NOT just rename other_events)
+2. Reference supplements by supplement_index (0-indexed position in supplements array)
+3. Reference meals by meal_index (0-indexed position in meals array)
+4. Remove standalone other_events that are now grouped into the routine
+5. Keep supplements and meals in their respective arrays (they are the single source of truth)
+
+**Example:** User says "collect my morning tasks into a routine"
+- Find morning supplements (e.g., supplements[0], supplements[1])
+- Find morning activities (e.g., shower, skincare)
+- Create: routine_events[0] = { name: "Morning Routine", start_time: "07:00", sub_events: [...] }
+- Do NOT create: other_events named "Morning Routine" - that's wrong
+
+## Routine Validation
+
+When outputting routine_events, verify:
+- All supplement_index values exist (< supplements.length)
+- All meal_index values exist (< meals.length)
+- Sub-events have sequential order values (0, 1, 2, ...)
+- Activities that are part of routines are NOT duplicated in other_events
+
 ## Supplement Timing Rules
 
 When a supplement should be taken WITH a meal:
@@ -567,7 +707,285 @@ When adding or modifying foods that require advance prep, create prep events in 
 - Marinating → "Prep: Marinate [food]" hours before the meal
 - Slow cooker meals → "Prep: Start slow cooker" in the morning for dinner
 
+## Schedule Architecture Rules
+
+The schedule is EVENT-DRIVEN. Timing information lives in the relevant section:
+- **Meals**: Each meal has a "time" field - keep meals in the diet.meals array
+- **Supplements**: Each supplement has a "time" field - keep supplements in the supplementation.supplements array
+- **Routines**: Grouped activities in schedules[].routine_events - reference meals/supplements by index
+- **Other events**: Simple standalone activities in schedules[].other_events
+
+## Routine Architecture Rules
+
+Use ROUTINES to group related activities that naturally occur together. This creates a cleaner schedule.
+
+**When to use routines:**
+- Morning activities after waking (shower, skincare, morning supplements, breakfast)
+- Evening wind-down (meditation, journaling, evening supplements, prep for sleep)
+- Post-workout recovery (shower, protein shake, stretching)
+- Pre-bed routine (supplements, relaxation)
+
+**Structure:**
+- Routine has "name" and "start_time"
+- Sub-events have "type", "order", and "duration_min"
+- For supplement sub-events: set type="supplement" and "supplement_index" matching the supplement's position in the supplements array (0-indexed)
+- For meal sub-events: set type="meal" and "meal_index" matching the meal's position in the meals array (0-indexed)
+- For activities: set type="activity" and provide "activity" name
+
+**CRITICAL - When creating routines:**
+1. Supplements/meals in routines MUST STILL EXIST in their respective arrays (diet.meals[], supplementation.supplements[])
+2. The routine's sub_event uses "supplement_index" or "meal_index" to REFERENCE that item (0-indexed)
+3. Do NOT remove supplements/meals from their arrays when adding them to routines
+4. Do NOT rename other_events to include "routine" - create actual routine_events
+5. Sub-event times are computed from routine start_time + cumulative duration
+
+**Example Morning Routine:**
+If supplements[0] is "Vitamin D" and supplements[1] is "Fish Oil", and meals[0] is "Breakfast":
+{
+  "name": "Morning Routine",
+  "start_time": "06:30",
+  "sub_events": [
+    { "type": "activity", "order": 0, "duration_min": 10, "activity": "Shower & skincare" },
+    { "type": "supplement", "order": 1, "duration_min": 2, "supplement_index": 0 },
+    { "type": "supplement", "order": 2, "duration_min": 2, "supplement_index": 1 },
+    { "type": "meal", "order": 3, "duration_min": 20, "meal_index": 0 }
+  ]
+}
+
 Generate the modified protocol with reasoning now.`;
+}
+
+/**
+ * Build prompt for Phase 2: Analyze if clarifying questions are needed.
+ */
+function buildQuestionsPrompt(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  userMessage: string,
+  researchText: string
+): string {
+  const goalsText = config.goals.map(g => g.name).join(', ') || 'General health';
+  const requirementsText = config.requirements.length > 0 ? config.requirements.join(', ') : 'None specified';
+
+  return `You are a health protocol assistant. Analyze the user's modification request and the research findings to determine if you need any clarifying information before making changes.
+
+## User's Request
+${userMessage}
+
+## Research Findings
+${researchText}
+
+## Current Protocol Summary
+- Goals: ${goalsText}
+- Requirements: ${requirementsText}
+- Wake: ${protocol.schedules[0]?.wake_time || 'N/A'}, Sleep: ${protocol.schedules[0]?.sleep_time || 'N/A'}
+- Training: ${protocol.training.program_name} (${protocol.training.days_per_week}x/week)
+
+## Instructions
+
+Analyze whether you have enough information to make the requested modification. Ask clarifying questions ONLY if:
+
+1. **The request is ambiguous** (e.g., "add more cardio" - how much? what type? when?)
+2. **There are multiple valid approaches** the research supports (e.g., supplement timing could be morning or evening with trade-offs)
+3. **User preferences would significantly affect the recommendation** (e.g., equipment availability, dietary preferences)
+4. **The research suggests important trade-offs** the user should choose between
+
+DO NOT ask questions if:
+1. The request is clear and specific (e.g., "change wake time to 6am")
+2. There's an obvious best practice to follow from the research
+3. The questions would be pedantic or unnecessary
+4. You're just being overly cautious
+
+If you have questions, provide 1-3 focused questions maximum. For each question:
+- Write a clear, concise question
+- Provide context explaining why this matters (1 sentence)
+- If there are common options from the research, provide them as choices (use inputType: "select")
+- For open-ended questions, use inputType: "text"
+
+Generate unique IDs for each question (use format: "q1", "q2", "q3").
+
+Always provide a brief researchSummary (1-2 sentences) of what the research found, regardless of whether you have questions.`;
+}
+
+/**
+ * Build prompt for Phase 3: Apply research with user answers to generate modified protocol.
+ */
+function buildApplyPromptWithAnswers(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  userMessage: string,
+  researchText: string,
+  answers: QuestionAnswer[]
+): string {
+  const answersText = answers.length > 0
+    ? `\n\n## User's Answers to Clarifying Questions\n${answers.map(a => `- ${a.questionId}: ${a.answer}`).join('\n')}`
+    : '';
+
+  return `You are an expert health protocol modifier. Apply the research findings to modify the user's protocol, incorporating their answers to clarifying questions.
+
+## User Configuration
+${JSON.stringify(config, null, 2)}
+
+## Current Protocol
+${JSON.stringify(protocol, null, 2)}
+
+## User's Requested Changes
+${userMessage}
+
+## Research Findings (from evidence-based search)
+${researchText}${answersText}
+
+## Instructions
+
+1. Modify the protocol incorporating the research findings and user's answers.
+2. If research suggests adjustments to the user's request, implement the evidence-based version.
+3. Maintain unaffected parts of the protocol exactly as they are.
+4. Provide clear reasoning explaining what you changed and why, referencing the research and user preferences.
+
+## Routine Detection
+
+**CRITICAL:** If the user's request mentions ANY of these keywords:
+- "routine", "morning routine", "evening routine", "night routine"
+- "collect", "group", "organize", "combine", "bundle"
+- "morning tasks", "evening tasks", "night tasks"
+- "habit stack"
+
+Then you MUST:
+1. Create proper routine_events with sub_events (do NOT just rename other_events)
+2. Reference supplements by supplement_index (0-indexed position in supplements array)
+3. Reference meals by meal_index (0-indexed position in meals array)
+4. Remove standalone other_events that are now grouped into the routine
+5. Keep supplements and meals in their respective arrays (they are the single source of truth)
+
+**Example:** User says "collect my morning tasks into a routine"
+- Find morning supplements (e.g., supplements[0], supplements[1])
+- Find morning activities (e.g., shower, skincare)
+- Create: routine_events[0] = { name: "Morning Routine", start_time: "07:00", sub_events: [...] }
+- Do NOT create: other_events named "Morning Routine" - that's wrong
+
+## Routine Validation
+
+When outputting routine_events, verify:
+- All supplement_index values exist (< supplements.length)
+- All meal_index values exist (< meals.length)
+- Sub-events have sequential order values (0, 1, 2, ...)
+- Activities that are part of routines are NOT duplicated in other_events
+
+## Supplement Timing Rules
+
+When a supplement should be taken WITH a meal:
+1. Set the supplement's "time" field to EXACTLY match the meal's time
+2. Use the "timing" field to document the relationship (e.g., "With breakfast")
+
+Common meal-associated supplements (should match meal times):
+- Fat-soluble vitamins (A, D, E, K), Omega-3/Fish oil, Digestive enzymes
+
+Standalone supplements (separate times):
+- Magnesium → before bed
+- Melatonin → 30-60 min before sleep
+- Pre/post-workout supplements → around training
+- Iron on empty stomach → separate time from meals
+
+IMPORTANT: When supplement timing matches a meal, use EXACTLY the same time. Do NOT create times that differ by only a few minutes.
+
+## Food Preparation Events
+
+When adding or modifying foods that require advance prep, create prep events in "other_events":
+
+- Overnight oats → "Prep: Overnight oats" at ~21:00 the night before
+- Marinating → "Prep: Marinate [food]" hours before the meal
+- Slow cooker meals → "Prep: Start slow cooker" in the morning for dinner
+
+## Schedule Architecture Rules
+
+The schedule is EVENT-DRIVEN. Timing information lives in the relevant section:
+- **Meals**: Each meal has a "time" field - keep meals in the diet.meals array
+- **Supplements**: Each supplement has a "time" field - keep supplements in the supplementation.supplements array
+- **Routines**: Grouped activities in schedules[].routine_events - reference meals/supplements by index
+- **Other events**: Simple standalone activities in schedules[].other_events
+
+## Routine Architecture Rules
+
+Use ROUTINES to group related activities that naturally occur together. This creates a cleaner schedule.
+
+**When to use routines:**
+- Morning activities after waking (shower, skincare, morning supplements, breakfast)
+- Evening wind-down (meditation, journaling, evening supplements, prep for sleep)
+- Post-workout recovery (shower, protein shake, stretching)
+- Pre-bed routine (supplements, relaxation)
+
+**Structure:**
+- Routine has "name" and "start_time"
+- Sub-events have "type", "order", and "duration_min"
+- For supplement sub-events: set type="supplement" and "supplement_index" matching the supplement's position in the supplements array (0-indexed)
+- For meal sub-events: set type="meal" and "meal_index" matching the meal's position in the meals array (0-indexed)
+- For activities: set type="activity" and provide "activity" name
+
+**CRITICAL - When creating routines:**
+1. Supplements/meals in routines MUST STILL EXIST in their respective arrays (diet.meals[], supplementation.supplements[])
+2. The routine's sub_event uses "supplement_index" or "meal_index" to REFERENCE that item (0-indexed)
+3. Do NOT remove supplements/meals from their arrays when adding them to routines
+4. Do NOT rename other_events to include "routine" - create actual routine_events
+5. Sub-event times are computed from routine start_time + cumulative duration
+
+**Example Morning Routine:**
+If supplements[0] is "Vitamin D" and supplements[1] is "Fish Oil", and meals[0] is "Breakfast":
+{
+  "name": "Morning Routine",
+  "start_time": "06:30",
+  "sub_events": [
+    { "type": "activity", "order": 0, "duration_min": 10, "activity": "Shower & skincare" },
+    { "type": "supplement", "order": 1, "duration_min": 2, "supplement_index": 0 },
+    { "type": "supplement", "order": 2, "duration_min": 2, "supplement_index": 1 },
+    { "type": "meal", "order": 3, "duration_min": 20, "meal_index": 0 }
+  ]
+}
+
+Generate the modified protocol with reasoning now.`;
+}
+
+/**
+ * Phase 2: Analyze research and determine if clarifying questions are needed.
+ * Returns questions to ask the user, or empty array if none needed.
+ */
+export async function analyzeForQuestions(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  userMessage: string,
+  researchText: string
+): Promise<{ hasQuestions: boolean; questions: ClarifyingQuestion[]; researchSummary: string }> {
+  const client = getGeminiClient();
+
+  const prompt = buildQuestionsPrompt(protocol, config, userMessage, researchText);
+
+  const response = await client.models.generateContent({
+    model: MODEL_GROUNDED, // Using Flash for questions analysis
+    contents: prompt,
+    config: {
+      thinkingConfig: { thinkingBudget: 4096 },
+      responseMimeType: 'application/json',
+      responseSchema: questionsAnalysisSchema as any,
+      // NO grounding - uses research from Phase 1
+    },
+  });
+
+  const text = response.text;
+  if (!text) {
+    throw new Error('No response from Gemini during questions analysis');
+  }
+
+  const parsed = JSON.parse(text);
+  return {
+    hasQuestions: parsed.hasQuestions || false,
+    questions: (parsed.questions || []).map((q: Record<string, unknown>) => ({
+      id: q.id || `q${Math.random().toString(36).slice(2, 8)}`,
+      question: q.question || '',
+      context: q.context || null,
+      options: q.options || null,
+      inputType: q.inputType || 'text',
+    })),
+    researchSummary: parsed.researchSummary || 'Research completed.',
+  };
 }
 
 /**
@@ -588,6 +1006,7 @@ async function researchModification(
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
+      thinkingConfig: { thinkingBudget: 8192 },
       // NO responseMimeType or responseSchema - free-form text output
     },
   });
@@ -622,6 +1041,7 @@ async function applyResearchToProtocol(
     model: MODEL_STRUCTURED,
     contents: prompt,
     config: {
+      thinkingConfig: { thinkingBudget: 8192 },
       responseMimeType: 'application/json',
       responseSchema: modifyResultSchema as any,
       // NO tools - no grounding in this phase
@@ -929,41 +1349,97 @@ export async function* generateProtocolStream(
   return result;
 }
 
+// Type for questions result yielded during streaming
+export type ModifyQuestionsYield = {
+  questions: ClarifyingQuestion[];
+  citations: Citation[];
+  researchSummary: string;
+  researchText: string;  // Stored for session
+};
+
+// Type for the final result of modify stream
+export type ModifyStreamResult = {
+  protocol: DailyProtocol;
+  reasoning: string;
+  citations: Citation[];
+};
+
 /**
- * Stream protocol modification with two-phase approach.
- * Yields stage indicators and text chunks, returns modified protocol + reasoning + citations.
+ * Stream protocol modification with three-phase approach.
+ * Yields stage indicators, text chunks, and optionally questions.
  *
- * Phase 1 (Research): Uses non-streaming to get grounding metadata/citations, simulates streaming.
- * Phase 2 (Apply): Uses true streaming since no grounding is needed.
+ * Phase 1 (Research): Uses non-streaming to get grounding metadata/citations with thinking.
+ * Phase 2 (Questions): Analyzes if clarifying questions needed with thinking.
+ * Phase 3 (Apply): Uses true streaming with thinking since no grounding is needed.
+ *
+ * If questions are needed, yields a questions object and the generator completes.
+ * The API route should save the session and wait for user answers.
+ * When answers are provided, call this again with previousResearch and answers.
  */
 export async function* modifyProtocolStream(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
-  userMessage: string
-): AsyncGenerator<string | { stage: string }, { protocol: DailyProtocol; reasoning: string; citations: Citation[] }, unknown> {
-  // === PHASE 1: Research with grounding ===
-  yield { stage: 'researching' };
+  userMessage: string,
+  previousResearch?: { researchText: string; citations: Citation[] },
+  answers?: QuestionAnswer[]
+): AsyncGenerator<
+  string | { stage: string } | ModifyQuestionsYield,
+  ModifyStreamResult | null,
+  unknown
+> {
+  let research: { researchText: string; citations: Citation[] };
 
-  // Non-streaming call to get citations (streaming API doesn't provide grounding metadata)
-  const research = await researchModification(protocol, config, userMessage);
+  if (previousResearch) {
+    // === SKIP PHASE 1 - Use cached research from session ===
+    research = previousResearch;
+  } else {
+    // === PHASE 1: Research with grounding + thinking ===
+    yield { stage: 'researching' };
 
-  // Simulate streaming the research text for UX
-  const researchChunkSize = 30;
-  for (let i = 0; i < research.researchText.length; i += researchChunkSize) {
-    yield research.researchText.slice(i, i + researchChunkSize);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // Non-streaming call to get citations (streaming API doesn't provide grounding metadata)
+    research = await researchModification(protocol, config, userMessage);
+
+    // Simulate streaming the research text for UX
+    const researchChunkSize = 30;
+    for (let i = 0; i < research.researchText.length; i += researchChunkSize) {
+      yield research.researchText.slice(i, i + researchChunkSize);
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    // === PHASE 2: Questions analysis (only if no answers provided) ===
+    if (!answers) {
+      yield { stage: 'analyzing' };
+
+      const questionsResult = await analyzeForQuestions(protocol, config, userMessage, research.researchText);
+
+      if (questionsResult.hasQuestions && questionsResult.questions.length > 0) {
+        // Yield questions and exit - client will call back with answers
+        yield {
+          questions: questionsResult.questions,
+          citations: research.citations,
+          researchSummary: questionsResult.researchSummary,
+          researchText: research.researchText,
+        };
+        return null;  // Signal that we're waiting for answers
+      }
+    }
   }
 
-  // === PHASE 2: Apply research with structured output (true streaming) ===
-  yield { stage: 'applying' };
+  // === PHASE 3: Apply research with structured output (true streaming) ===
+  yield { stage: 'modifying' };
 
   const client = getGeminiClient();
-  const applyPrompt = buildApplyPrompt(protocol, config, userMessage, research.researchText);
+
+  // Use the version with answers if provided
+  const applyPrompt = answers && answers.length > 0
+    ? buildApplyPromptWithAnswers(protocol, config, userMessage, research.researchText, answers)
+    : buildApplyPrompt(protocol, config, userMessage, research.researchText);
 
   const stream = await client.models.generateContentStream({
     model: MODEL_STRUCTURED,
     contents: applyPrompt,
     config: {
+      thinkingConfig: { thinkingBudget: 8192 },
       responseMimeType: 'application/json',
       responseSchema: modifyResultSchema as any,
       // NO tools - no grounding in this phase

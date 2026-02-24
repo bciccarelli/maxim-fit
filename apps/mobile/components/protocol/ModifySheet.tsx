@@ -1,13 +1,15 @@
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Wand2, Check, XCircle, CheckCircle2 } from 'lucide-react-native';
+import { X, Wand2, Check, XCircle } from 'lucide-react-native';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { getStreamingStatus } from '@/lib/utils';
 import { ScoreComparison } from './ScoreComparison';
-import type { DailyProtocol } from '@protocol/shared/schemas';
+import { QuestionsCard } from './QuestionsCard';
+import { ModifyLoadingView } from './ModifyLoadingView';
+import type { DailyProtocol, ClarifyingQuestion, Citation } from '@protocol/shared/schemas';
 
-type ModifyState = 'input' | 'streaming' | 'proposal' | 'error';
+type ModifyState = 'input' | 'streaming' | 'questions' | 'proposal' | 'error';
 
 interface ModifyProposal {
   modificationId: string;
@@ -16,12 +18,10 @@ interface ModifyProposal {
     reasoning: string;
     verification: {
       weighted_goal_score: number;
-      viability_score: number;
     };
   };
   currentScores: {
     weighted_goal_score: number | null;
-    viability_score: number | null;
     requirements_met: boolean | null;
   };
 }
@@ -32,7 +32,6 @@ interface ModifySheetProps {
   protocolId: string;
   currentScores: {
     weighted_goal_score: number | null;
-    viability_score: number | null;
   };
   onAccepted: (newProtocolId: string) => void;
   initialMessage?: string;
@@ -54,7 +53,15 @@ export function ModifySheet({
   const [statusHistory, setStatusHistory] = useState<string[]>([]);
   const lastStatusRef = useRef<string>('');
 
-  const { streamedText, error, isStreaming, startStream, reset } = useSSEStream<ModifyProposal>();
+  // Questions flow state
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<ClarifyingQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [citations, setCitations] = useState<Citation[]>([]);
+  const [researchSummary, setResearchSummary] = useState<string>('');
+  const [isSubmittingAnswers, setIsSubmittingAnswers] = useState(false);
+
+  const { streamedText, error, isStreaming, startStream, reset, questionsData, stage } = useSSEStream<ModifyProposal>();
 
   // Set initial message when prop changes
   useEffect(() => {
@@ -63,7 +70,29 @@ export function ModifySheet({
     }
   }, [initialMessage, visible]);
 
-  // Track status changes and build history
+  // Map stage to human-readable status
+  const getStageStatus = (s: string): string => {
+    switch (s) {
+      case 'researching': return 'Researching your request...';
+      case 'analyzing': return 'Analyzing for questions...';
+      case 'modifying': return 'Applying modifications...';
+      case 'verifying': return 'Verifying changes...';
+      default: return s;
+    }
+  };
+
+  // Track stage changes
+  useEffect(() => {
+    if (state === 'streaming' && stage) {
+      const stageStatus = getStageStatus(stage);
+      setStatusHistory(prev => {
+        if (prev.includes(stageStatus)) return prev;
+        return [...prev, stageStatus];
+      });
+    }
+  }, [stage, state]);
+
+  // Track detailed status changes from JSON content
   const currentStatus = getStreamingStatus(streamedText);
   useEffect(() => {
     if (state === 'streaming' && currentStatus !== lastStatusRef.current) {
@@ -75,6 +104,18 @@ export function ModifySheet({
       });
     }
   }, [currentStatus, state]);
+
+  // Watch for questionsData being set from SSE stream
+  useEffect(() => {
+    if (questionsData && state === 'streaming') {
+      setQuestions(questionsData.questions);
+      setCitations(questionsData.citations);
+      setResearchSummary(questionsData.researchSummary);
+      setSessionId(questionsData.sessionId);
+      setAnswers({});
+      setState('questions');
+    }
+  }, [questionsData, state]);
 
   const handleSubmit = useCallback(async () => {
     if (!message.trim()) return;
@@ -98,13 +139,89 @@ export function ModifySheet({
       }),
     });
 
-    if (result) {
-      setProposal(result);
+    // If result is null, check if questionsData was set (handled by effect above)
+    // Otherwise, it's a regular modify result
+    if (result && 'modificationId' in result) {
+      setProposal(result as ModifyProposal);
+      setState('proposal');
+    } else if (!result && error) {
+      setState('error');
+    }
+    // Note: If result is null and no error, questionsData effect will handle the state change
+  }, [message, protocolId, startStream, reset, error]);
+
+  const handleAnswerChange = useCallback((questionId: string, answer: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+  }, []);
+
+  const handleAnswersSubmit = useCallback(async () => {
+    if (!sessionId) return;
+
+    setIsSubmittingAnswers(true);
+    setState('streaming');
+    setStatusHistory([]);
+    lastStatusRef.current = '';
+    reset();
+
+    const headers = await getAuthHeaders();
+
+    const result = await startStream(apiUrl('/api/protocol/modify?stream=true'), {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionId,
+        answers: Object.entries(answers).map(([questionId, answer]) => ({
+          questionId,
+          answer,
+        })),
+      }),
+    });
+
+    setIsSubmittingAnswers(false);
+
+    if (result && 'modificationId' in result) {
+      setProposal(result as ModifyProposal);
       setState('proposal');
     } else if (error) {
       setState('error');
     }
-  }, [message, protocolId, startStream, reset, error]);
+  }, [sessionId, answers, startStream, reset, error]);
+
+  const handleSkipQuestions = useCallback(async () => {
+    if (!sessionId) return;
+
+    setIsSubmittingAnswers(true);
+    setState('streaming');
+    setStatusHistory([]);
+    lastStatusRef.current = '';
+    reset();
+
+    const headers = await getAuthHeaders();
+
+    const result = await startStream(apiUrl('/api/protocol/modify?stream=true'), {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionId,
+        answers: [], // Empty answers = skip
+      }),
+    });
+
+    setIsSubmittingAnswers(false);
+
+    if (result && 'modificationId' in result) {
+      setProposal(result as ModifyProposal);
+      setState('proposal');
+    } else if (error) {
+      setState('error');
+    }
+  }, [sessionId, startStream, reset, error]);
 
   const handleAccept = useCallback(async () => {
     if (!proposal) return;
@@ -167,6 +284,13 @@ export function ModifySheet({
     setProposal(null);
     setStatusHistory([]);
     lastStatusRef.current = '';
+    // Reset questions state
+    setSessionId(null);
+    setQuestions([]);
+    setAnswers({});
+    setCitations([]);
+    setResearchSummary('');
+    setIsSubmittingAnswers(false);
     reset();
     onClose();
   }, [onClose, reset]);
@@ -221,31 +345,20 @@ export function ModifySheet({
           )}
 
           {state === 'streaming' && (
-            <View style={styles.streamingContainer}>
-              <View style={styles.progressList}>
-                {statusHistory.map((status, index) => {
-                  const isCurrentStep = index === statusHistory.length - 1;
-                  return (
-                    <View key={status} style={styles.progressItem}>
-                      <View style={styles.progressIconContainer}>
-                        {isCurrentStep ? (
-                          <ActivityIndicator size="small" color="#2d5a2d" />
-                        ) : (
-                          <CheckCircle2 size={18} color="#2d5a2d" />
-                        )}
-                      </View>
-                      <Text style={[
-                        styles.progressText,
-                        isCurrentStep && styles.progressTextActive,
-                        !isCurrentStep && styles.progressTextComplete,
-                      ]}>
-                        {status.replace('...', '')}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
+            <ModifyLoadingView statusHistory={statusHistory} />
+          )}
+
+          {state === 'questions' && questions.length > 0 && (
+            <QuestionsCard
+              questions={questions}
+              citations={citations}
+              researchSummary={researchSummary}
+              answers={answers}
+              onAnswerChange={handleAnswerChange}
+              onSubmit={handleAnswersSubmit}
+              onSkip={handleSkipQuestions}
+              isSubmitting={isSubmittingAnswers}
+            />
           )}
 
           {state === 'proposal' && proposal && (
@@ -256,10 +369,9 @@ export function ModifySheet({
               </View>
 
               <ScoreComparison
-                currentScores={currentScores}
+                currentScores={proposal.currentScores}
                 proposedScores={{
                   weighted_goal_score: proposal.proposal.verification.weighted_goal_score,
-                  viability_score: proposal.proposal.verification.viability_score,
                 }}
               />
 
@@ -383,35 +495,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
-  },
-  streamingContainer: {
-    paddingVertical: 24,
-  },
-  progressList: {
-    gap: 12,
-  },
-  progressItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  progressIconContainer: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressText: {
-    fontSize: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    flex: 1,
-  },
-  progressTextActive: {
-    color: '#2d5a2d',
-    fontWeight: '600',
-  },
-  progressTextComplete: {
-    color: '#666',
   },
   reasoningCard: {
     backgroundColor: '#fff',

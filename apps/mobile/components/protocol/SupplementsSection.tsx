@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, Modal, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback } from 'react';
 import { Plus, Trash2, X, Pill } from 'lucide-react-native';
 import type { SupplementationPlan, Supplement } from '@protocol/shared/schemas';
@@ -119,13 +119,17 @@ export function SupplementsSection({
         animationType="fade"
         onRequestClose={() => setEditingIndex(null)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => {
-            Keyboard.dismiss();
-            setEditingIndex(null);
-          }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              Keyboard.dismiss();
+              setEditingIndex(null);
+            }}
+          >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {editingSupplement && editingIndex !== null && (
               <>
@@ -208,6 +212,7 @@ export function SupplementsSection({
             )}
           </Pressable>
         </Pressable>
+      </KeyboardAvoidingView>
       </Modal>
     </View>
   );

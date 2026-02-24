@@ -81,7 +81,6 @@ export async function POST(request: NextRequest) {
       .from('protocols')
       .update({
         weighted_goal_score: verification.weighted_goal_score,
-        viability_score: verification.viability_score,
         requirements_met: verification.requirements_met,
         requirement_scores: verification.requirement_scores,
         goal_scores: verification.goal_scores,

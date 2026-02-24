@@ -26,6 +26,10 @@ interface UpgradeModalProps {
   feature: string | null;
   onUpgrade: (interval: 'month' | 'year') => Promise<void>;
   onRestore?: () => Promise<void>;
+  /** External loading state for purchase in progress */
+  isLoading?: boolean;
+  /** External loading state for restore in progress */
+  isRestoring?: boolean;
 }
 
 export function UpgradeModal({
@@ -34,36 +38,50 @@ export function UpgradeModal({
   feature,
   onUpgrade,
   onRestore,
+  isLoading: externalIsLoading,
+  isRestoring: externalIsRestoring,
 }: UpgradeModalProps) {
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>(
     'month'
   );
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
+  const [internalIsLoading, setInternalIsLoading] = useState(false);
+  const [internalIsRestoring, setInternalIsRestoring] = useState(false);
+
+  // Use external state if provided, otherwise use internal state
+  const isLoading = externalIsLoading ?? internalIsLoading;
+  const isRestoring = externalIsRestoring ?? internalIsRestoring;
 
   const price =
     billingInterval === 'month' ? PRICING.monthly.amount : PRICING.annual.amount;
 
   const handleUpgrade = async () => {
-    setIsLoading(true);
+    if (externalIsLoading === undefined) {
+      setInternalIsLoading(true);
+    }
     try {
       await onUpgrade(billingInterval);
     } catch (error) {
       console.error('Upgrade error:', error);
     } finally {
-      setIsLoading(false);
+      if (externalIsLoading === undefined) {
+        setInternalIsLoading(false);
+      }
     }
   };
 
   const handleRestore = async () => {
     if (!onRestore) return;
-    setIsRestoring(true);
+    if (externalIsRestoring === undefined) {
+      setInternalIsRestoring(true);
+    }
     try {
       await onRestore();
     } catch (error) {
       console.error('Restore error:', error);
     } finally {
-      setIsRestoring(false);
+      if (externalIsRestoring === undefined) {
+        setInternalIsRestoring(false);
+      }
     }
   };
 

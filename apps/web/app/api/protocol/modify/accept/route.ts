@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
     // Extract scores from proposed_scores (now includes citations)
     const proposedScores = modification.proposed_scores as {
       weighted_goal_score?: number;
-      viability_score?: number;
       requirements_met?: boolean;
       requirement_scores?: unknown;
       goal_scores?: unknown;
@@ -83,7 +82,6 @@ export async function POST(request: NextRequest) {
         verified: true,
         verified_at: new Date().toISOString(),
         weighted_goal_score: proposedScores?.weighted_goal_score ?? null,
-        viability_score: proposedScores?.viability_score ?? null,
         requirements_met: proposedScores?.requirements_met ?? null,
         requirement_scores: proposedScores?.requirement_scores ?? null,
         goal_scores: proposedScores?.goal_scores ?? null,

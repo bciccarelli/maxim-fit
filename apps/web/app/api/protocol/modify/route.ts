@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { modifyProtocol, modifyProtocolStream, verifyProtocol, extractPreferenceNotes } from '@/lib/gemini/generation';
-import { normalizeProtocol, type DailyProtocol, type Citation } from '@/lib/schemas/protocol';
+import { modifyProtocol, modifyProtocolStream, verifyProtocol, extractPreferenceNotes, type ModifyQuestionsYield, type ModifyStreamResult } from '@/lib/gemini/generation';
+import { normalizeProtocol, type DailyProtocol, type Citation, type QuestionAnswer } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
@@ -76,20 +76,76 @@ export async function POST(request: NextRequest) {
       }, { status: 402 });
     }
 
-    const { protocolId, userMessage } = await request.json();
+    const { protocolId, userMessage, sessionId, answers } = await request.json() as {
+      protocolId?: string;
+      userMessage?: string;
+      sessionId?: string;
+      answers?: QuestionAnswer[];
+    };
 
-    if (!protocolId || typeof protocolId !== 'string') {
-      return NextResponse.json({ error: 'Protocol ID is required' }, { status: 400 });
+    // If sessionId is provided, we're continuing from questions
+    // Otherwise, we need protocolId and userMessage
+    if (sessionId) {
+      // Continuing from questions - sessionId is required
+      if (typeof sessionId !== 'string') {
+        return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
+      }
+    } else {
+      if (!protocolId || typeof protocolId !== 'string') {
+        return NextResponse.json({ error: 'Protocol ID is required' }, { status: 400 });
+      }
+      if (!userMessage || typeof userMessage !== 'string') {
+        return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+      }
     }
-    if (!userMessage || typeof userMessage !== 'string') {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+
+    // If continuing from session, fetch session data
+    let session: {
+      id: string;
+      protocol_id: string;
+      user_message: string;
+      research_text: string;
+      research_citations: Citation[];
+    } | null = null;
+
+    let effectiveProtocolId = protocolId;
+    let effectiveUserMessage = userMessage;
+
+    if (sessionId) {
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('modify_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (sessionError || !sessionData) {
+        return NextResponse.json({ error: 'Session not found or expired' }, { status: 404 });
+      }
+
+      // Check if session is expired
+      if (new Date(sessionData.expires_at) < new Date()) {
+        await supabase.from('modify_sessions').delete().eq('id', sessionId);
+        return NextResponse.json({ error: 'Session expired' }, { status: 410 });
+      }
+
+      session = {
+        id: sessionData.id,
+        protocol_id: sessionData.protocol_id,
+        user_message: sessionData.user_message,
+        research_text: sessionData.research_text,
+        research_citations: sessionData.research_citations as Citation[],
+      };
+
+      effectiveProtocolId = session.protocol_id;
+      effectiveUserMessage = session.user_message;
     }
 
     // Fetch the protocol with config
     const { data: protocol, error: fetchError } = await supabase
       .from('protocols')
       .select('*, user_configs(*)')
-      .eq('id', protocolId)
+      .eq('id', effectiveProtocolId)
       .eq('user_id', user.id)
       .single();
 
@@ -104,14 +160,13 @@ export async function POST(request: NextRequest) {
     // Build current scores, falling back to the last verified version if current has no scores
     let currentScores = {
       weighted_goal_score: protocol.weighted_goal_score as number | null,
-      viability_score: protocol.viability_score as number | null,
       requirements_met: protocol.requirements_met as boolean | null,
     };
 
     if (currentScores.weighted_goal_score == null && protocol.version_chain_id) {
       const { data: lastVerified } = await supabase
         .from('protocols')
-        .select('weighted_goal_score, viability_score, requirements_met')
+        .select('weighted_goal_score, requirements_met')
         .eq('version_chain_id', protocol.version_chain_id)
         .eq('verified', true)
         .order('created_at', { ascending: false })
@@ -121,7 +176,6 @@ export async function POST(request: NextRequest) {
       if (lastVerified) {
         currentScores = {
           weighted_goal_score: lastVerified.weighted_goal_score,
-          viability_score: lastVerified.viability_score,
           requirements_met: lastVerified.requirements_met,
         };
       }
@@ -132,27 +186,92 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            // Stream modification generation with two-phase approach
-            // Generator yields: { stage: string } | string (text chunks)
-            const generator = modifyProtocolStream(protocolData, modifyConfig, userMessage);
-            let genResult: IteratorResult<string | { stage: string }, { protocol: DailyProtocol; reasoning: string; citations: Citation[] }>;
+            // Prepare previous research if continuing from session
+            const previousResearch = session ? {
+              researchText: session.research_text,
+              citations: session.research_citations,
+            } : undefined;
+
+            // Stream modification generation with three-phase approach
+            // Generator yields: { stage: string } | string (text chunks) | ModifyQuestionsYield
+            const generator = modifyProtocolStream(
+              protocolData,
+              modifyConfig,
+              effectiveUserMessage!,
+              previousResearch,
+              answers
+            );
+
+            let genResult: IteratorResult<
+              string | { stage: string } | ModifyQuestionsYield,
+              ModifyStreamResult | null
+            >;
+
             do {
               genResult = await generator.next();
               if (!genResult.done && genResult.value) {
-                // Check if it's a stage indicator or a text chunk
-                if (typeof genResult.value === 'object' && 'stage' in genResult.value) {
+                const value = genResult.value;
+
+                // Check if it's a questions yield (has questions array)
+                if (typeof value === 'object' && 'questions' in value) {
+                  const questionsYield = value as ModifyQuestionsYield;
+
+                  // Save session for later continuation
+                  const { data: newSession } = await supabase
+                    .from('modify_sessions')
+                    .insert({
+                      protocol_id: effectiveProtocolId,
+                      user_id: user.id,
+                      user_message: effectiveUserMessage,
+                      research_text: questionsYield.researchText,
+                      research_citations: questionsYield.citations,
+                      questions: questionsYield.questions,
+                      research_summary: questionsYield.researchSummary,
+                      status: 'pending_questions',
+                    })
+                    .select('id')
+                    .single();
+
+                  // Return questions to client
                   controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ stage: genResult.value.stage })}\n\n`)
+                    encoder.encode(`data: ${JSON.stringify({
+                      questions: questionsYield.questions,
+                      citations: questionsYield.citations,
+                      researchSummary: questionsYield.researchSummary,
+                      sessionId: newSession?.id,
+                    })}\n\n`)
                   );
-                } else {
+
+                  controller.close();
+                  return;
+                }
+
+                // Check if it's a stage indicator
+                if (typeof value === 'object' && 'stage' in value) {
                   controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ chunk: genResult.value })}\n\n`)
+                    encoder.encode(`data: ${JSON.stringify({ stage: value.stage })}\n\n`)
+                  );
+                } else if (typeof value === 'string') {
+                  // Text chunk
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: value })}\n\n`)
                   );
                 }
               }
             } while (!genResult.done);
 
+            // If generator returned null, it means questions were asked (already handled above)
+            if (genResult.value === null) {
+              controller.close();
+              return;
+            }
+
             const { protocol: modifiedProtocol, reasoning, citations: modifyCitations } = genResult.value;
+
+            // Clean up session if we used one
+            if (session) {
+              await supabase.from('modify_sessions').delete().eq('id', session.id);
+            }
 
             // Verify the modified protocol (returns verification citations)
             controller.enqueue(
@@ -172,9 +291,9 @@ export async function POST(request: NextRequest) {
             const { data: modification } = await supabase
               .from('protocol_modifications')
               .insert({
-                protocol_id: protocolId,
+                protocol_id: effectiveProtocolId,
                 user_id: user.id,
-                user_message: userMessage,
+                user_message: effectiveUserMessage,
                 proposed_protocol_data: modifiedProtocol,
                 proposed_scores: proposedScoresWithCitations,
                 current_scores: currentScores,
@@ -185,7 +304,7 @@ export async function POST(request: NextRequest) {
               .single();
 
             // Extract and save preference notes (non-blocking)
-            saveExtractedNotes(supabase, user.id, protocolId, userMessage);
+            saveExtractedNotes(supabase, user.id, effectiveProtocolId!, effectiveUserMessage!);
 
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
@@ -213,10 +332,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming path - now captures citations
+    // Note: Non-streaming path doesn't support session continuation (questions flow)
+    // If sessionId is provided, the streaming path should be used
+    if (!effectiveUserMessage) {
+      return NextResponse.json({ error: 'Message is required for non-streaming modify' }, { status: 400 });
+    }
+
     const { protocol: modifiedProtocol, reasoning, citations: modifyCitations } = await modifyProtocol(
       protocolData,
       modifyConfig,
-      userMessage
+      effectiveUserMessage
     );
 
     const { verification, citations: verifyCitations } = await verifyProtocol(modifiedProtocol, modifyConfig);
@@ -233,9 +358,9 @@ export async function POST(request: NextRequest) {
     const { data: modification, error: saveError } = await supabase
       .from('protocol_modifications')
       .insert({
-        protocol_id: protocolId,
+        protocol_id: effectiveProtocolId,
         user_id: user.id,
-        user_message: userMessage,
+        user_message: effectiveUserMessage,
         proposed_protocol_data: modifiedProtocol,
         proposed_scores: proposedScoresWithCitations,
         current_scores: currentScores,
@@ -250,7 +375,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract and save preference notes (non-blocking)
-    saveExtractedNotes(supabase, user.id, protocolId, userMessage);
+    saveExtractedNotes(supabase, user.id, effectiveProtocolId!, effectiveUserMessage);
 
     return NextResponse.json({
       modificationId: modification?.id,

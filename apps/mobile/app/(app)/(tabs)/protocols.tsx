@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, Wand2, Plus, ShieldCheck, Pencil, Trash2 } from 'lucide-react-native';
+import { ChevronDown, Wand2, Plus, ShieldCheck, Pencil, Trash2, Upload, History } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,10 +11,13 @@ import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
 import { CritiquesSection } from '@/components/protocol/CritiquesSection';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
+import { ImportProtocolSheet } from '@/components/protocol/ImportProtocolSheet';
+import { VersionHistorySheet } from '@/components/protocol/VersionHistorySheet';
 import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
 import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
 import { ProFeatureButton } from '@/components/subscription/ProFeatureButton';
 import { useUserConfig } from '@/hooks/useUserConfig';
+import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 
 export default function ProtocolsScreen() {
   const { user } = useAuth();
@@ -54,6 +57,11 @@ export default function ProtocolsScreen() {
   const [showModifySheet, setShowModifySheet] = useState(false);
   const [modifyContext, setModifyContext] = useState<string | undefined>(undefined);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showImportSheet, setShowImportSheet] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+
+  // Subscription context for Pro feature gating
+  const { canAccess, showUpgradeModal } = useSubscriptionContext();
 
   // Delete state
   const [confirmDeleteChainId, setConfirmDeleteChainId] = useState<string | null>(null);
@@ -236,6 +244,26 @@ export default function ProtocolsScreen() {
     await refreshChains();
   }, [refreshChains]);
 
+  const handleImportComplete = useCallback(async (protocolId: string) => {
+    // Refresh protocols to show the new one
+    await refreshChains();
+  }, [refreshChains]);
+
+  const handleImportPress = useCallback(() => {
+    if (!canAccess('import')) {
+      showUpgradeModal('Import Protocol');
+      return;
+    }
+    setShowChainDropdown(false);
+    setShowImportSheet(true);
+  }, [canAccess, showUpgradeModal]);
+
+  const handleVersionRevert = useCallback(async (newProtocolId: string) => {
+    // Refresh both chains (to update current version ID) and versions
+    await refreshChains();
+    await refreshVersions();
+  }, [refreshChains, refreshVersions]);
+
   const openModifyWithContext = (context?: string) => {
     setModifyContext(context);
     setShowModifySheet(true);
@@ -335,6 +363,15 @@ export default function ProtocolsScreen() {
                 <Plus size={16} color="#2d5a2d" />
                 <Text style={[styles.dropdownItemText, styles.newProtocolText]}>
                   New Protocol
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.dropdownItem}
+                onPress={handleImportPress}
+              >
+                <Upload size={16} color="#2d5a2d" />
+                <Text style={[styles.dropdownItemText, styles.newProtocolText]}>
+                  Import Protocol
                 </Text>
               </Pressable>
               <View style={styles.dropdownDivider} />
@@ -476,6 +513,14 @@ export default function ProtocolsScreen() {
 
           {/* Actions */}
           <View style={styles.actionsRow}>
+            {/* History Button */}
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => setShowVersionHistory(true)}
+            >
+              <History size={18} color="#666" />
+            </Pressable>
+
             {/* Verified Button */}
             <ProFeatureButton feature="verify" onPress={handleVerify} disabled={selectedVersion.verified}>
               <View
@@ -559,6 +604,20 @@ export default function ProtocolsScreen() {
           requirements: userConfig.requirements,
         } : undefined}
       />
+      <ImportProtocolSheet
+        visible={showImportSheet}
+        onClose={() => setShowImportSheet(false)}
+        onComplete={handleImportComplete}
+      />
+      {selectedChain && selectedVersion && (
+        <VersionHistorySheet
+          visible={showVersionHistory}
+          onClose={() => setShowVersionHistory(false)}
+          versionChainId={selectedChain.version_chain_id}
+          currentVersionId={selectedVersion.id}
+          onRevert={handleVersionRevert}
+        />
+      )}
     </View>
   );
 }
@@ -789,6 +848,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginLeft: 'auto',
     gap: 8,
+    alignItems: 'center',
+  },
+  iconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   verifyButton: {
     flexDirection: 'row',

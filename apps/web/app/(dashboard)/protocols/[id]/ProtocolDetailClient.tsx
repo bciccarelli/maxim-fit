@@ -23,7 +23,6 @@ interface ProtocolData {
   citations: Citation[] | null;
   requirements_met: boolean | null;
   weighted_goal_score: number | null;
-  viability_score: number | null;
   version: number | null;
   version_chain_id: string | null;
   verified: boolean | null;
@@ -117,7 +116,6 @@ export function ProtocolDetailClient({ protocol, tier = 'free' }: ProtocolDetail
         <EvaluationSummary
           requirementsMet={protocol.requirements_met ?? undefined}
           goalScore={protocol.weighted_goal_score ?? undefined}
-          viabilityScore={protocol.viability_score ?? undefined}
           verified={isVerified}
         />
         <div className="flex items-center gap-2">

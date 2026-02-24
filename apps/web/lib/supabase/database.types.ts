@@ -229,6 +229,56 @@ export type Database = {
           },
         ]
       }
+      modify_sessions: {
+        Row: {
+          id: string
+          protocol_id: string
+          user_id: string
+          user_message: string
+          research_text: string
+          research_citations: Json
+          questions: Json
+          research_summary: string | null
+          status: string
+          created_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          protocol_id: string
+          user_id: string
+          user_message: string
+          research_text: string
+          research_citations?: Json
+          questions?: Json
+          research_summary?: string | null
+          status?: string
+          created_at?: string
+          expires_at?: string
+        }
+        Update: {
+          id?: string
+          protocol_id?: string
+          user_id?: string
+          user_message?: string
+          research_text?: string
+          research_citations?: Json
+          questions?: Json
+          research_summary?: string | null
+          status?: string
+          created_at?: string
+          expires_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modify_sessions_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       protocols: {
         Row: {
           change_note: string | null
@@ -253,7 +303,6 @@ export type Database = {
           verified_at: string | null
           version: number | null
           version_chain_id: string | null
-          viability_score: number | null
           weighted_goal_score: number | null
         }
         Insert: {
@@ -279,7 +328,6 @@ export type Database = {
           verified_at?: string | null
           version?: number | null
           version_chain_id?: string | null
-          viability_score?: number | null
           weighted_goal_score?: number | null
         }
         Update: {
@@ -305,7 +353,6 @@ export type Database = {
           verified_at?: string | null
           version?: number | null
           version_chain_id?: string | null
-          viability_score?: number | null
           weighted_goal_score?: number | null
         }
         Relationships: [

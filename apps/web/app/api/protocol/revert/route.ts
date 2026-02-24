@@ -28,25 +28,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Target version not found' }, { status: 404 });
     }
 
-    // Find the current version in this chain
-    const { data: currentVersion } = await supabase
+    // Find the highest version in this chain (for version number and parent reference)
+    const { data: highestVersion } = await supabase
       .from('protocols')
-      .select('*')
+      .select('id, version')
       .eq('version_chain_id', target.version_chain_id!)
-      .eq('is_current', true)
       .eq('user_id', user.id)
+      .order('version', { ascending: false })
+      .limit(1)
       .single();
 
-    if (currentVersion) {
-      // Mark current version as not current
-      await supabase
-        .from('protocols')
-        .update({ is_current: false })
-        .eq('id', currentVersion.id)
-        .eq('user_id', user.id);
-    }
+    const newVersion = (highestVersion?.version ?? target.version ?? 1) + 1;
 
-    const newVersion = (currentVersion?.version ?? target.version ?? 1) + 1;
+    // Mark all versions in this chain as not current
+    await supabase
+      .from('protocols')
+      .update({ is_current: false })
+      .eq('version_chain_id', target.version_chain_id!)
+      .eq('user_id', user.id);
 
     // Create new row copying target version's data
     const { data: reverted, error: insertError } = await supabase
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
         version: newVersion,
         version_chain_id: target.version_chain_id ?? target.id,
         is_current: true,
-        parent_version_id: currentVersion?.id ?? target.id,
+        parent_version_id: highestVersion?.id ?? target.id,
         change_note: `Reverted to version ${target.version}`,
         change_source: 'revert',
         verified: target.verified,

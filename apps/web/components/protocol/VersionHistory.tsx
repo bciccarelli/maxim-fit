@@ -166,11 +166,6 @@ export function VersionHistory({
                           Goal {version.weighted_goal_score.toFixed(1)}
                         </span>
                       )}
-                      {version.viability_score != null && (
-                        <span className="font-mono tabular-nums">
-                          Viability {version.viability_score.toFixed(1)}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -222,11 +217,6 @@ export function VersionHistory({
                           {version.weighted_goal_score != null && (
                             <span className="font-mono tabular-nums">
                               Goal {version.weighted_goal_score.toFixed(1)}
-                            </span>
-                          )}
-                          {version.viability_score != null && (
-                            <span className="font-mono tabular-nums">
-                              Viability {version.viability_score.toFixed(1)}
                             </span>
                           )}
                         </div>

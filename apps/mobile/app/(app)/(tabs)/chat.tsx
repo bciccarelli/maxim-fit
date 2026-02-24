@@ -82,8 +82,11 @@ export default function ChatScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -437,7 +440,7 @@ export default function ChatScreen() {
       </ScrollView>
 
       {/* Input Area - extra padding for tab bar when keyboard is hidden */}
-      <View style={[styles.inputContainer, { paddingBottom: keyboardVisible ? 12 : insets.bottom + 72 }]}>
+      <View style={[styles.inputContainer, { paddingBottom: keyboardVisible ? 8 : insets.bottom + 50 }]}>
         <TextInput
           style={styles.input}
           value={question}

@@ -5,17 +5,15 @@ import { CheckCircle, XCircle, ShieldOff } from 'lucide-react';
 interface EvaluationSummaryProps {
   requirementsMet?: boolean;
   goalScore?: number;
-  viabilityScore?: number;
   verified?: boolean;
 }
 
 export function EvaluationSummary({
   requirementsMet,
   goalScore,
-  viabilityScore,
   verified = true,
 }: EvaluationSummaryProps) {
-  const hasData = goalScore != null || viabilityScore != null || requirementsMet != null;
+  const hasData = goalScore != null || requirementsMet != null;
   if (!hasData) return null;
 
   return (
@@ -36,14 +34,6 @@ export function EvaluationSummary({
             {goalScore.toFixed(1)}
           </span>
           <span className="text-xs text-muted-foreground">Goal</span>
-        </div>
-      )}
-      {viabilityScore != null && (
-        <div className="flex items-center gap-1">
-          <span className="font-mono text-sm font-semibold tabular-nums">
-            {viabilityScore.toFixed(1)}
-          </span>
-          <span className="text-xs text-muted-foreground">Viability</span>
         </div>
       )}
       {!verified && (

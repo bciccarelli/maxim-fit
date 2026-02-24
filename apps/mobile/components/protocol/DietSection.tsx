@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, Modal, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback } from 'react';
 import { Plus, Trash2, X, Utensils } from 'lucide-react-native';
 import type { DietPlan, Meal } from '@protocol/shared/schemas';
@@ -246,13 +246,17 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
         animationType="fade"
         onRequestClose={() => setEditingMealIndex(null)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => {
-            Keyboard.dismiss();
-            setEditingMealIndex(null);
-          }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              Keyboard.dismiss();
+              setEditingMealIndex(null);
+            }}
+          >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {editingMeal && editingMealIndex !== null && (
               <>
@@ -366,6 +370,7 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
             )}
           </Pressable>
         </Pressable>
+      </KeyboardAvoidingView>
       </Modal>
     </View>
   );

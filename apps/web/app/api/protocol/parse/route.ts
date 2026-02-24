@@ -98,7 +98,6 @@ export async function POST(request: NextRequest) {
         config_id: config?.id ?? null,
         name: protocolName,
         weighted_goal_score: verification.weighted_goal_score,
-        viability_score: verification.viability_score,
         requirements_met: verification.requirements_met,
         iteration: 0,
         requirement_scores: verification.requirement_scores,

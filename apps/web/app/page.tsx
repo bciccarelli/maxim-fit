@@ -60,7 +60,7 @@ const FEATURES: Feature[] = [
   {
     icon: BarChart3,
     title: 'Evaluation',
-    description: 'Goal and viability scores. Requirement adherence.'
+    description: 'Goal scores and requirement adherence.'
   },
   {
     icon: MessageSquare,
@@ -74,7 +74,6 @@ export default function HomePage() {
   const [scores, setScores] = useState<{
     requirements_met?: boolean;
     weighted_goal_score?: number;
-    viability_score?: number;
   } | null>(null);
   const [generationStage, setGenerationStage] =
     useState<GenerationStage | null>(null);
@@ -131,7 +130,6 @@ export default function HomePage() {
           ? {
               requirements_met: data.evaluation.requirements_met,
               weighted_goal_score: data.evaluation.weighted_goal_score,
-              viability_score: data.evaluation.viability_score
             }
           : null
       );
@@ -283,7 +281,6 @@ export default function HomePage() {
                   <EvaluationSummary
                     requirementsMet={scores.requirements_met}
                     goalScore={scores.weighted_goal_score}
-                    viabilityScore={scores.viability_score}
                   />
                 )}
               </div>

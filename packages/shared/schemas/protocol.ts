@@ -24,6 +24,38 @@ export const otherEventSchema = z.object({
 
 export type OtherEvent = z.infer<typeof otherEventSchema>;
 
+// =============================================================================
+// Routine Schemas (habit stacking / grouped activities)
+// =============================================================================
+
+export const routineSubEventTypeSchema = z.enum(['activity', 'supplement', 'meal']);
+export type RoutineSubEventType = z.infer<typeof routineSubEventTypeSchema>;
+
+export const routineSubEventSchema = z.object({
+  type: routineSubEventTypeSchema,
+  order: z.number().int().min(0),
+  duration_min: z.number().int().min(1),
+  // For type='activity'
+  activity: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  // For type='supplement' - reference by index into supplements array
+  supplement_index: z.number().int().min(0).optional().nullable(),
+  // For type='meal' - reference by index into meals array
+  meal_index: z.number().int().min(0).optional().nullable(),
+});
+
+export type RoutineSubEvent = z.infer<typeof routineSubEventSchema>;
+
+export const routineEventSchema = z.object({
+  name: z.string(),
+  start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
+  sub_events: z.array(routineSubEventSchema).min(1),
+  notes: z.string().optional().nullable(),
+  requirement_satisfied: z.string().optional().nullable(),
+});
+
+export type RoutineEvent = z.infer<typeof routineEventSchema>;
+
 export const dayOfWeekSchema = z.enum([
   'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
 ]);
@@ -44,6 +76,7 @@ export const scheduleVariantSchema = z.object({
   wake_time: z.string(),
   sleep_time: z.string(),
   other_events: z.array(otherEventSchema),
+  routine_events: z.array(routineEventSchema).optional().default([]),
 });
 
 export type ScheduleVariant = z.infer<typeof scheduleVariantSchema>;
@@ -235,7 +268,6 @@ export type Critique = z.infer<typeof critiqueSchema>;
 
 export const critiqueEvaluationSchema = z.object({
   critiques: z.array(critiqueSchema),
-  overall_viability_score: z.number().min(0).max(100),
   strongest_aspects: z.array(z.string()),
   weakest_aspects: z.array(z.string()),
   devil_advocate_summary: z.string(),
@@ -265,6 +297,42 @@ export type Citation = z.infer<typeof citationSchema>;
 export const citationsArraySchema = z.array(citationSchema);
 
 // =============================================================================
+// Clarifying Questions (for Modify flow)
+// =============================================================================
+
+export const clarifyingQuestionOptionSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+});
+
+export type ClarifyingQuestionOption = z.infer<typeof clarifyingQuestionOptionSchema>;
+
+export const clarifyingQuestionSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  context: z.string().optional().nullable(),  // Why this question matters
+  options: z.array(clarifyingQuestionOptionSchema).optional().nullable(),
+  inputType: z.enum(['text', 'select']).default('text'),
+});
+
+export type ClarifyingQuestion = z.infer<typeof clarifyingQuestionSchema>;
+
+export const questionAnswerSchema = z.object({
+  questionId: z.string(),
+  answer: z.string(),
+});
+
+export type QuestionAnswer = z.infer<typeof questionAnswerSchema>;
+
+export const questionsPhaseResultSchema = z.object({
+  hasQuestions: z.boolean(),
+  questions: z.array(clarifyingQuestionSchema),
+  researchSummary: z.string(),
+});
+
+export type QuestionsPhaseResult = z.infer<typeof questionsPhaseResultSchema>;
+
+// =============================================================================
 // Verification Result
 // =============================================================================
 
@@ -290,7 +358,6 @@ export type VerificationResult = {
   }>;
   requirements_met: boolean;
   weighted_goal_score: number;
-  viability_score: number;
 };
 
 // =============================================================================
@@ -318,7 +385,6 @@ export type ProtocolVersion = {
   verified: boolean;
   verified_at: string | null;
   weighted_goal_score: number | null;
-  viability_score: number | null;
   created_at: string;
 };
 
@@ -681,7 +747,11 @@ export function normalizeProtocol(data: unknown): DailyProtocol {
     converted.schedules = schedulesArr.map((variant: Record<string, unknown>) => {
       // If already has other_events and no schedule, skip migration
       if (Array.isArray(variant.other_events) && !Array.isArray(variant.schedule)) {
-        return variant;
+        // Ensure routine_events exists
+        return {
+          ...variant,
+          routine_events: variant.routine_events ?? [],
+        };
       }
 
       // If has legacy schedule array, migrate to other_events
@@ -696,13 +766,15 @@ export function normalizeProtocol(data: unknown): DailyProtocol {
         return {
           ...rest,
           other_events: otherEvents,
+          routine_events: [],
         };
       }
 
-      // No schedule or other_events, add empty other_events
+      // No schedule or other_events, add empty other_events and routine_events
       return {
         ...variant,
         other_events: [],
+        routine_events: [],
       };
     });
   }

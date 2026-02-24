@@ -34,9 +34,14 @@ This separation allows Phase 1 to focus on evidence gathering without JSON forma
 - `components/ui/` - Shared UI primitives (shadcn)
 - `lib/gemini/` - Gemini API integration (generation, verification, modification, Q&A)
 - `lib/schemas/` - Zod schemas for protocol data and user config
-- `lib/supabase/` - Supabase client and database types (you should have access to the Supabase MCP as well)
+- `lib/supabase/` - Supabase client and database types. 
 - `lib/streaming.ts` - SSE stream creation utility
 - `lib/hooks/useSSEStream.ts` - Client-side SSE consumption hook
+
+
+## Supabase
+
+You should have access to the Supabase MCP as well, make any migrations using this tool directly.
 
 ## Architecture
 

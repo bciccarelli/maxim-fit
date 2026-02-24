@@ -1,12 +1,13 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock } from 'lucide-react-native';
+import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock, Layers, ChevronDown, ChevronRight } from 'lucide-react-native';
 import type { DailyProtocol, ScheduleVariant, OtherEvent, DayOfWeek } from '@protocol/shared/schemas';
 import {
   computeScheduleEvents,
   getVariantIndexForDay,
   type ScheduleEvent,
   type ScheduleEventSource,
+  type ComputedSubEvent,
 } from '@protocol/shared';
 import { EditableField } from './EditableField';
 
@@ -132,6 +133,8 @@ function getEventBlockStyle(source: ScheduleEventSource) {
       return { backgroundColor: 'rgba(2, 132, 199, 0.1)', borderLeftColor: '#0284c7' };
     case 'workout':
       return { backgroundColor: 'rgba(217, 119, 6, 0.1)', borderLeftColor: '#d97706' };
+    case 'routine':
+      return { backgroundColor: 'rgba(45, 90, 45, 0.12)', borderLeftColor: '#2d5a2d' };
     case 'other':
       return { backgroundColor: 'rgba(102, 102, 102, 0.1)', borderLeftColor: '#666' };
   }
@@ -146,7 +149,21 @@ function SourceIcon({ source }: { source: ScheduleEventSource }) {
       return <Pill {...iconProps} color="#0284c7" />;
     case 'workout':
       return <Dumbbell {...iconProps} color="#d97706" />;
+    case 'routine':
+      return <Layers {...iconProps} color="#2d5a2d" />;
     case 'other':
+      return <Clock {...iconProps} color="#666" />;
+  }
+}
+
+function SubEventIcon({ type }: { type: ComputedSubEvent['type'] }) {
+  const iconProps = { size: 12 };
+  switch (type) {
+    case 'meal':
+      return <Utensils {...iconProps} color="#2d5a2d" />;
+    case 'supplement':
+      return <Pill {...iconProps} color="#0284c7" />;
+    case 'activity':
       return <Clock {...iconProps} color="#666" />;
   }
 }
@@ -169,10 +186,23 @@ export function ScheduleSection({
   });
   const [editingEvent, setEditingEvent] = useState<EditingEventId>(null);
   const [editingWakeSleep, setEditingWakeSleep] = useState(false);
+  const [expandedRoutines, setExpandedRoutines] = useState<Set<number>>(new Set());
   const [currentTimeMin, setCurrentTimeMin] = useState<number>(() => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
   });
+
+  const toggleRoutineExpanded = useCallback((index: number) => {
+    setExpandedRoutines((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }, []);
 
   // Get today's day of week
   const today = useMemo(() => {
@@ -307,6 +337,22 @@ export function ScheduleSection({
           updated = { ...protocol, schedules: newSchedules };
           break;
         }
+        case 'routine': {
+          const newSchedules = [...protocol.schedules];
+          const variant = newSchedules[variantIndex];
+          if (variant) {
+            const routineEvents = [...(variant.routine_events ?? [])];
+            if (routineEvents[event.sourceIndex]) {
+              routineEvents[event.sourceIndex] = {
+                ...routineEvents[event.sourceIndex],
+                start_time: newStartTime,
+              };
+            }
+            newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+          }
+          updated = { ...protocol, schedules: newSchedules };
+          break;
+        }
       }
 
       updateProtocol(updated);
@@ -361,6 +407,16 @@ export function ScheduleSection({
           if (variant) {
             const newOtherEvents = variant.other_events.filter((_, i) => i !== event.sourceIndex);
             newSchedules[variantIndex] = { ...variant, other_events: newOtherEvents };
+          }
+          updated = { ...protocol, schedules: newSchedules };
+          break;
+        }
+        case 'routine': {
+          const newSchedules = [...protocol.schedules];
+          const variant = newSchedules[variantIndex];
+          if (variant) {
+            const routineEvents = (variant.routine_events ?? []).filter((_, i) => i !== event.sourceIndex);
+            newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
           }
           updated = { ...protocol, schedules: newSchedules };
           break;
@@ -494,6 +550,10 @@ export function ScheduleSection({
             <Text style={styles.legendText}>Workout</Text>
           </View>
           <View style={styles.legendItem}>
+            <Layers size={12} color="#2d5a2d" />
+            <Text style={styles.legendText}>Routine</Text>
+          </View>
+          <View style={styles.legendItem}>
             <Clock size={12} color="#666" />
             <Text style={styles.legendText}>Other</Text>
           </View>
@@ -545,9 +605,14 @@ export function ScheduleSection({
                     const durationMin = endMin - startMin;
                     const top = ((startMin - rangeStartMin) / 60) * HOUR_HEIGHT;
                     const naturalHeight = (durationMin / 60) * HOUR_HEIGHT;
-                    const height = Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
+                    const isExpandedRoutine = event.isRoutine && expandedRoutines.has(index);
+                    const subEventCount = event.subEvents?.length ?? 0;
+                    const expandedRoutineHeight = isExpandedRoutine ? 32 + (subEventCount * 22) : 0;
+                    const height = isExpandedRoutine
+                      ? Math.max(naturalHeight, expandedRoutineHeight, MIN_BLOCK_HEIGHT)
+                      : Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
                     const { columnIndex, totalColumns } = blockLayout[index] || { columnIndex: 0, totalColumns: 1 };
-                    const isShort = durationMin <= 30;
+                    const isShort = durationMin <= 30 && !isExpandedRoutine;
                     const isNarrow = totalColumns >= 3;
 
                     return (
@@ -564,9 +629,49 @@ export function ScheduleSection({
                           },
                           isNarrow && styles.eventBlockNarrow,
                         ]}
-                        onPress={() => editable && setEditingEvent({ source: event.source, sourceIndex: event.sourceIndex })}
+                        onPress={() => {
+                          if (event.isRoutine) {
+                            toggleRoutineExpanded(index);
+                          } else if (editable) {
+                            setEditingEvent({ source: event.source, sourceIndex: event.sourceIndex });
+                          }
+                        }}
                       >
-                        {isNarrow ? (
+                        {event.isRoutine && event.subEvents ? (
+                          // Routine event with expandable sub-events
+                          <View style={styles.eventBlockContentStandard}>
+                            <View style={styles.eventBlockHeader}>
+                              {expandedRoutines.has(index) ? (
+                                <ChevronDown size={12} color="#666" />
+                              ) : (
+                                <ChevronRight size={12} color="#666" />
+                              )}
+                              <SourceIcon source={event.source} />
+                              <Text style={styles.eventBlockName} numberOfLines={1}>
+                                {event.activity}
+                              </Text>
+                              <Text style={styles.eventBlockSubCount}>({subEventCount})</Text>
+                            </View>
+                            <Text style={styles.eventBlockTimeRange}>
+                              {event.start_time} – {event.end_time}
+                            </Text>
+                            {isExpandedRoutine && (
+                              <View style={styles.routineSubEvents}>
+                                {event.subEvents.map((subEvent, subIdx) => (
+                                  <View key={subIdx} style={styles.routineSubEvent}>
+                                    <SubEventIcon type={subEvent.type} />
+                                    <Text style={styles.routineSubEventName} numberOfLines={1}>
+                                      {subEvent.activity}
+                                    </Text>
+                                    <Text style={styles.routineSubEventTime}>
+                                      {subEvent.start_time}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                          </View>
+                        ) : isNarrow ? (
                           <View style={styles.eventBlockContentNarrow}>
                             <SourceIcon source={event.source} />
                           </View>
@@ -637,88 +742,93 @@ export function ScheduleSection({
         animationType="fade"
         onRequestClose={() => setEditingEvent(null)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => {
-            Keyboard.dismiss();
-            setEditingEvent(null);
-          }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            {editingEventData && (
-              <>
-                <View style={styles.modalHeader}>
-                  <View style={styles.modalHeaderLeft}>
-                    <SourceIcon source={editingEventData.source} />
-                    <Text style={styles.modalTitle}>
-                      {editingEventData.activity}
-                    </Text>
-                  </View>
-                  <Pressable
-                    style={styles.modalCloseButton}
-                    onPress={() => setEditingEvent(null)}
-                  >
-                    <X size={20} color="#666" />
-                  </Pressable>
-                </View>
-
-                <View style={styles.modalBody}>
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalFieldLabel}>Start time</Text>
-                    <EditableField
-                      value={editingEventData.start_time}
-                      onChange={(t) => handleUpdateEventTime(editingEventData, t)}
-                      type="time"
-                      editable
-                      mono
-                      style={styles.modalFieldInput}
-                    />
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              Keyboard.dismiss();
+              setEditingEvent(null);
+            }}
+          >
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              {editingEventData && (
+                <>
+                  <View style={styles.modalHeader}>
+                    <View style={styles.modalHeaderLeft}>
+                      <SourceIcon source={editingEventData.source} />
+                      <Text style={styles.modalTitle}>
+                        {editingEventData.activity}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={styles.modalCloseButton}
+                      onPress={() => setEditingEvent(null)}
+                    >
+                      <X size={20} color="#666" />
+                    </Pressable>
                   </View>
 
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalFieldLabel}>End time</Text>
-                    <EditableField
-                      value={editingEventData.end_time}
-                      onChange={(t) =>
-                        handleUpdateEventTime(
-                          editingEventData,
-                          editingEventData.start_time,
-                          t
-                        )
-                      }
-                      type="time"
-                      editable={editingEventData.source === 'other'}
-                      mono
-                      style={styles.modalFieldInput}
-                    />
-                  </View>
-
-                  {editingEventData.source === 'other' && (
+                  <View style={styles.modalBody}>
                     <View style={styles.modalField}>
-                      <Text style={styles.modalFieldLabel}>Activity</Text>
+                      <Text style={styles.modalFieldLabel}>Start time</Text>
                       <EditableField
-                        value={editingEventData.activity}
-                        onChange={(a) =>
-                          handleUpdateOtherEventActivity(editingEventData, a)
-                        }
+                        value={editingEventData.start_time}
+                        onChange={(t) => handleUpdateEventTime(editingEventData, t)}
+                        type="time"
                         editable
+                        mono
                         style={styles.modalFieldInput}
                       />
                     </View>
-                  )}
-                </View>
 
-                <Pressable
-                  style={styles.modalDeleteButton}
-                  onPress={() => handleDeleteEvent(editingEventData)}
-                >
-                  <Trash2 size={16} color="#c62828" />
-                  <Text style={styles.modalDeleteText}>Delete event</Text>
-                </Pressable>
-              </>
-            )}
+                    <View style={styles.modalField}>
+                      <Text style={styles.modalFieldLabel}>End time</Text>
+                      <EditableField
+                        value={editingEventData.end_time}
+                        onChange={(t) =>
+                          handleUpdateEventTime(
+                            editingEventData,
+                            editingEventData.start_time,
+                            t
+                          )
+                        }
+                        type="time"
+                        editable={editingEventData.source === 'other'}
+                        mono
+                        style={styles.modalFieldInput}
+                      />
+                    </View>
+
+                    {editingEventData.source === 'other' && (
+                      <View style={styles.modalField}>
+                        <Text style={styles.modalFieldLabel}>Activity</Text>
+                        <EditableField
+                          value={editingEventData.activity}
+                          onChange={(a) =>
+                            handleUpdateOtherEventActivity(editingEventData, a)
+                          }
+                          editable
+                          style={styles.modalFieldInput}
+                        />
+                      </View>
+                    )}
+                  </View>
+
+                  <Pressable
+                    style={styles.modalDeleteButton}
+                    onPress={() => handleDeleteEvent(editingEventData)}
+                  >
+                    <Trash2 size={16} color="#c62828" />
+                    <Text style={styles.modalDeleteText}>Delete event</Text>
+                  </Pressable>
+                </>
+              )}
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -945,6 +1055,35 @@ const styles = StyleSheet.create({
     color: '#666',
     fontVariant: ['tabular-nums'],
     marginTop: 2,
+  },
+  eventBlockSubCount: {
+    fontSize: 10,
+    color: '#666',
+  },
+
+  // Routine sub-events
+  routineSubEvents: {
+    marginTop: 6,
+    marginLeft: 8,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(45, 90, 45, 0.2)',
+  },
+  routineSubEvent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  routineSubEventName: {
+    fontSize: 10,
+    color: '#1a2e1a',
+    flex: 1,
+  },
+  routineSubEventTime: {
+    fontSize: 9,
+    color: '#666',
+    fontVariant: ['tabular-nums'],
   },
 
   iconButton: {
