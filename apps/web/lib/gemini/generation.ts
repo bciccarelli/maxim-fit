@@ -1336,10 +1336,11 @@ export async function* generateProtocolStream(
     chunkCount++;
     const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (text && typeof text === 'string') {
-      // Skip corrupted chunks (binary metadata rendered as hex/zeros)
+      // Stop on corrupted chunks (binary metadata rendered as hex/zeros)
+      // Once corruption starts, it won't recover - break immediately
       if (/^[0-9a-f]{20,}$/i.test(text) || /^[\x00-\x1f]+$/.test(text)) {
-        console.warn('[generateProtocolStream] Skipping corrupted chunk');
-        continue;
+        console.warn('[generateProtocolStream] Corrupted chunk detected, stopping stream');
+        break;
       }
       fullText += text;
       yield text;
@@ -1455,10 +1456,11 @@ export async function* modifyProtocolStream(
   for await (const chunk of stream) {
     const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (text && typeof text === 'string') {
-      // Skip corrupted chunks (binary metadata rendered as hex/zeros)
+      // Stop on corrupted chunks (binary metadata rendered as hex/zeros)
+      // Once corruption starts, it won't recover - break immediately
       if (/^[0-9a-f]{20,}$/i.test(text) || /^[\x00-\x1f]+$/.test(text)) {
-        console.warn('[modifyProtocolStream] Skipping corrupted chunk');
-        continue;
+        console.warn('[modifyProtocolStream] Corrupted chunk detected, stopping stream');
+        break;
       }
       fullText += text;
       yield text;
