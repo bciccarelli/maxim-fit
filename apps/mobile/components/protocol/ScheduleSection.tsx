@@ -10,6 +10,7 @@ import {
   type ComputedSubEvent,
 } from '@protocol/shared';
 import { EditableField } from './EditableField';
+import { DraggableEventBlock } from './DraggableEventBlock';
 
 type Props = {
   protocol: DailyProtocol;
@@ -243,7 +244,7 @@ export function ScheduleSection({
   }, [events, editingEvent]);
 
   // Timeline range computation
-  const { firstHour, lastHour, hours, rangeStartMin, totalHeight } = useMemo(() => {
+  const { firstHour, lastHour, hours, rangeStartMin, rangeEndMin, totalHeight } = useMemo(() => {
     if (events.length === 0) {
       const defaultHours = Array.from({ length: 17 }, (_, i) => i + 6);
       return {
@@ -251,6 +252,7 @@ export function ScheduleSection({
         lastHour: 22,
         hours: defaultHours,
         rangeStartMin: 360,
+        rangeEndMin: 22 * 60,
         totalHeight: 16 * HOUR_HEIGHT,
       };
     }
@@ -265,6 +267,7 @@ export function ScheduleSection({
       lastHour: last,
       hours: hoursArray,
       rangeStartMin: first * 60,
+      rangeEndMin: last * 60,
       totalHeight: (last - first) * HOUR_HEIGHT,
     };
   }, [events]);
@@ -616,8 +619,13 @@ export function ScheduleSection({
                     const isNarrow = totalColumns >= 3;
 
                     return (
-                      <Pressable
+                      <DraggableEventBlock
                         key={index}
+                        event={event}
+                        index={index}
+                        rangeStartMin={rangeStartMin}
+                        rangeEndMin={rangeEndMin}
+                        editable={!!editable}
                         style={[
                           styles.eventBlock,
                           getEventBlockStyle(event.source),
@@ -629,6 +637,9 @@ export function ScheduleSection({
                           },
                           isNarrow && styles.eventBlockNarrow,
                         ]}
+                        onTimeChange={(newStartTime, newEndTime) => {
+                          handleUpdateEventTime(event, newStartTime, newEndTime);
+                        }}
                         onPress={() => {
                           if (event.isRoutine) {
                             toggleRoutineExpanded(index);
@@ -696,7 +707,7 @@ export function ScheduleSection({
                             </Text>
                           </View>
                         )}
-                      </Pressable>
+                      </DraggableEventBlock>
                     );
                   })}
                 </View>

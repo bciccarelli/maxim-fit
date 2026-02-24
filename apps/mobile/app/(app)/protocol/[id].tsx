@@ -196,6 +196,7 @@ export default function ProtocolDetailScreen() {
           viability_score: protocol.viability_score,
         }}
         onAccepted={handleModifyAccepted}
+        currentProtocol={parsedData ?? undefined}
       />
     </View>
   );

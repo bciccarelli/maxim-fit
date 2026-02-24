@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable, Modal, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Plus, Trash2, X, Utensils } from 'lucide-react-native';
 import type { DietPlan, Meal } from '@protocol/shared/schemas';
 import { EditableField } from './EditableField';
@@ -25,6 +25,13 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
   const [editingMacros, setEditingMacros] = useState(false);
   const [editingMealIndex, setEditingMealIndex] = useState<number | null>(null);
   const [expandedMealIndex, setExpandedMealIndex] = useState<number | null>(null);
+
+  const mealTotals = useMemo(() => ({
+    calories: diet.meals.reduce((sum, m) => sum + m.calories, 0),
+    protein: diet.meals.reduce((sum, m) => sum + m.protein_g, 0),
+    carbs: diet.meals.reduce((sum, m) => sum + m.carbs_g, 0),
+    fat: diet.meals.reduce((sum, m) => sum + m.fat_g, 0),
+  }), [diet.meals]);
 
   const updateDiet = useCallback(
     (updates: Partial<DietPlan>) => {
@@ -139,19 +146,23 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
       <Pressable onPress={() => editable && setEditingMacros(true)}>
         <View style={styles.macrosRow}>
           <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{diet.daily_calories.toLocaleString()}</Text>
+            <Text style={styles.macroValue}>{mealTotals.calories.toLocaleString()}</Text>
+            <Text style={styles.macroTarget}>of {diet.daily_calories.toLocaleString()}</Text>
             <Text style={styles.macroLabel}>Calories</Text>
           </View>
           <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{diet.protein_target_g}g</Text>
+            <Text style={styles.macroValue}>{mealTotals.protein}g</Text>
+            <Text style={styles.macroTarget}>of {diet.protein_target_g}g</Text>
             <Text style={styles.macroLabel}>Protein</Text>
           </View>
           <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{diet.carbs_target_g}g</Text>
+            <Text style={styles.macroValue}>{mealTotals.carbs}g</Text>
+            <Text style={styles.macroTarget}>of {diet.carbs_target_g}g</Text>
             <Text style={styles.macroLabel}>Carbs</Text>
           </View>
           <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{diet.fat_target_g}g</Text>
+            <Text style={styles.macroValue}>{mealTotals.fat}g</Text>
+            <Text style={styles.macroTarget}>of {diet.fat_target_g}g</Text>
             <Text style={styles.macroLabel}>Fat</Text>
           </View>
         </View>
@@ -412,6 +423,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a2e1a',
     fontVariant: ['tabular-nums'],
+  },
+  macroTarget: {
+    fontSize: 11,
+    color: '#888',
+    fontVariant: ['tabular-nums'],
+    marginTop: 1,
   },
   macroLabel: {
     fontSize: 10,

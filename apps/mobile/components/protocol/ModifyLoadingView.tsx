@@ -303,7 +303,7 @@ const StatusItem = memo(function StatusItem({
   return (
     <Animated.View
       style={styles.statusItem}
-      entering={SlideInRight.duration(300).delay(index === 0 ? 0 : 50).springify().damping(15)}
+      entering={SlideInRight.duration(250).delay(index === 0 ? 0 : 50).easing(Easing.out(Easing.cubic))}
     >
       <View style={styles.indicatorContainer}>
         {isActive && <SpinnerIndicator />}
@@ -314,25 +314,61 @@ const StatusItem = memo(function StatusItem({
   );
 });
 
+// Collapsed view showing summary with current step
+function CollapsedView({ currentStep }: { currentStep: string }) {
+  const cleanStep = currentStep.replace(/\.{3}$/, '');
+
+  return (
+    <View style={styles.collapsedContainer}>
+      <View style={styles.collapsedRow}>
+        <SpinnerIndicator />
+        <Text style={styles.collapsedTitle}>Making changes...</Text>
+      </View>
+      <Text style={styles.collapsedSubtitle}>{cleanStep}</Text>
+    </View>
+  );
+}
+
 export function ModifyLoadingView({ statusHistory }: ModifyLoadingViewProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const hasCollapsedRef = useRef(false);
+
+  // Auto-collapse after 2+ items
+  useEffect(() => {
+    if (statusHistory.length >= 2 && !hasCollapsedRef.current) {
+      hasCollapsedRef.current = true;
+      // Small delay to let the second item animate in
+      const timer = setTimeout(() => {
+        setIsCollapsed(true);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [statusHistory.length]);
+
+  const currentStep = statusHistory[statusHistory.length - 1] || 'Researching...';
+
   return (
     <View style={styles.container}>
       <ProcessingHeader />
 
       <View style={styles.divider} />
 
-      <View style={styles.timeline}>
-        <TimelineConnector itemCount={statusHistory.length} />
-        {statusHistory.map((status, index) => (
-          <StatusItem
-            key={`${status}-${index}`}
-            status={status}
-            isActive={index === statusHistory.length - 1}
-            isComplete={index < statusHistory.length - 1}
-            index={index}
-          />
-        ))}
-      </View>
+      {isCollapsed ? (
+        <CollapsedView currentStep={currentStep} />
+      ) : (
+        <View style={styles.timeline}>
+          <TimelineConnector itemCount={statusHistory.length} />
+          {statusHistory.map((status, index) => (
+            <StatusItem
+              key={`${status}-${index}`}
+              status={status}
+              isActive={index === statusHistory.length - 1}
+              isComplete={index < statusHistory.length - 1}
+              index={index}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -463,5 +499,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     marginLeft: 2,
     borderRadius: 1,
+  },
+
+  // Collapsed View
+  collapsedContainer: {
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  collapsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  collapsedTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  collapsedSubtitle: {
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: colors.textMuted,
+    marginTop: 8,
   },
 });

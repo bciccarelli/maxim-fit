@@ -7,6 +7,7 @@ import { getStreamingStatus } from '@/lib/utils';
 import { ScoreComparison } from './ScoreComparison';
 import { QuestionsCard } from './QuestionsCard';
 import { ModifyLoadingView } from './ModifyLoadingView';
+import { ProposalComparisonView } from './ProposalComparisonView';
 import type { DailyProtocol, ClarifyingQuestion, Citation } from '@protocol/shared/schemas';
 
 type ModifyState = 'input' | 'streaming' | 'questions' | 'proposal' | 'error';
@@ -35,6 +36,7 @@ interface ModifySheetProps {
   };
   onAccepted: (newProtocolId: string) => void;
   initialMessage?: string;
+  currentProtocol?: DailyProtocol;
 }
 
 export function ModifySheet({
@@ -44,6 +46,7 @@ export function ModifySheet({
   currentScores,
   onAccepted,
   initialMessage,
+  currentProtocol,
 }: ModifySheetProps) {
   const [state, setState] = useState<ModifyState>('input');
   const [message, setMessage] = useState(initialMessage || '');
@@ -319,7 +322,7 @@ export function ModifySheet({
           {state === 'input' && (
             <>
               <Text style={styles.description}>
-                Describe what you'd like to change about your protocol. The AI will research and propose modifications.
+                Describe what you'd like to change about your protocol. Maxim will research and propose modifications.
               </Text>
 
               <TextInput
@@ -374,6 +377,15 @@ export function ModifySheet({
                   weighted_goal_score: proposal.proposal.verification.weighted_goal_score,
                 }}
               />
+
+              {currentProtocol && (
+                <View style={styles.comparisonContainer}>
+                  <ProposalComparisonView
+                    currentProtocol={currentProtocol}
+                    proposedProtocol={proposal.proposal.protocol}
+                  />
+                </View>
+              )}
 
               <View style={styles.actionButtons}>
                 <Pressable
@@ -515,6 +527,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 20,
+  },
+  comparisonContainer: {
+    marginTop: 16,
+    marginHorizontal: -16,
+    height: 400,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
   },
   actionButtons: {
     flexDirection: 'row',

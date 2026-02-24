@@ -592,6 +592,7 @@ export default function ProtocolsScreen() {
           }}
           onAccepted={handleModifyAccepted}
           initialMessage={modifyContext}
+          currentProtocol={parsedData ?? undefined}
         />
       )}
       <GenerateProtocolModal

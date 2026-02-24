@@ -43,6 +43,17 @@ This separation allows Phase 1 to focus on evidence gathering without JSON forma
 
 You should have access to the Supabase MCP as well, make any migrations using this tool directly.
 
+## Deployment
+
+**Vercel Hosting:** The web API (`apps/web`) is deployed on Vercel. Changes to server-side code (API routes, `lib/gemini/generation.ts`, etc.) require pushing to git to trigger a Vercel deployment.
+
+**Mobile App:** When testing the mobile app locally with `npx expo run:ios`, API calls go to the **production Vercel deployment**, not your local server. To test API changes:
+1. Push changes to git → Vercel auto-deploys
+2. Wait for deployment to complete
+3. Test on mobile app
+
+Alternatively, run the web app locally (`npm run dev` in `apps/web`) and update the mobile app's API base URL to point to `localhost:3000` for local testing.
+
 ## Architecture
 
 ### Protocol Lifecycle

@@ -53,7 +53,7 @@ export default function ChatScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Use shared protocol context
-  const { selectedChain, selectedVersion, refreshChains } = useProtocol();
+  const { selectedChain, selectedVersion, parsedProtocol, refreshChains } = useProtocol();
 
   // Conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -485,6 +485,7 @@ export default function ChatScreen() {
           }}
           onAccepted={handleModifyAccepted}
           initialMessage={modifyContext}
+          currentProtocol={parsedProtocol ?? undefined}
         />
       )}
     </KeyboardAvoidingView>
