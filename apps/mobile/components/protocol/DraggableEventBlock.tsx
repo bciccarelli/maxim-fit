@@ -1,5 +1,5 @@
-import React, { useCallback, useState, useRef, type ReactNode } from 'react';
-import { View, Text, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useCallback, useState, useEffect, type ReactNode } from 'react';
+import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -25,7 +25,7 @@ interface DraggableEventBlockProps {
   style: StyleProp<ViewStyle>;
   onTimeChange: (newStartTime: string, newEndTime?: string) => void;
   onPress: () => void;
-  children: ReactNode;
+  children: (displayStartTime: string, displayEndTime: string) => ReactNode;
 }
 
 /** Convert "HH:MM" to total minutes from midnight */
@@ -100,8 +100,21 @@ export function DraggableEventBlock({
   const blockHeight = useSharedValue(0);
   const originalHeight = useSharedValue(0); // Captured at drag start to avoid feedback loop
 
-  // React state for preview text
-  const [previewText, setPreviewText] = useState(`${event.start_time} – ${event.end_time}`);
+  // React state for display times (separate values for reliable updates)
+  const [displayStartTime, setDisplayStartTime] = useState(event.start_time);
+  const [displayEndTime, setDisplayEndTime] = useState(event.end_time);
+
+  // Reset state when event times change (e.g., after undo)
+  useEffect(() => {
+    // Reset all drag-related state to match the new event props
+    offsetY.value = 0;
+    isDragging.value = false;
+    dragMode.value = 'none';
+    setIsDragActive(false);
+    setCurrentDragMode('none');
+    setDisplayStartTime(event.start_time);
+    setDisplayEndTime(event.end_time);
+  }, [event.start_time, event.end_time]);
 
   // Calculate new times based on drag offset (non-worklet version for JS thread)
   const calculateNewTimes = (
@@ -157,12 +170,14 @@ export function DraggableEventBlock({
   const activateDrag = useCallback((mode: DragMode) => {
     setCurrentDragMode(mode);
     setIsDragActive(true);
-    setPreviewText(`${event.start_time} – ${event.end_time}`);
+    setDisplayStartTime(event.start_time);
+    setDisplayEndTime(event.end_time);
   }, [event.start_time, event.end_time]);
 
   const updatePreview = useCallback((translationY: number, mode: DragMode) => {
     const { newStartMin, newEndMin } = calculateNewTimes(mode, translationY);
-    setPreviewText(`${fromMinutes(newStartMin)} – ${fromMinutes(newEndMin)}`);
+    setDisplayStartTime(fromMinutes(newStartMin));
+    setDisplayEndTime(fromMinutes(newEndMin));
   }, []);
 
   const commitDrag = useCallback((finalOffsetY: number, mode: DragMode) => {
@@ -273,11 +288,6 @@ export function DraggableEventBlock({
     borderColor: isDragging.value ? '#2d5a2d' : 'transparent',
   }));
 
-  // Animated style for time preview
-  const animatedPreviewStyle = useAnimatedStyle(() => ({
-    opacity: isDragging.value ? 1 : 0,
-  }));
-
   // Animated style for resize handles
   const topHandleStyle = useAnimatedStyle(() => ({
     opacity: isDragging.value && isResizable ? 0.8 : 0,
@@ -295,6 +305,10 @@ export function DraggableEventBlock({
   // Compose gestures: pan (with long-press) takes priority over tap
   const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
 
+  // Use state display times during drag, original event times otherwise
+  const effectiveStartTime = isDragActive ? displayStartTime : event.start_time;
+  const effectiveEndTime = isDragActive ? displayEndTime : event.end_time;
+
   return (
     <GestureDetector gesture={composedGesture}>
       <Animated.View
@@ -308,7 +322,7 @@ export function DraggableEventBlock({
           blockHeight.value = e.nativeEvent.layout.height;
         }}
       >
-        <>{children}</>
+        <>{children(effectiveStartTime, effectiveEndTime)}</>
 
         {/* Top resize handle */}
         {canResize(event.source) && (
@@ -324,10 +338,6 @@ export function DraggableEventBlock({
           </Animated.View>
         )}
 
-        {/* Time preview */}
-        <Animated.View style={[styles.timePreview, animatedPreviewStyle]}>
-          <Text style={styles.timePreviewText}>{previewText}</Text>
-        </Animated.View>
       </Animated.View>
     </GestureDetector>
   );
@@ -353,21 +363,5 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#2d5a2d',
-  },
-  timePreview: {
-    position: 'absolute',
-    right: -4,
-    top: '50%',
-    transform: [{ translateX: '100%' }, { translateY: -10 }],
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  timePreviewText: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'JetBrainsMono',
-    fontVariant: ['tabular-nums'],
   },
 });

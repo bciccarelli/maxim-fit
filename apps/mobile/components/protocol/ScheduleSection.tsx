@@ -564,14 +564,7 @@ export function ScheduleSection({
 
         {/* Visual Timeline */}
         {events.length > 0 ? (
-          <Pressable
-            style={styles.timelineContainer}
-            onPress={() => {
-              if (editingEvent !== null) {
-                setEditingEvent(null);
-              }
-            }}
-          >
+          <View style={styles.timelineContainer}>
             <View style={[styles.timelineGrid, { height: totalHeight }]}>
               {/* Hour markers column */}
               <View style={styles.hourMarkersColumn}>
@@ -648,65 +641,67 @@ export function ScheduleSection({
                           }
                         }}
                       >
-                        {event.isRoutine && event.subEvents ? (
-                          // Routine event with expandable sub-events
-                          <View style={styles.eventBlockContentStandard}>
-                            <View style={styles.eventBlockHeader}>
-                              {expandedRoutines.has(index) ? (
-                                <ChevronDown size={12} color="#666" />
-                              ) : (
-                                <ChevronRight size={12} color="#666" />
-                              )}
-                              <SourceIcon source={event.source} />
-                              <Text style={styles.eventBlockName} numberOfLines={1}>
-                                {event.activity}
-                              </Text>
-                              <Text style={styles.eventBlockSubCount}>({subEventCount})</Text>
-                            </View>
-                            <Text style={styles.eventBlockTimeRange}>
-                              {event.start_time} – {event.end_time}
-                            </Text>
-                            {isExpandedRoutine && (
-                              <View style={styles.routineSubEvents}>
-                                {event.subEvents.map((subEvent, subIdx) => (
-                                  <View key={subIdx} style={styles.routineSubEvent}>
-                                    <SubEventIcon type={subEvent.type} />
-                                    <Text style={styles.routineSubEventName} numberOfLines={1}>
-                                      {subEvent.activity}
-                                    </Text>
-                                    <Text style={styles.routineSubEventTime}>
-                                      {subEvent.start_time}
-                                    </Text>
-                                  </View>
-                                ))}
+                        {(displayStartTime, displayEndTime) =>
+                          event.isRoutine && event.subEvents ? (
+                            // Routine event with expandable sub-events
+                            <View style={styles.eventBlockContentStandard}>
+                              <View style={styles.eventBlockHeader}>
+                                {expandedRoutines.has(index) ? (
+                                  <ChevronDown size={12} color="#666" />
+                                ) : (
+                                  <ChevronRight size={12} color="#666" />
+                                )}
+                                <SourceIcon source={event.source} />
+                                <Text style={styles.eventBlockName} numberOfLines={1}>
+                                  {event.activity}
+                                </Text>
+                                <Text style={styles.eventBlockSubCount}>({subEventCount})</Text>
                               </View>
-                            )}
-                          </View>
-                        ) : isNarrow ? (
-                          <View style={styles.eventBlockContentNarrow}>
-                            <SourceIcon source={event.source} />
-                          </View>
-                        ) : isShort ? (
-                          <View style={styles.eventBlockContentShort}>
-                            <SourceIcon source={event.source} />
-                            <Text style={styles.eventBlockName} numberOfLines={1}>
-                              {event.activity}
-                            </Text>
-                            <Text style={styles.eventBlockTime}>{event.start_time}</Text>
-                          </View>
-                        ) : (
-                          <View style={styles.eventBlockContentStandard}>
-                            <View style={styles.eventBlockHeader}>
-                              <SourceIcon source={event.source} />
-                              <Text style={styles.eventBlockName} numberOfLines={1}>
-                                {event.activity}
+                              <Text style={styles.eventBlockTimeRange}>
+                                {displayStartTime} – {displayEndTime}
+                              </Text>
+                              {isExpandedRoutine && (
+                                <View style={styles.routineSubEvents}>
+                                  {event.subEvents.map((subEvent, subIdx) => (
+                                    <View key={subIdx} style={styles.routineSubEvent}>
+                                      <SubEventIcon type={subEvent.type} />
+                                      <Text style={styles.routineSubEventName} numberOfLines={1}>
+                                        {subEvent.activity}
+                                      </Text>
+                                      <Text style={styles.routineSubEventTime}>
+                                        {subEvent.start_time}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              )}
+                            </View>
+                          ) : isNarrow || isShort ? (
+                            <View style={styles.eventBlockContentStandard}>
+                              <View style={styles.eventBlockHeader}>
+                                <SourceIcon source={event.source} />
+                                <Text style={styles.eventBlockName} numberOfLines={1}>
+                                  {event.activity}
+                                </Text>
+                              </View>
+                              {!isShort && (
+                                <Text style={styles.eventBlockTime}>{displayStartTime}</Text>
+                              )}
+                            </View>
+                          ) : (
+                            <View style={styles.eventBlockContentStandard}>
+                              <View style={styles.eventBlockHeader}>
+                                <SourceIcon source={event.source} />
+                                <Text style={styles.eventBlockName} numberOfLines={1}>
+                                  {event.activity}
+                                </Text>
+                              </View>
+                              <Text style={styles.eventBlockTimeRange}>
+                                {displayStartTime} – {displayEndTime}
                               </Text>
                             </View>
-                            <Text style={styles.eventBlockTimeRange}>
-                              {event.start_time} – {event.end_time}
-                            </Text>
-                          </View>
-                        )}
+                          )
+                        }
                       </DraggableEventBlock>
                     );
                   })}
@@ -732,7 +727,7 @@ export function ScheduleSection({
                 <Text style={styles.addButtonText}>Add other event</Text>
               </Pressable>
             )}
-          </Pressable>
+          </View>
         ) : (
           <View style={styles.emptyTimeline}>
             <Text style={styles.noEvents}>No events scheduled for this day</Text>
