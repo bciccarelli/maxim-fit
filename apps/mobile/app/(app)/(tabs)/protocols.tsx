@@ -5,7 +5,7 @@ import { ChevronDown, Wand2, Plus, ShieldCheck, Pencil, Trash2, Upload, History 
 import { useRouter } from 'expo-router';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProtocol, type ProtocolChain, type ProtocolVersion } from '@/contexts/ProtocolContext';
+import { useProtocol, type ProtocolChain } from '@/contexts/ProtocolContext';
 import type { DailyProtocol } from '@protocol/shared/schemas';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
 import { CritiquesSection } from '@/components/protocol/CritiquesSection';
@@ -32,20 +32,16 @@ export default function ProtocolsScreen() {
     selectedChain,
     selectChain,
     updateSelectedChain,
-    versions,
     selectedVersion,
-    selectVersion,
     updateSelectedVersion,
     parsedProtocol: parsedData,
     isLoadingChains: isLoading,
-    isLoadingVersions,
     refreshChains,
     refreshVersions,
   } = useProtocol();
 
   // Local UI state
   const [showChainDropdown, setShowChainDropdown] = useState(false);
-  const [showVersionDropdown, setShowVersionDropdown] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -109,11 +105,6 @@ export default function ProtocolsScreen() {
     setShowChainDropdown(false);
   };
 
-  const handleVersionSelect = (version: ProtocolVersion) => {
-    selectVersion(version);
-    setShowVersionDropdown(false);
-  };
-
   const handleModifyAccepted = useCallback(async (newProtocolId: string) => {
     // Refresh to get the new version
     await refreshVersions();
@@ -137,23 +128,6 @@ export default function ProtocolsScreen() {
       throw error;
     }
   }, [selectedVersion, refreshVersions]);
-
-  const getVersionLabel = (version: ProtocolVersion) => {
-    const sourceLabels: Record<string, string> = {
-      generated: 'Generated',
-      imported: 'Imported',
-      direct_edit: 'Edited',
-      ai_modify: 'AI Modified',
-      critique_apply: 'Critique Applied',
-      revert: 'Reverted',
-    };
-    const source = version.change_source ? sourceLabels[version.change_source] || version.change_source : '';
-    return `v${version.version}${source ? ` – ${source}` : ''}`;
-  };
-
-  const getShortVersionLabel = (version: ProtocolVersion) => {
-    return `v${version.version}`;
-  };
 
   const handleStartEditName = () => {
     setEditedName(selectedChain?.name || '');
@@ -343,10 +317,7 @@ export default function ProtocolsScreen() {
         <View style={[styles.dropdownButtonWrapper, { zIndex: 20 }]}>
           <Pressable
             style={styles.dropdownButton}
-            onPress={() => {
-              setShowChainDropdown(!showChainDropdown);
-              setShowVersionDropdown(false);
-            }}
+            onPress={() => setShowChainDropdown(!showChainDropdown)}
           >
             <ChevronDown size={20} color="#666" />
           </Pressable>
@@ -438,67 +409,9 @@ export default function ProtocolsScreen() {
         </View>
       </View>
 
-      {/* Version and Actions Bar */}
+      {/* Actions Bar */}
       {selectedVersion && (
         <View style={styles.actionsBar}>
-          {/* Version Selector */}
-          <View style={[styles.versionSelectorWrapper, { zIndex: 10 }]}>
-            <Pressable
-              style={[styles.versionSelector, isLoadingVersions && styles.dropdownDisabled]}
-              onPress={() => {
-                if (!isLoadingVersions && versions.length > 0) {
-                  setShowVersionDropdown(!showVersionDropdown);
-                  setShowChainDropdown(false);
-                }
-              }}
-              disabled={isLoadingVersions}
-            >
-              {isLoadingVersions ? (
-                <ActivityIndicator size="small" color="#666" />
-              ) : (
-                <>
-                  <Text style={styles.versionText} numberOfLines={1} ellipsizeMode="tail">
-                    {selectedVersion ? getShortVersionLabel(selectedVersion) : 'Select'}
-                  </Text>
-                  <ChevronDown size={14} color="#666" />
-                </>
-              )}
-            </Pressable>
-
-            {showVersionDropdown && versions.length > 0 && (
-              <View style={[styles.dropdownMenu, styles.versionDropdownMenu]}>
-                <ScrollView style={styles.versionScrollView} nestedScrollEnabled>
-                  {versions.map((version) => (
-                    <Pressable
-                      key={version.id}
-                      style={[
-                        styles.dropdownItem,
-                        version.id === selectedVersion?.id && styles.dropdownItemSelected,
-                      ]}
-                      onPress={() => handleVersionSelect(version)}
-                    >
-                      <View style={styles.versionItemContent}>
-                        <Text
-                          style={[
-                            styles.dropdownItemText,
-                            version.id === selectedVersion?.id && styles.dropdownItemTextSelected,
-                          ]}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {getVersionLabel(version)}
-                        </Text>
-                        <Text style={styles.versionDate}>
-                          {new Date(version.created_at).toLocaleDateString()}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
           {/* Scores */}
           <View style={styles.scoresInline}>
             {selectedVersion.weighted_goal_score !== null && (
@@ -513,13 +426,13 @@ export default function ProtocolsScreen() {
 
           {/* Actions */}
           <View style={styles.actionsRow}>
-            {/* History Button */}
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => setShowVersionHistory(true)}
-            >
-              <History size={18} color="#666" />
-            </Pressable>
+            {/* Modify Button */}
+            <ProFeatureButton feature="modify" onPress={() => openModifyWithContext()}>
+              <View style={styles.actionButton} pointerEvents="none">
+                <Wand2 size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Modify</Text>
+              </View>
+            </ProFeatureButton>
 
             {/* Verified Button */}
             <ProFeatureButton feature="verify" onPress={handleVerify} disabled={selectedVersion.verified}>
@@ -546,13 +459,13 @@ export default function ProtocolsScreen() {
               </View>
             </ProFeatureButton>
 
-            {/* Modify Button */}
-            <ProFeatureButton feature="modify" onPress={() => openModifyWithContext()}>
-              <View style={styles.actionButton} pointerEvents="none">
-                <Wand2 size={16} color="#fff" />
-                <Text style={styles.actionButtonText}>Modify</Text>
-              </View>
-            </ProFeatureButton>
+            {/* History Button */}
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => setShowVersionHistory(true)}
+            >
+              <History size={18} color="#666" />
+            </Pressable>
           </View>
         </View>
       )}
@@ -784,44 +697,6 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e5e5',
     gap: 8,
   },
-  versionSelectorWrapper: {
-    position: 'relative',
-  },
-  versionSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f0',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 4,
-    minWidth: 80,
-  },
-  versionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#1a2e1a',
-  },
-  versionDropdownMenu: {
-    left: 0,
-    right: 'auto',
-    minWidth: 180,
-    maxHeight: 250,
-  },
-  versionScrollView: {
-    maxHeight: 250,
-  },
-  versionItemContent: {
-    flex: 1,
-  },
-  versionDate: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 2,
-  },
-  dropdownDisabled: {
-    opacity: 0.6,
-  },
   scoresInline: {
     flexDirection: 'row',
     gap: 6,
@@ -847,7 +722,6 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
-    marginLeft: 'auto',
     gap: 8,
     alignItems: 'center',
   },
