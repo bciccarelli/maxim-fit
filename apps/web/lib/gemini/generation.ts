@@ -1,8 +1,14 @@
 import { getGeminiClient, MODEL_GROUNDED, MODEL_FAST, MODEL_RESEARCH, MODEL_STRUCTURED } from './client';
-import { dailyProtocolSchema, normalizeProtocol, type DailyProtocol, type VerificationResult, type Citation } from '../schemas/protocol';
+import { createPartFromBase64, type Part } from '@google/genai';
+import { dailyProtocolSchema, normalizeProtocol, type DailyProtocol, type VerificationResult, type Citation, type QuestionAnswer, type ClarifyingQuestion } from '../schemas/protocol';
 import type { UserConfig, AnonymousUserConfig } from '../schemas/user-config';
 import { goalSchema, type Goal } from '../schemas/user-config';
 import { extractCitations, getGroundingMetadata } from './citations';
+
+export type ImageData = {
+  base64: string;
+  mimeType: string;
+};
 
 /**
  * Validate and fix corrupted exercise data from Gemini responses.
@@ -437,6 +443,32 @@ const verificationSchema = {
           criticism: { type: 'string' },
           severity: { type: 'string', enum: ['minor', 'moderate', 'major'] },
           suggestion: { type: 'string' },
+          questions: {
+            type: 'array',
+            description: 'Clarifying questions to ask before applying this suggestion. Only include when user input would meaningfully affect implementation.',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'Unique identifier (e.g., "c0_q1")' },
+                question: { type: 'string', description: 'Clear, concise question' },
+                context: { type: 'string', description: 'Why this question matters' },
+                options: {
+                  type: 'array',
+                  description: 'Predefined choices if common options exist',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      value: { type: 'string' },
+                      label: { type: 'string' },
+                    },
+                    required: ['value', 'label'],
+                  },
+                },
+                inputType: { type: 'string', enum: ['text', 'select'], description: '"text" for open-ended, "select" for multiple choice' },
+              },
+              required: ['id', 'question', 'inputType'],
+            },
+          },
         },
         required: ['category', 'criticism', 'severity', 'suggestion'],
       },
@@ -489,6 +521,20 @@ ${formatTrainingSummary(protocol)}
 1. **Requirement Adherence**: For each requirement, score how well the protocol meets it (0-100%).
 2. **Goal Scores**: For each goal, score how well the protocol supports it (0-100) with reasoning based on current evidence.
 3. **Critiques**: Identify weaknesses, potential issues, and areas for improvement. Verify claims against current research.
+
+   For each critique, determine if applying the suggestion requires user input. If so, generate 1-3 clarifying questions. Include questions when:
+   - The suggestion has multiple valid approaches (e.g., "reduce training" could mean fewer days OR shorter sessions)
+   - User preferences would significantly affect implementation (e.g., equipment availability, food preferences)
+   - Research shows trade-offs the user should choose between
+
+   DO NOT generate questions for straightforward suggestions with one clear implementation path.
+
+   Question format:
+   - id: unique identifier (e.g., "c0_q1" for critique 0, question 1)
+   - question: clear, concise question
+   - context: 1 sentence explaining why this matters (optional)
+   - options: provide if there are common research-backed choices (use inputType: "select")
+   - inputType: "text" for open-ended, "select" for multiple choice
 
 Be thorough and honest. A protocol that won't be followed is worthless.`;
 
@@ -563,8 +609,6 @@ const questionsAnalysisSchema = {
   required: ['hasQuestions', 'questions', 'researchSummary'],
 } as const;
 
-import type { ClarifyingQuestion, QuestionAnswer } from '../schemas/protocol';
-
 // ---------------------------------------------------------------------------
 // Two-Phase Modification: Research + Apply
 // ---------------------------------------------------------------------------
@@ -576,12 +620,19 @@ import type { ClarifyingQuestion, QuestionAnswer } from '../schemas/protocol';
 function buildResearchPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
-  userMessage: string
+  userMessage: string,
+  userPreferences?: string[]
 ): string {
+  const preferencesSection = userPreferences && userPreferences.length > 0
+    ? `\n\n## User Preferences (from previous interactions)
+These are established preferences the user has expressed. Research should respect these constraints:
+${userPreferences.map((p) => `- ${p}`).join('\n')}`
+    : '';
+
   return `You are a health research specialist. Research the user's protocol modification request using Google Search.
 
 ## User Configuration
-${JSON.stringify(config, null, 2)}
+${JSON.stringify(config, null, 2)}${preferencesSection}
 
 ## Current Protocol Summary
 - Wake: ${protocol.schedules[0]?.wake_time || 'N/A'}, Sleep: ${protocol.schedules[0]?.sleep_time || 'N/A'}
@@ -630,9 +681,16 @@ function buildApplyPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   userMessage: string,
-  researchText: string
+  researchText: string,
+  userPreferences?: string[]
 ): string {
-  return `You are an expert health protocol modifier. Apply the research findings to modify the user's protocol.
+  const preferencesSection = userPreferences && userPreferences.length > 0
+    ? `\n\n## User Preferences (MUST be respected)
+These are established preferences from previous interactions. The modification MUST respect these:
+${userPreferences.map((p) => `- ${p}`).join('\n')}`
+    : '';
+
+  return `You are an expert health protocol modifier. Apply the research findings to modify the user's protocol.${preferencesSection}
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
@@ -762,10 +820,17 @@ function buildQuestionsPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   userMessage: string,
-  researchText: string
+  researchText: string,
+  userPreferences?: string[]
 ): string {
   const goalsText = config.goals.map(g => g.name).join(', ') || 'General health';
   const requirementsText = config.requirements.length > 0 ? config.requirements.join(', ') : 'None specified';
+
+  const preferencesSection = userPreferences && userPreferences.length > 0
+    ? `\n\n## Known User Preferences
+The following preferences are already known. DO NOT ask questions about topics covered by these preferences:
+${userPreferences.map((p) => `- ${p}`).join('\n')}`
+    : '';
 
   return `You are a health protocol assistant. Analyze the user's modification request and the research findings to determine if you need any clarifying information before making changes.
 
@@ -773,7 +838,7 @@ function buildQuestionsPrompt(
 ${userMessage}
 
 ## Research Findings
-${researchText}
+${researchText}${preferencesSection}
 
 ## Current Protocol Summary
 - Goals: ${goalsText}
@@ -793,8 +858,9 @@ Analyze whether you have enough information to make the requested modification. 
 DO NOT ask questions if:
 1. The request is clear and specific (e.g., "change wake time to 6am")
 2. There's an obvious best practice to follow from the research
-3. The questions would be pedantic or unnecessary
-4. You're just being overly cautious
+3. **The question is already answered by a known user preference**
+4. The questions would be pedantic or unnecessary
+5. You're just being overly cautious
 
 If you have questions, provide 1-3 focused questions maximum. For each question:
 - Write a clear, concise question
@@ -815,13 +881,20 @@ function buildApplyPromptWithAnswers(
   config: UserConfig | AnonymousUserConfig,
   userMessage: string,
   researchText: string,
-  answers: QuestionAnswer[]
+  answers: QuestionAnswer[],
+  userPreferences?: string[]
 ): string {
   const answersText = answers.length > 0
     ? `\n\n## User's Answers to Clarifying Questions\n${answers.map(a => `- ${a.questionId}: ${a.answer}`).join('\n')}`
     : '';
 
-  return `You are an expert health protocol modifier. Apply the research findings to modify the user's protocol, incorporating their answers to clarifying questions.
+  const preferencesSection = userPreferences && userPreferences.length > 0
+    ? `\n\n## User Preferences (MUST be respected)
+These are established preferences from previous interactions. The modification MUST respect these:
+${userPreferences.map((p) => `- ${p}`).join('\n')}`
+    : '';
+
+  return `You are an expert health protocol modifier. Apply the research findings to modify the user's protocol, incorporating their answers to clarifying questions.${preferencesSection}
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
@@ -952,11 +1025,12 @@ export async function analyzeForQuestions(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   userMessage: string,
-  researchText: string
+  researchText: string,
+  userPreferences?: string[]
 ): Promise<{ hasQuestions: boolean; questions: ClarifyingQuestion[]; researchSummary: string }> {
   const client = getGeminiClient();
 
-  const prompt = buildQuestionsPrompt(protocol, config, userMessage, researchText);
+  const prompt = buildQuestionsPrompt(protocol, config, userMessage, researchText, userPreferences);
 
   const response = await client.models.generateContent({
     model: MODEL_GROUNDED, // Using Flash for questions analysis
@@ -992,14 +1066,15 @@ export async function analyzeForQuestions(
  * Phase 1: Research the user's modification request using Google Search grounding.
  * Returns unstructured research text with citations.
  */
-async function researchModification(
+export async function researchModification(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
-  userMessage: string
+  userMessage: string,
+  userPreferences?: string[]
 ): Promise<{ researchText: string; citations: Citation[] }> {
   const client = getGeminiClient();
 
-  const prompt = buildResearchPrompt(protocol, config, userMessage);
+  const prompt = buildResearchPrompt(protocol, config, userMessage, userPreferences);
 
   const response = await client.models.generateContent({
     model: MODEL_RESEARCH,
@@ -1026,16 +1101,23 @@ async function researchModification(
 /**
  * Phase 2: Apply research findings to generate structured protocol modification.
  * Uses structured output with Pro model, no grounding.
+ * Exported for use in job-based async processing.
+ * @param answers - Optional user answers to clarifying questions from Phase 1.5
  */
-async function applyResearchToProtocol(
+export async function applyResearchToProtocol(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   userMessage: string,
-  researchText: string
+  researchText: string,
+  userPreferences?: string[],
+  answers?: QuestionAnswer[]
 ): Promise<{ protocol: DailyProtocol; reasoning: string }> {
   const client = getGeminiClient();
 
-  const prompt = buildApplyPrompt(protocol, config, userMessage, researchText);
+  // Use the version with answers if provided
+  const prompt = answers && answers.length > 0
+    ? buildApplyPromptWithAnswers(protocol, config, userMessage, researchText, answers)
+    : buildApplyPrompt(protocol, config, userMessage, researchText, userPreferences);
 
   const response = await client.models.generateContent({
     model: MODEL_STRUCTURED,
@@ -1072,13 +1154,14 @@ async function applyResearchToProtocol(
 export async function modifyProtocol(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
-  userMessage: string
+  userMessage: string,
+  userPreferences?: string[]
 ): Promise<{ protocol: DailyProtocol; reasoning: string; citations: Citation[] }> {
   // Phase 1: Research with grounding
-  const research = await researchModification(protocol, config, userMessage);
+  const research = await researchModification(protocol, config, userMessage, userPreferences);
 
   // Phase 2: Apply research with structured output
-  const result = await applyResearchToProtocol(protocol, config, userMessage, research.researchText);
+  const result = await applyResearchToProtocol(protocol, config, userMessage, research.researchText, userPreferences);
 
   return {
     ...result,
@@ -1089,7 +1172,7 @@ export async function modifyProtocol(
 const askResultSchema = {
   type: 'object',
   properties: {
-    answer: { type: 'string', description: 'Short, conversational answer (2-4 sentences) to the user question about their protocol' },
+    answer: { type: 'string', description: 'Direct, conversational answer to the user question about their protocol. Prefer brevity but expand when the question warrants a fuller explanation.' },
     suggestsModification: { type: 'boolean', description: 'True if the answer implies the user might want to modify their protocol' },
   },
   required: ['answer', 'suggestsModification'],
@@ -1101,7 +1184,8 @@ function buildAskPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
-  history: QAHistoryItem[] = []
+  history: QAHistoryItem[] = [],
+  hasImage = false
 ): string {
   const historySection = history.length > 0
     ? `## Previous Conversation
@@ -1110,11 +1194,17 @@ ${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n'
 `
     : '';
 
+  const imageContext = hasImage
+    ? `
+
+The user has attached an image to this question. Analyze the image in the context of their health protocol and question. If the image shows food, a nutrition label, a workout, supplements, or any health-related content, provide relevant analysis. Consider how the image relates to their goals and current protocol.`
+    : '';
+
   return `You are a knowledgeable health coach. Answer questions about the user's protocol using current research and evidence.
 
 IMPORTANT: Use Google Search to verify any health claims, supplement recommendations, exercise science, or nutritional guidance. Ground your response in current research and cite your sources.
 
-Keep your answer to 2-4 sentences. Be direct and conversational — no bullet points or formal structure unless specifically asked. If the question suggests a protocol change, briefly note the trade-off but focus on answering the question directly.
+Be direct and conversational — no bullet points or formal structure unless specifically asked. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, research, or nuance, give a fuller answer. If the question suggests a protocol change, note the trade-off but focus on answering the question directly.${imageContext}
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
@@ -1130,21 +1220,29 @@ Answer now, using Google Search to verify your claims.`;
 
 /**
  * Answer a question about a protocol, optionally using search grounding.
+ * Supports multimodal input with optional image.
  * Returns answer, modification suggestion flag, and citations from grounding.
  */
 export async function askAboutProtocol(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
-  history: QAHistoryItem[] = []
+  history: QAHistoryItem[] = [],
+  image?: ImageData | null
 ): Promise<{ answer: string; suggestsModification: boolean; citations: Citation[] }> {
   const client = getGeminiClient();
 
-  const prompt = buildAskPrompt(protocol, config, question, history);
+  const prompt = buildAskPrompt(protocol, config, question, history, !!image);
+
+  // Build multimodal content with text and optional image
+  const parts: Part[] = [{ text: prompt }];
+  if (image) {
+    parts.push(createPartFromBase64(image.base64, image.mimeType));
+  }
 
   const response = await client.models.generateContent({
     model: MODEL_GROUNDED,
-    contents: prompt,
+    contents: [{ role: 'user', parts }],
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: 'application/json',
@@ -1387,7 +1485,8 @@ export async function* modifyProtocolStream(
   config: UserConfig | AnonymousUserConfig,
   userMessage: string,
   previousResearch?: { researchText: string; citations: Citation[] },
-  answers?: QuestionAnswer[]
+  answers?: QuestionAnswer[],
+  userPreferences?: string[]
 ): AsyncGenerator<
   string | { stage: string } | ModifyQuestionsYield,
   ModifyStreamResult | null,
@@ -1403,7 +1502,7 @@ export async function* modifyProtocolStream(
     yield { stage: 'researching' };
 
     // Non-streaming call to get citations (streaming API doesn't provide grounding metadata)
-    research = await researchModification(protocol, config, userMessage);
+    research = await researchModification(protocol, config, userMessage, userPreferences);
 
     // Simulate streaming the research text for UX
     const researchChunkSize = 30;
@@ -1416,7 +1515,7 @@ export async function* modifyProtocolStream(
     if (!answers) {
       yield { stage: 'analyzing' };
 
-      const questionsResult = await analyzeForQuestions(protocol, config, userMessage, research.researchText);
+      const questionsResult = await analyzeForQuestions(protocol, config, userMessage, research.researchText, userPreferences);
 
       if (questionsResult.hasQuestions && questionsResult.questions.length > 0) {
         // Yield questions and exit - client will call back with answers
@@ -1438,8 +1537,8 @@ export async function* modifyProtocolStream(
 
   // Use the version with answers if provided
   const applyPrompt = answers && answers.length > 0
-    ? buildApplyPromptWithAnswers(protocol, config, userMessage, research.researchText, answers)
-    : buildApplyPrompt(protocol, config, userMessage, research.researchText);
+    ? buildApplyPromptWithAnswers(protocol, config, userMessage, research.researchText, answers, userPreferences)
+    : buildApplyPrompt(protocol, config, userMessage, research.researchText, userPreferences);
 
   const stream = await client.models.generateContentStream({
     model: MODEL_STRUCTURED,
@@ -1467,8 +1566,36 @@ export async function* modifyProtocolStream(
     }
   }
 
-  // Parse the final result
-  const parsed = JSON.parse(fullText);
+  // Sanitize and parse the final result
+  fullText = fullText.trim();
+
+  // Fix trailing commas before closing braces/brackets (common LLM output issue)
+  fullText = fullText.replace(/,(\s*[}\]])/g, '$1');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fullText);
+  } catch (e) {
+    const error = e as SyntaxError;
+    const positionMatch = error.message.match(/position (\d+)/);
+    const position = positionMatch ? parseInt(positionMatch[1]) : 0;
+
+    // Extract context around the error for debugging
+    const start = Math.max(0, position - 100);
+    const end = Math.min(fullText.length, position + 100);
+    const context = fullText.slice(start, end);
+    const marker = ' '.repeat(Math.min(100, position - start)) + '^';
+
+    console.error('[modifyProtocolStream] JSON parse error:', {
+      message: error.message,
+      position,
+      fullTextLength: fullText.length,
+      context: `\n${context}\n${marker}`,
+    });
+
+    throw new Error('Failed to parse modified protocol. The AI generated invalid JSON. Please try again.');
+  }
+
   validateExerciseData(parsed);
   const protocolData = dailyProtocolSchema.parse(parsed);
 
@@ -1481,6 +1608,7 @@ export async function* modifyProtocolStream(
 
 /**
  * Stream answer to a question about the protocol. Yields text chunks, returns answer with citations.
+ * Supports multimodal input with optional image.
  *
  * Note: Gemini's streaming API (generateContentStream) does not provide grounding metadata.
  * We use non-streaming internally to get citations, then simulate streaming by yielding
@@ -1491,10 +1619,11 @@ export async function* askAboutProtocolStream(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
-  history: QAHistoryItem[] = []
+  history: QAHistoryItem[] = [],
+  image?: ImageData | null
 ): AsyncGenerator<string, { answer: string; suggestsModification: boolean; citations: Citation[] }, unknown> {
   // Use non-streaming call to get citations (streaming API doesn't provide grounding metadata)
-  const result = await askAboutProtocol(protocol, config, question, history);
+  const result = await askAboutProtocol(protocol, config, question, history, image);
 
   // Simulate streaming by yielding the answer in chunks for better UX
   const chunkSize = 15; // Characters per chunk - balances smoothness vs overhead
@@ -1773,26 +1902,52 @@ const noteExtractionSchema = {
 } as const;
 
 /**
- * Extract preference notes from a user's modification request.
+ * Extract ACTUAL preference notes from a user's modification request.
+ * Only extracts stable preferences, NOT modification requests.
  * Returns an array of concise preference statements.
  */
-export async function extractPreferenceNotes(userMessage: string): Promise<string[]> {
+export async function extractPreferenceNotes(
+  userMessage: string,
+  existingPreferences?: string[]
+): Promise<string[]> {
   const client = getGeminiClient();
 
-  const prompt = `Analyze the following user message about modifying their health protocol. Extract any preferences, likes, dislikes, or constraints they mention. Return them as concise, reusable preference notes.
+  const existingSection = existingPreferences && existingPreferences.length > 0
+    ? `\n\n## Existing Preferences (avoid duplicates)
+${existingPreferences.map((p) => `- ${p}`).join('\n')}`
+    : '';
 
-Only extract clear preferences - don't make assumptions. If no preferences are expressed, return an empty array.
+  const prompt = `Analyze the following user message about modifying their health protocol. Extract ONLY stable preferences - NOT modification requests.
 
-Examples of preferences to extract:
-- "I prefer morning workouts" → "Prefers morning workouts"
-- "I don't like running" → "Dislikes running"
-- "Can we reduce the protein?" → "Prefers lower protein intake"
-- "I need to be done by 8pm" → "Needs to finish activities by 8pm"
+## What IS a preference (extract these):
+- Lifestyle constraints: "I prefer morning workouts", "I'm a morning person", "I work night shifts"
+- Equipment/access: "I only have dumbbells at home", "I have a full gym", "No access to a pool"
+- Time constraints: "I need to be done by 8pm", "I only have 30 minutes to exercise"
+- Dietary restrictions: "I'm vegetarian", "I'm lactose intolerant", "I don't eat pork"
+- Physical limitations: "I have a bad knee", "I can't do high impact exercises"
+- General preferences: "I prefer outdoor activities", "I don't like running", "I enjoy swimming"
 
-User message:
+## What is NOT a preference (DO NOT extract):
+- Modification requests: "Can we add more protein?", "Reduce the carbs", "Add creatine"
+- One-time changes: "Change wake time to 6am", "Move my workout to evening today"
+- Questions: "Should I take vitamin D?", "Is this enough protein?"
+- Complaints: "This is too hard", "I don't have time for all this"
+
+## Examples:
+- "Can we reduce the protein?" → DO NOT EXTRACT (this is a request, not a preference)
+- "I prefer lower protein because I have kidney concerns" → EXTRACT: "Has kidney concerns affecting protein intake"
+- "Add more cardio" → DO NOT EXTRACT (this is a request)
+- "I enjoy running and want to do more of it" → EXTRACT: "Enjoys running"
+- "Change my workout to 6am" → DO NOT EXTRACT (this is a one-time change)
+- "I'm a morning person and do best working out early" → EXTRACT: "Morning person, prefers early workouts"
+- "Add creatine to my supplements" → DO NOT EXTRACT (this is a request)
+- "I prefer taking supplements with meals rather than separately" → EXTRACT: "Prefers taking supplements with meals"
+${existingSection}
+
+## User message:
 ${userMessage}
 
-Extract preference notes now.`;
+Extract ONLY genuine preferences. If none exist, return an empty array. DO NOT create preferences from modification requests.`;
 
   try {
     const response = await client.models.generateContent({
@@ -1810,7 +1965,21 @@ Extract preference notes now.`;
     }
 
     const parsed = JSON.parse(text);
-    return Array.isArray(parsed.notes) ? parsed.notes.filter((n: unknown) => typeof n === 'string' && n.length > 0) : [];
+    const notes = Array.isArray(parsed.notes)
+      ? parsed.notes.filter((n: unknown) => typeof n === 'string' && n.length > 0)
+      : [];
+
+    // Filter out duplicates against existing preferences
+    if (existingPreferences && existingPreferences.length > 0) {
+      const lowerExisting = existingPreferences.map(p => p.toLowerCase());
+      return notes.filter((note: string) =>
+        !lowerExisting.some(existing =>
+          existing.includes(note.toLowerCase()) || note.toLowerCase().includes(existing)
+        )
+      );
+    }
+
+    return notes;
   } catch (error) {
     console.error('[extractPreferenceNotes] Error:', error);
     return [];

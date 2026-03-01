@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock, Layers, ChevronDown, ChevronRight } from 'lucide-react-native';
+import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock, Layers } from 'lucide-react-native';
 import type { DailyProtocol, ScheduleVariant, OtherEvent, DayOfWeek } from '@protocol/shared/schemas';
 import {
   computeScheduleEvents,
@@ -187,23 +187,11 @@ export function ScheduleSection({
   });
   const [editingEvent, setEditingEvent] = useState<EditingEventId>(null);
   const [editingWakeSleep, setEditingWakeSleep] = useState(false);
-  const [expandedRoutines, setExpandedRoutines] = useState<Set<number>>(new Set());
+  const [viewingRoutine, setViewingRoutine] = useState<ScheduleEvent | null>(null);
   const [currentTimeMin, setCurrentTimeMin] = useState<number>(() => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
   });
-
-  const toggleRoutineExpanded = useCallback((index: number) => {
-    setExpandedRoutines((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  }, []);
 
   // Get today's day of week
   const today = useMemo(() => {
@@ -601,14 +589,10 @@ export function ScheduleSection({
                     const durationMin = endMin - startMin;
                     const top = ((startMin - rangeStartMin) / 60) * HOUR_HEIGHT;
                     const naturalHeight = (durationMin / 60) * HOUR_HEIGHT;
-                    const isExpandedRoutine = event.isRoutine && expandedRoutines.has(index);
                     const subEventCount = event.subEvents?.length ?? 0;
-                    const expandedRoutineHeight = isExpandedRoutine ? 32 + (subEventCount * 22) : 0;
-                    const height = isExpandedRoutine
-                      ? Math.max(naturalHeight, expandedRoutineHeight, MIN_BLOCK_HEIGHT)
-                      : Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
+                    const height = Math.max(naturalHeight, MIN_BLOCK_HEIGHT);
                     const { columnIndex, totalColumns } = blockLayout[index] || { columnIndex: 0, totalColumns: 1 };
-                    const isShort = durationMin <= 30 && !isExpandedRoutine;
+                    const isShort = durationMin <= 30;
                     const isNarrow = totalColumns >= 3;
 
                     return (
@@ -635,7 +619,7 @@ export function ScheduleSection({
                         }}
                         onPress={() => {
                           if (event.isRoutine) {
-                            toggleRoutineExpanded(index);
+                            setViewingRoutine(event);
                           } else if (editable) {
                             setEditingEvent({ source: event.source, sourceIndex: event.sourceIndex });
                           }
@@ -643,14 +627,9 @@ export function ScheduleSection({
                       >
                         {(displayStartTime, displayEndTime) =>
                           event.isRoutine && event.subEvents ? (
-                            // Routine event with expandable sub-events
+                            // Routine event - tap to open popup
                             <View style={styles.eventBlockContentStandard}>
                               <View style={styles.eventBlockHeader}>
-                                {expandedRoutines.has(index) ? (
-                                  <ChevronDown size={12} color="#666" />
-                                ) : (
-                                  <ChevronRight size={12} color="#666" />
-                                )}
                                 <SourceIcon source={event.source} />
                                 <Text style={styles.eventBlockName} numberOfLines={1}>
                                   {event.activity}
@@ -660,21 +639,6 @@ export function ScheduleSection({
                               <Text style={styles.eventBlockTimeRange}>
                                 {displayStartTime} – {displayEndTime}
                               </Text>
-                              {isExpandedRoutine && (
-                                <View style={styles.routineSubEvents}>
-                                  {event.subEvents.map((subEvent, subIdx) => (
-                                    <View key={subIdx} style={styles.routineSubEvent}>
-                                      <SubEventIcon type={subEvent.type} />
-                                      <Text style={styles.routineSubEventName} numberOfLines={1}>
-                                        {subEvent.activity}
-                                      </Text>
-                                      <Text style={styles.routineSubEventTime}>
-                                        {subEvent.start_time}
-                                      </Text>
-                                    </View>
-                                  ))}
-                                </View>
-                              )}
                             </View>
                           ) : isNarrow || isShort ? (
                             <View style={styles.eventBlockContentStandard}>
@@ -835,6 +799,60 @@ export function ScheduleSection({
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Routine Popup Modal */}
+      <Modal
+        visible={viewingRoutine !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingRoutine(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setViewingRoutine(null)}
+        >
+          <Pressable style={styles.routineModalContent} onPress={(e) => e.stopPropagation()}>
+            {viewingRoutine && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderLeft}>
+                    <Layers size={16} color="#2d5a2d" />
+                    <Text style={styles.modalTitle}>
+                      {viewingRoutine.activity}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={styles.modalCloseButton}
+                    onPress={() => setViewingRoutine(null)}
+                  >
+                    <X size={20} color="#666" />
+                  </Pressable>
+                </View>
+
+                <Text style={styles.routineModalTime}>
+                  {viewingRoutine.start_time} – {viewingRoutine.end_time}
+                </Text>
+
+                {viewingRoutine.subEvents && viewingRoutine.subEvents.length > 0 && (
+                  <ScrollView style={styles.routineModalSubEvents}>
+                    {viewingRoutine.subEvents.map((subEvent, idx) => (
+                      <View key={idx} style={styles.routineModalSubEvent}>
+                        <SubEventIcon type={subEvent.type} />
+                        <Text style={styles.routineModalSubEventName} numberOfLines={1}>
+                          {subEvent.activity}
+                        </Text>
+                        <Text style={styles.routineModalSubEventTime}>
+                          {subEvent.start_time}
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -1184,5 +1202,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#c62828',
+  },
+
+  // Routine modal styles
+  routineModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 340,
+    maxHeight: '70%',
+  },
+  routineModalTime: {
+    fontSize: 14,
+    color: '#666',
+    fontVariant: ['tabular-nums'],
+    marginBottom: 16,
+  },
+  routineModalSubEvents: {
+    maxHeight: 300,
+  },
+  routineModalSubEvent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  routineModalSubEventName: {
+    fontSize: 14,
+    color: '#1a2e1a',
+    flex: 1,
+  },
+  routineModalSubEventTime: {
+    fontSize: 12,
+    color: '#666',
+    fontVariant: ['tabular-nums'],
   },
 });

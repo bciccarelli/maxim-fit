@@ -1,11 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { askAboutProtocol, askAboutProtocolStream, type QAHistoryItem } from '@/lib/gemini/generation';
+import { askAboutProtocol, askAboutProtocolStream, type QAHistoryItem, type ImageData } from '@/lib/gemini/generation';
 import { normalizeProtocol, type Citation } from '@/lib/schemas/protocol';
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
 import { mergeCitations } from '@/lib/gemini/citations';
+
+const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB base64 (approximately 3MB image)
+const VALID_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+function validateImage(image: unknown): ImageData | null {
+  if (!image || typeof image !== 'object') return null;
+  const img = image as Record<string, unknown>;
+
+  if (!img.base64 || typeof img.base64 !== 'string') return null;
+  if (!img.mimeType || typeof img.mimeType !== 'string') return null;
+
+  if (img.base64.length > MAX_IMAGE_SIZE) {
+    throw new Error('Image too large. Maximum size is 3MB.');
+  }
+
+  if (!VALID_MIME_TYPES.includes(img.mimeType)) {
+    throw new Error('Invalid image type. Use JPEG, PNG, GIF, or WebP.');
+  }
+
+  return { base64: img.base64, mimeType: img.mimeType };
+}
+
+async function uploadImageToStorage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  base64: string,
+  mimeType: string,
+  userId: string
+): Promise<string | null> {
+  try {
+    // Convert base64 to buffer
+    const buffer = Buffer.from(base64, 'base64');
+
+    // Generate unique filename
+    const ext = mimeType.split('/')[1] || 'jpg';
+    const filename = `${userId}/${Date.now()}.${ext}`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('chat-images')
+      .upload(filename, buffer, {
+        contentType: mimeType,
+        cacheControl: '31536000', // 1 year cache
+      });
+
+    if (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('chat-images')
+      .getPublicUrl(data.path);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error processing image upload:', error);
+    return null;
+  }
+}
 
 function buildConfig(configData: Record<string, unknown> | null) {
   if (!configData) return null;
@@ -48,7 +108,7 @@ export async function GET(request: NextRequest) {
     if (conversationId) {
       const { data: questions, error } = await supabase
         .from('protocol_questions')
-        .select('id, question, answer, created_at, citations, conversation_id')
+        .select('id, question, answer, created_at, citations, conversation_id, image_url')
         .eq('version_chain_id', chainId)
         .eq('conversation_id', conversationId)
         .eq('user_id', user.id)
@@ -64,7 +124,7 @@ export async function GET(request: NextRequest) {
     // Otherwise, return all Q&A grouped by conversation
     const { data: questions, error } = await supabase
       .from('protocol_questions')
-      .select('id, question, answer, created_at, citations, conversation_id')
+      .select('id, question, answer, created_at, citations, conversation_id, image_url')
       .eq('version_chain_id', chainId)
       .eq('user_id', user.id)
       .order('created_at', { ascending: true });
@@ -129,13 +189,24 @@ export async function POST(request: NextRequest) {
       }, { status: 402 });
     }
 
-    const { protocolId, question, conversationId } = await request.json();
+    const { protocolId, question, conversationId, image } = await request.json();
 
     if (!protocolId || typeof protocolId !== 'string') {
       return NextResponse.json({ error: 'Protocol ID is required' }, { status: 400 });
     }
     if (!question || typeof question !== 'string') {
       return NextResponse.json({ error: 'Question is required' }, { status: 400 });
+    }
+
+    // Validate image if present
+    let imageData: ImageData | null = null;
+    try {
+      imageData = validateImage(image);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Invalid image' },
+        { status: 400 }
+      );
     }
 
     // Generate new conversation ID if not provided
@@ -181,7 +252,7 @@ export async function POST(request: NextRequest) {
               encoder.encode(`data: ${JSON.stringify({ stage: 'researching' })}\n\n`)
             );
 
-            const generator = askAboutProtocolStream(protocolData, askConfig, question, history);
+            const generator = askAboutProtocolStream(protocolData, askConfig, question, history, imageData);
             let genResult: IteratorResult<string, { answer: string; suggestsModification: boolean; citations: Citation[] }>;
             do {
               genResult = await generator.next();
@@ -194,7 +265,13 @@ export async function POST(request: NextRequest) {
 
             const { answer, suggestsModification, citations: newCitations } = genResult.value;
 
-            // Save Q&A with conversation ID and citations
+            // Upload image to storage if present
+            let imageUrl: string | null = null;
+            if (imageData) {
+              imageUrl = await uploadImageToStorage(supabase, imageData.base64, imageData.mimeType, user.id);
+            }
+
+            // Save Q&A with conversation ID, citations, and image URL
             await supabase
               .from('protocol_questions')
               .insert({
@@ -205,6 +282,7 @@ export async function POST(request: NextRequest) {
                 question,
                 answer,
                 citations: newCitations.length > 0 ? newCitations : null,
+                image_url: imageUrl,
               });
 
             // Merge new citations with existing ones on the protocol
@@ -223,7 +301,7 @@ export async function POST(request: NextRequest) {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 done: true,
-                result: { answer, suggestsModification, citations: newCitations, conversationId: activeConversationId },
+                result: { answer, suggestsModification, citations: newCitations, conversationId: activeConversationId, imageUrl },
               })}\n\n`)
             );
           } catch (error) {
@@ -242,13 +320,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming path - now captures citations
-    const { answer, suggestsModification, citations: newCitations } = await askAboutProtocol(protocolData, askConfig, question, history);
+    const { answer, suggestsModification, citations: newCitations } = await askAboutProtocol(protocolData, askConfig, question, history, imageData);
 
     // Merge new citations with existing ones on the protocol
     const existingCitations = (protocol.citations as Citation[]) || [];
     const mergedCitations = mergeCitations(existingCitations, newCitations);
 
-    // Save Q&A with conversation ID and citations
+    // Upload image to storage if present
+    let imageUrl: string | null = null;
+    if (imageData) {
+      imageUrl = await uploadImageToStorage(supabase, imageData.base64, imageData.mimeType, user.id);
+    }
+
+    // Save Q&A with conversation ID, citations, and image URL
     const { error: saveError } = await supabase
       .from('protocol_questions')
       .insert({
@@ -259,6 +343,7 @@ export async function POST(request: NextRequest) {
         question,
         answer,
         citations: newCitations.length > 0 ? newCitations : null,
+        image_url: imageUrl,
       });
 
     if (saveError) {
@@ -274,7 +359,7 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id);
     }
 
-    return NextResponse.json({ answer, suggestsModification, citations: mergedCitations, conversationId: activeConversationId });
+    return NextResponse.json({ answer, suggestsModification, citations: mergedCitations, conversationId: activeConversationId, imageUrl });
   } catch (error) {
     console.error('Protocol ask error:', error);
     return NextResponse.json(

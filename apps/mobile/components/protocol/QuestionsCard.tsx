@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +12,8 @@ import {
 import { Search, ArrowRight, ExternalLink } from 'lucide-react-native';
 import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 import type { ClarifyingQuestion, Citation } from '@protocol/shared/schemas';
+
+const OTHER_VALUE = '__other__';
 
 // Map well-known domains to display colors
 const DOMAIN_COLORS: Record<string, string> = {
@@ -55,10 +58,27 @@ export function QuestionsCard({
   onSkip,
   isSubmitting,
 }: QuestionsCardProps) {
+  // Track which questions have "Other" selected
+  const [otherSelected, setOtherSelected] = useState<Record<string, boolean>>({});
+
   const allAnswered = questions.every((q) => {
     const answer = answers[q.id];
     return answer && answer.trim().length > 0;
   });
+
+  const handleOptionSelect = (questionId: string, value: string) => {
+    if (value === OTHER_VALUE) {
+      setOtherSelected((prev) => ({ ...prev, [questionId]: true }));
+      onAnswerChange(questionId, ''); // Clear answer to trigger text input
+    } else {
+      setOtherSelected((prev) => ({ ...prev, [questionId]: false }));
+      onAnswerChange(questionId, value);
+    }
+  };
+
+  const isOtherSelected = (questionId: string) => {
+    return otherSelected[questionId] === true;
+  };
 
   return (
     <View style={styles.container}>
@@ -109,7 +129,8 @@ export function QuestionsCard({
               {question.inputType === 'select' && question.options ? (
                 <View style={styles.optionsContainer}>
                   {question.options.map((option) => {
-                    const isSelected = answers[question.id] === option.value;
+                    const isSelected =
+                      answers[question.id] === option.value && !isOtherSelected(question.id);
                     return (
                       <Pressable
                         key={option.value}
@@ -117,7 +138,7 @@ export function QuestionsCard({
                           styles.optionButton,
                           isSelected && styles.optionButtonSelected,
                         ]}
-                        onPress={() => onAnswerChange(question.id, option.value)}
+                        onPress={() => handleOptionSelect(question.id, option.value)}
                       >
                         <View
                           style={[
@@ -138,6 +159,46 @@ export function QuestionsCard({
                       </Pressable>
                     );
                   })}
+
+                  {/* Other option */}
+                  <Pressable
+                    style={[
+                      styles.optionButton,
+                      isOtherSelected(question.id) && styles.optionButtonSelected,
+                    ]}
+                    onPress={() => handleOptionSelect(question.id, OTHER_VALUE)}
+                  >
+                    <View
+                      style={[
+                        styles.optionRadio,
+                        isOtherSelected(question.id) && styles.optionRadioSelected,
+                      ]}
+                    >
+                      {isOtherSelected(question.id) && <View style={styles.optionRadioInner} />}
+                    </View>
+                    <Text
+                      style={[
+                        styles.optionLabel,
+                        isOtherSelected(question.id) && styles.optionLabelSelected,
+                      ]}
+                    >
+                      Other
+                    </Text>
+                  </Pressable>
+
+                  {/* Text input for "Other" */}
+                  {isOtherSelected(question.id) && (
+                    <TextInput
+                      style={styles.otherInput}
+                      value={answers[question.id] || ''}
+                      onChangeText={(text) => onAnswerChange(question.id, text)}
+                      placeholder="Enter your answer..."
+                      placeholderTextColor={colors.textMuted}
+                      multiline
+                      numberOfLines={2}
+                      autoFocus
+                    />
+                  )}
                 </View>
               ) : (
                 <TextInput
@@ -349,6 +410,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
     marginTop: spacing.sm,
+  },
+  otherInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    marginTop: spacing.xs,
   },
 
   // Actions

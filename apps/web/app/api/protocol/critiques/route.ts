@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { protocolId, critiqueIndices, action } = await request.json();
+    const { protocolId, critiqueIndices, action, answers } = await request.json();
 
     if (!protocolId || typeof protocolId !== 'string') {
       return NextResponse.json({ error: 'Protocol ID is required' }, { status: 400 });
@@ -81,7 +81,22 @@ export async function POST(request: NextRequest) {
     }
 
     const protocolData = normalizeProtocol(protocol.protocol_data);
-    const suggestionsToApply = validIndices.map((i: number) => currentCritiques[i].suggestion);
+
+    // Build suggestions with user answers if provided
+    const suggestionsToApply = validIndices.map((i: number) => {
+      const critique = currentCritiques[i];
+
+      // Find answers for this critique's questions
+      const critiqueAnswers = (answers || [])
+        .filter((a: { critiqueIndex: number; questionId: string; answer: string }) => a.critiqueIndex === i)
+        .map((a: { critiqueIndex: number; questionId: string; answer: string }) => `- ${a.questionId}: ${a.answer}`)
+        .join('\n');
+
+      if (critiqueAnswers) {
+        return `${critique.suggestion}\n\nUser preferences:\n${critiqueAnswers}`;
+      }
+      return critique.suggestion;
+    });
 
     // Apply critique suggestions via AI
     const modifiedProtocol = await applyCritiqueSuggestions(protocolData, suggestionsToApply);

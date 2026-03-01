@@ -44,7 +44,14 @@
         }
       ],
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Maxim to access your photos to share images for health protocol questions.",
+          "cameraPermission": "Allow Maxim to use your camera to take photos for health protocol questions."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

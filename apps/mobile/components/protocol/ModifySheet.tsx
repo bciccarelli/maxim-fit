@@ -1,31 +1,15 @@
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { X, Wand2, Check, XCircle } from 'lucide-react-native';
-import { useSSEStream } from '@/lib/useSSEStream';
+import { useModifyJob, type JobStatus } from '@/lib/useModifyJob';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
-import { getStreamingStatus } from '@/lib/utils';
 import { ScoreComparison } from './ScoreComparison';
 import { QuestionsCard } from './QuestionsCard';
 import { ModifyLoadingView } from './ModifyLoadingView';
 import { ProposalComparisonView } from './ProposalComparisonView';
-import type { DailyProtocol, ClarifyingQuestion, Citation } from '@protocol/shared/schemas';
+import type { DailyProtocol } from '@protocol/shared/schemas';
 
 type ModifyState = 'input' | 'streaming' | 'questions' | 'proposal' | 'error';
-
-interface ModifyProposal {
-  modificationId: string;
-  proposal: {
-    protocol: DailyProtocol;
-    reasoning: string;
-    verification: {
-      weighted_goal_score: number;
-    };
-  };
-  currentScores: {
-    weighted_goal_score: number | null;
-    requirements_met: boolean | null;
-  };
-}
 
 interface ModifySheetProps {
   visible: boolean;
@@ -48,23 +32,79 @@ export function ModifySheet({
   initialMessage,
   currentProtocol,
 }: ModifySheetProps) {
-  const [state, setState] = useState<ModifyState>('input');
   const [message, setMessage] = useState(initialMessage || '');
-  const [proposal, setProposal] = useState<ModifyProposal | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
-  const [statusHistory, setStatusHistory] = useState<string[]>([]);
-  const lastStatusRef = useRef<string>('');
 
-  // Questions flow state
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<ClarifyingQuestion[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [citations, setCitations] = useState<Citation[]>([]);
-  const [researchSummary, setResearchSummary] = useState<string>('');
-  const [isSubmittingAnswers, setIsSubmittingAnswers] = useState(false);
+  // Use the job-based hook for background-resilient modify operations
+  const {
+    status: jobStatus,
+    stage,
+    questions: questionsData,
+    proposal: jobProposal,
+    currentScores: jobCurrentScores,
+    modificationId,
+    error,
+    isLoading,
+    upgradeRequired,
+    startJob,
+    submitAnswers,
+    reset: resetJob,
+  } = useModifyJob();
 
-  const { streamedText, error, isStreaming, startStream, reset, questionsData, stage } = useSSEStream<ModifyProposal>();
+  // Map job status to UI state
+  const state = useMemo((): ModifyState => {
+    switch (jobStatus) {
+      case 'idle':
+        return 'input';
+      case 'pending':
+      case 'researching':
+      case 'research_complete':
+      case 'applying':
+      case 'verifying':
+        return 'streaming';
+      case 'awaiting_answers':
+        return 'questions';
+      case 'completed':
+        return 'proposal';
+      case 'failed':
+        return 'error';
+      default:
+        return 'input';
+    }
+  }, [jobStatus]);
+
+  // Build status history from stage changes
+  const statusHistory = useMemo((): string[] => {
+    const history: string[] = [];
+
+    const addIfNotPresent = (status: string) => {
+      if (!history.includes(status)) {
+        history.push(status);
+      }
+    };
+
+    // Add stages in order based on current stage
+    const stages: Array<{ stage: JobStatus | string; label: string }> = [
+      { stage: 'pending', label: 'Starting...' },
+      { stage: 'researching', label: 'Researching your request...' },
+      { stage: 'analyzing', label: 'Analyzing for questions...' },
+      { stage: 'awaiting_answers', label: 'Waiting for your input...' },
+      { stage: 'applying', label: 'Applying modifications...' },
+      { stage: 'verifying', label: 'Verifying changes...' },
+    ];
+
+    // Find current stage index
+    const currentIndex = stages.findIndex(s => s.stage === jobStatus || s.stage === stage);
+
+    // Add all completed stages
+    for (let i = 0; i <= currentIndex && i < stages.length; i++) {
+      addIfNotPresent(stages[i].label);
+    }
+
+    return history;
+  }, [jobStatus, stage]);
 
   // Set initial message when prop changes
   useEffect(() => {
@@ -73,161 +113,46 @@ export function ModifySheet({
     }
   }, [initialMessage, visible]);
 
-  // Map stage to human-readable status
-  const getStageStatus = (s: string): string => {
-    switch (s) {
-      case 'researching': return 'Researching your request...';
-      case 'analyzing': return 'Analyzing for questions...';
-      case 'modifying': return 'Applying modifications...';
-      case 'verifying': return 'Verifying changes...';
-      default: return s;
-    }
-  };
+  // Build proposal object for UI
+  const proposal = useMemo(() => {
+    if (!jobProposal || !modificationId) return null;
 
-  // Track stage changes
-  useEffect(() => {
-    if (state === 'streaming' && stage) {
-      const stageStatus = getStageStatus(stage);
-      setStatusHistory(prev => {
-        if (prev.includes(stageStatus)) return prev;
-        return [...prev, stageStatus];
-      });
-    }
-  }, [stage, state]);
-
-  // Track detailed status changes from JSON content
-  const currentStatus = getStreamingStatus(streamedText);
-  useEffect(() => {
-    if (state === 'streaming' && currentStatus !== lastStatusRef.current) {
-      lastStatusRef.current = currentStatus;
-      setStatusHistory(prev => {
-        // Don't add duplicates
-        if (prev.includes(currentStatus)) return prev;
-        return [...prev, currentStatus];
-      });
-    }
-  }, [currentStatus, state]);
-
-  // Watch for questionsData being set from SSE stream
-  useEffect(() => {
-    if (questionsData && state === 'streaming') {
-      setQuestions(questionsData.questions);
-      setCitations(questionsData.citations);
-      setResearchSummary(questionsData.researchSummary);
-      setSessionId(questionsData.sessionId);
-      setAnswers({});
-      setState('questions');
-    }
-  }, [questionsData, state]);
+    return {
+      modificationId,
+      proposal: {
+        protocol: jobProposal.protocol,
+        reasoning: jobProposal.reasoning,
+        verification: jobProposal.verification,
+      },
+      currentScores: jobCurrentScores || { weighted_goal_score: null, requirements_met: null },
+    };
+  }, [jobProposal, modificationId, jobCurrentScores]);
 
   const handleSubmit = useCallback(async () => {
     if (!message.trim()) return;
-
-    setState('streaming');
-    setStatusHistory([]);
-    lastStatusRef.current = '';
-    reset();
-
-    const headers = await getAuthHeaders();
-
-    const result = await startStream(apiUrl('/api/protocol/modify?stream=true'), {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        protocolId,
-        userMessage: message.trim(),
-      }),
-    });
-
-    // If result is null, check if questionsData was set (handled by effect above)
-    // Otherwise, it's a regular modify result
-    if (result && 'modificationId' in result) {
-      setProposal(result as ModifyProposal);
-      setState('proposal');
-    } else if (!result && error) {
-      setState('error');
-    }
-    // Note: If result is null and no error, questionsData effect will handle the state change
-  }, [message, protocolId, startStream, reset, error]);
+    await startJob(protocolId, message.trim());
+  }, [message, protocolId, startJob]);
 
   const handleAnswerChange = useCallback((questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
   }, []);
 
   const handleAnswersSubmit = useCallback(async () => {
-    if (!sessionId) return;
-
-    setIsSubmittingAnswers(true);
-    setState('streaming');
-    setStatusHistory([]);
-    lastStatusRef.current = '';
-    reset();
-
-    const headers = await getAuthHeaders();
-
-    const result = await startStream(apiUrl('/api/protocol/modify?stream=true'), {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sessionId,
-        answers: Object.entries(answers).map(([questionId, answer]) => ({
-          questionId,
-          answer,
-        })),
-      }),
-    });
-
-    setIsSubmittingAnswers(false);
-
-    if (result && 'modificationId' in result) {
-      setProposal(result as ModifyProposal);
-      setState('proposal');
-    } else if (error) {
-      setState('error');
-    }
-  }, [sessionId, answers, startStream, reset, error]);
+    const answersList = Object.entries(answers).map(([questionId, answer]) => ({
+      questionId,
+      answer,
+    }));
+    await submitAnswers(answersList);
+    setAnswers({});
+  }, [answers, submitAnswers]);
 
   const handleSkipQuestions = useCallback(async () => {
-    if (!sessionId) return;
-
-    setIsSubmittingAnswers(true);
-    setState('streaming');
-    setStatusHistory([]);
-    lastStatusRef.current = '';
-    reset();
-
-    const headers = await getAuthHeaders();
-
-    const result = await startStream(apiUrl('/api/protocol/modify?stream=true'), {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sessionId,
-        answers: [], // Empty answers = skip
-      }),
-    });
-
-    setIsSubmittingAnswers(false);
-
-    if (result && 'modificationId' in result) {
-      setProposal(result as ModifyProposal);
-      setState('proposal');
-    } else if (error) {
-      setState('error');
-    }
-  }, [sessionId, startStream, reset, error]);
+    await submitAnswers([]);
+    setAnswers({});
+  }, [submitAnswers]);
 
   const handleAccept = useCallback(async () => {
-    if (!proposal) return;
+    if (!modificationId) return;
 
     setIsAccepting(true);
 
@@ -240,7 +165,7 @@ export function ModifySheet({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          modificationId: proposal.modificationId,
+          modificationId,
         }),
       });
 
@@ -254,10 +179,10 @@ export function ModifySheet({
     } finally {
       setIsAccepting(false);
     }
-  }, [proposal, onAccepted]);
+  }, [modificationId, onAccepted]);
 
   const handleReject = useCallback(async () => {
-    if (!proposal) return;
+    if (!modificationId) return;
 
     setIsRejecting(true);
 
@@ -270,7 +195,7 @@ export function ModifySheet({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          modificationId: proposal.modificationId,
+          modificationId,
         }),
       });
     } catch (err) {
@@ -279,24 +204,14 @@ export function ModifySheet({
       setIsRejecting(false);
       handleClose();
     }
-  }, [proposal]);
+  }, [modificationId]);
 
   const handleClose = useCallback(() => {
-    setState('input');
     setMessage('');
-    setProposal(null);
-    setStatusHistory([]);
-    lastStatusRef.current = '';
-    // Reset questions state
-    setSessionId(null);
-    setQuestions([]);
     setAnswers({});
-    setCitations([]);
-    setResearchSummary('');
-    setIsSubmittingAnswers(false);
-    reset();
+    resetJob();
     onClose();
-  }, [onClose, reset]);
+  }, [onClose, resetJob]);
 
   return (
     <Modal
@@ -337,9 +252,9 @@ export function ModifySheet({
               />
 
               <Pressable
-                style={[styles.submitButton, !message.trim() && styles.submitButtonDisabled]}
+                style={[styles.submitButton, (!message.trim() || isLoading) && styles.submitButtonDisabled]}
                 onPress={handleSubmit}
-                disabled={!message.trim()}
+                disabled={!message.trim() || isLoading}
               >
                 <Wand2 size={20} color="#fff" />
                 <Text style={styles.submitButtonText}>Generate Modification</Text>
@@ -351,16 +266,16 @@ export function ModifySheet({
             <ModifyLoadingView statusHistory={statusHistory} />
           )}
 
-          {state === 'questions' && questions.length > 0 && (
+          {state === 'questions' && questionsData && questionsData.questions.length > 0 && (
             <QuestionsCard
-              questions={questions}
-              citations={citations}
-              researchSummary={researchSummary}
+              questions={questionsData.questions}
+              citations={questionsData.citations}
+              researchSummary={questionsData.researchSummary}
               answers={answers}
               onAnswerChange={handleAnswerChange}
               onSubmit={handleAnswersSubmit}
               onSkip={handleSkipQuestions}
-              isSubmitting={isSubmittingAnswers}
+              isSubmitting={isLoading}
             />
           )}
 
@@ -423,16 +338,21 @@ export function ModifySheet({
 
           {(state === 'error' || error) && (
             <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error || 'An error occurred'}</Text>
-              <Pressable
-                style={styles.retryButton}
-                onPress={() => {
-                  setState('input');
-                  reset();
-                }}
-              >
-                <Text style={styles.retryButtonText}>Try Again</Text>
-              </Pressable>
+              <Text style={styles.errorText}>
+                {upgradeRequired
+                  ? 'This feature requires a Pro subscription'
+                  : error || 'An error occurred'}
+              </Text>
+              {!upgradeRequired && (
+                <Pressable
+                  style={styles.retryButton}
+                  onPress={() => {
+                    resetJob();
+                  }}
+                >
+                  <Text style={styles.retryButtonText}>Try Again</Text>
+                </Pressable>
+              )}
             </View>
           )}
         </ScrollView>

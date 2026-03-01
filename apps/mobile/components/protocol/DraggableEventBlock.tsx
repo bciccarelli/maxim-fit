@@ -6,6 +6,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   runOnJS,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import type { ScheduleEvent, ScheduleEventSource } from '@protocol/shared';
 
@@ -106,6 +107,9 @@ export function DraggableEventBlock({
 
   // Reset state when event times change (e.g., after undo)
   useEffect(() => {
+    // Cancel any ongoing animations before resetting
+    cancelAnimation(offsetY);
+
     // Reset all drag-related state to match the new event props
     offsetY.value = 0;
     isDragging.value = false;

@@ -192,6 +192,7 @@ export type Database = {
           conversation_id: string
           created_at: string | null
           id: string
+          image_url: string | null
           protocol_id: string | null
           question: string
           user_id: string | null
@@ -203,6 +204,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string | null
           id?: string
+          image_url?: string | null
           protocol_id?: string | null
           question: string
           user_id?: string | null
@@ -214,6 +216,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string | null
           id?: string
+          image_url?: string | null
           protocol_id?: string | null
           question?: string
           user_id?: string | null
@@ -225,6 +228,78 @@ export type Database = {
             columns: ["protocol_id"]
             isOneToOne: false
             referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modify_jobs: {
+        Row: {
+          id: string
+          user_id: string
+          protocol_id: string
+          user_message: string
+          status: string
+          research_text: string | null
+          research_citations: Json
+          research_summary: string | null
+          questions: Json | null
+          user_answers: Json | null
+          modification_id: string | null
+          error_message: string | null
+          current_stage: string | null
+          created_at: string
+          updated_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          protocol_id: string
+          user_message: string
+          status?: string
+          research_text?: string | null
+          research_citations?: Json
+          research_summary?: string | null
+          questions?: Json | null
+          user_answers?: Json | null
+          modification_id?: string | null
+          error_message?: string | null
+          current_stage?: string | null
+          created_at?: string
+          updated_at?: string
+          expires_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          protocol_id?: string
+          user_message?: string
+          status?: string
+          research_text?: string | null
+          research_citations?: Json
+          research_summary?: string | null
+          questions?: Json | null
+          user_answers?: Json | null
+          modification_id?: string | null
+          error_message?: string | null
+          current_stage?: string | null
+          created_at?: string
+          updated_at?: string
+          expires_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modify_jobs_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "modify_jobs_modification_id_fkey"
+            columns: ["modification_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_modifications"
             referencedColumns: ["id"]
           },
         ]

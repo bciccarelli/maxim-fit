@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, Image, ActionSheetIOS, Alert } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Send, ChevronDown, Plus, Wand2, Lock, MessageSquare } from 'lucide-react-native';
+import { Send, ChevronDown, Plus, Wand2, Lock, MessageSquare, ImageIcon, X } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useProtocol } from '@/contexts/ProtocolContext';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 import { useSSEStream } from '@/lib/useSSEStream';
@@ -18,6 +19,7 @@ type QuestionAnswer = {
   created_at: string;
   citations?: Citation[];
   conversation_id?: string;
+  image_url?: string;
 };
 
 type Conversation = {
@@ -33,6 +35,7 @@ type AskResult = {
   suggestsModification: boolean;
   citations?: Citation[];
   conversationId?: string;
+  imageUrl?: string;
 };
 
 function formatRelativeDate(dateStr: string): string {
@@ -67,6 +70,14 @@ export default function ChatScreen() {
   const [pendingQuestion, setPendingQuestion] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+
+  // Image state
+  const [selectedImage, setSelectedImage] = useState<{
+    base64: string;
+    mimeType: string;
+    uri: string;
+  } | null>(null);
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
 
   const { streamedText, result, error, isStreaming, stage, startStream, reset } = useSSEStream<AskResult>();
 
@@ -163,7 +174,8 @@ export default function ChatScreen() {
   }, [streamedText, result]);
 
   const handleSend = useCallback(async () => {
-    if (!question.trim() || !selectedVersion || isStreaming) return;
+    const hasContent = question.trim() || selectedImage;
+    if (!hasContent || !selectedVersion || isStreaming) return;
 
     // Check Pro access before sending
     if (!hasAskAccess) {
@@ -171,12 +183,30 @@ export default function ChatScreen() {
       return;
     }
 
-    const currentQuestion = question.trim();
+    const currentQuestion = question.trim() || 'What can you tell me about this image?';
+    const currentImage = selectedImage;
+
     setPendingQuestion(currentQuestion);
+    setPendingImageUri(currentImage?.uri || null);
     setQuestion('');
+    setSelectedImage(null);
     reset();
 
     const headers = await getAuthHeaders();
+
+    const body: Record<string, unknown> = {
+      protocolId: selectedVersion.id,
+      question: currentQuestion,
+      conversationId: activeConversationId,
+    };
+
+    // Add image data if present
+    if (currentImage) {
+      body.image = {
+        base64: currentImage.base64,
+        mimeType: currentImage.mimeType,
+      };
+    }
 
     const finalResult = await startStream(apiUrl('/api/protocol/ask?stream=true'), {
       method: 'POST',
@@ -184,11 +214,7 @@ export default function ChatScreen() {
         ...headers,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        protocolId: selectedVersion.id,
-        question: currentQuestion,
-        conversationId: activeConversationId,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (finalResult) {
@@ -197,7 +223,7 @@ export default function ChatScreen() {
         setActiveConversationId(finalResult.conversationId);
       }
 
-      // Add to history with citations
+      // Add to history with citations and image URL
       setHistory((prev) => [
         ...prev,
         {
@@ -207,9 +233,11 @@ export default function ChatScreen() {
           created_at: new Date().toISOString(),
           citations: finalResult.citations,
           conversation_id: finalResult.conversationId,
+          image_url: finalResult.imageUrl,
         },
       ]);
       setPendingQuestion('');
+      setPendingImageUri(null);
       reset();
 
       // Refresh conversations list to include this new message
@@ -228,8 +256,11 @@ export default function ChatScreen() {
           console.error('Error refreshing conversations:', err);
         }
       }
+    } else {
+      // Clear pending state on error
+      setPendingImageUri(null);
     }
-  }, [question, selectedVersion, selectedChain, isStreaming, hasAskAccess, showUpgradeModal, startStream, reset, activeConversationId]);
+  }, [question, selectedImage, selectedVersion, selectedChain, isStreaming, hasAskAccess, showUpgradeModal, startStream, reset, activeConversationId]);
 
   const handleNewChat = useCallback(() => {
     setSelectedConversation(null);
@@ -256,6 +287,76 @@ export default function ChatScreen() {
   const handleGenerateComplete = useCallback(async (protocolId: string) => {
     await refreshChains();
   }, [refreshChains]);
+
+  const pickImage = useCallback(async (source: 'camera' | 'library') => {
+    const options: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+      base64: true,
+      exif: false,
+    };
+
+    try {
+      let result;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please allow camera access to take photos.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync(options);
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please allow photo library access to select photos.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync(options);
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        if (asset.base64) {
+          setSelectedImage({
+            base64: asset.base64,
+            mimeType: asset.mimeType || 'image/jpeg',
+            uri: asset.uri,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  }, []);
+
+  const showImagePicker = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Library'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) pickImage('camera');
+          if (buttonIndex === 2) pickImage('library');
+        }
+      );
+    } else {
+      // For Android, use a simple alert with buttons
+      Alert.alert(
+        'Add Photo',
+        'Choose an option',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Take Photo', onPress: () => pickImage('camera') },
+          { text: 'Choose from Library', onPress: () => pickImage('library') },
+        ]
+      );
+    }
+  }, [pickImage]);
 
   if (!selectedChain) {
     return (
@@ -387,6 +488,13 @@ export default function ChatScreen() {
             {history.map((qa) => (
               <View key={qa.id} style={styles.qaContainer}>
                 <View style={styles.questionBubble}>
+                  {qa.image_url && (
+                    <Image
+                      source={{ uri: qa.image_url }}
+                      style={styles.questionImage}
+                      resizeMode="cover"
+                    />
+                  )}
                   <Text style={styles.questionText}>{qa.question}</Text>
                 </View>
                 <View style={styles.answerWrapper}>
@@ -411,6 +519,13 @@ export default function ChatScreen() {
             {isStreaming && (
               <View style={styles.qaContainer}>
                 <View style={styles.questionBubble}>
+                  {pendingImageUri && (
+                    <Image
+                      source={{ uri: pendingImageUri }}
+                      style={styles.questionImage}
+                      resizeMode="cover"
+                    />
+                  )}
                   <Text style={styles.questionText}>{pendingQuestion}</Text>
                 </View>
                 <View style={styles.answerWrapper}>
@@ -439,13 +554,36 @@ export default function ChatScreen() {
         )}
       </ScrollView>
 
+      {/* Image Preview */}
+      {selectedImage && (
+        <View style={styles.imagePreviewContainer}>
+          <Image
+            source={{ uri: selectedImage.uri }}
+            style={styles.imagePreview}
+          />
+          <Pressable
+            style={styles.removeImageButton}
+            onPress={() => setSelectedImage(null)}
+          >
+            <X size={14} color="#fff" />
+          </Pressable>
+        </View>
+      )}
+
       {/* Input Area - extra padding for tab bar when keyboard is hidden */}
       <View style={[styles.inputContainer, { paddingBottom: keyboardVisible ? 8 : insets.bottom + 50 }]}>
+        <Pressable
+          style={[styles.photoButton, isStreaming && styles.photoButtonDisabled]}
+          onPress={showImagePicker}
+          disabled={isStreaming}
+        >
+          <ImageIcon size={20} color={isStreaming ? '#ccc' : '#2d5a2d'} />
+        </Pressable>
         <TextInput
           style={styles.input}
           value={question}
           onChangeText={setQuestion}
-          placeholder="Ask a question..."
+          placeholder={selectedImage ? 'Ask about this image...' : 'Ask a question...'}
           placeholderTextColor="#999"
           multiline
           maxLength={500}
@@ -454,11 +592,11 @@ export default function ChatScreen() {
         <Pressable
           style={[
             styles.sendButton,
-            (!question.trim() || isStreaming) && styles.sendButtonDisabled,
+            (!question.trim() && !selectedImage || isStreaming) && styles.sendButtonDisabled,
             !hasAskAccess && !isBypassEnabled && styles.sendButtonLocked,
           ]}
           onPress={handleSend}
-          disabled={!question.trim() || isStreaming}
+          disabled={(!question.trim() && !selectedImage) || isStreaming}
         >
           {isStreaming ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -771,5 +909,44 @@ const styles = StyleSheet.create({
   },
   sendButtonLocked: {
     backgroundColor: '#8B6914',
+  },
+  // Image picker styles
+  photoButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  photoButtonDisabled: {
+    backgroundColor: '#f0f0f0',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginHorizontal: 12,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  imagePreview: {
+    width: 100,
+    height: 75,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f0',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
+    padding: 4,
+  },
+  questionImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 8,
   },
 });

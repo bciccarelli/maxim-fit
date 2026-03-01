@@ -9,15 +9,17 @@ import { mergeCitations } from '@/lib/gemini/citations';
 
 /**
  * Extract and save preference notes from a user's modification message.
+ * Passes existing preferences to avoid extracting duplicates.
  */
 async function saveExtractedNotes(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   protocolId: string,
-  userMessage: string
+  userMessage: string,
+  existingPreferences: string[]
 ) {
   try {
-    const notes = await extractPreferenceNotes(userMessage);
+    const notes = await extractPreferenceNotes(userMessage, existingPreferences);
     if (notes.length === 0) return;
 
     const notesToInsert = notes.map((note) => ({
@@ -75,6 +77,17 @@ export async function POST(request: NextRequest) {
         currentTier: tier,
       }, { status: 402 });
     }
+
+    // Fetch user preferences from user_notes table
+    let userPreferences: string[] = [];
+    const { data: notes } = await supabase
+      .from('user_notes')
+      .select('note')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    userPreferences = notes?.map((n) => n.note) ?? [];
+    console.log(`[modify] Fetched ${userPreferences.length} user preferences`);
 
     const { protocolId, userMessage, sessionId, answers } = await request.json() as {
       protocolId?: string;
@@ -199,7 +212,8 @@ export async function POST(request: NextRequest) {
               modifyConfig,
               effectiveUserMessage!,
               previousResearch,
-              answers
+              answers,
+              userPreferences
             );
 
             let genResult: IteratorResult<
@@ -304,7 +318,7 @@ export async function POST(request: NextRequest) {
               .single();
 
             // Extract and save preference notes (non-blocking)
-            saveExtractedNotes(supabase, user.id, effectiveProtocolId!, effectiveUserMessage!);
+            saveExtractedNotes(supabase, user.id, effectiveProtocolId!, effectiveUserMessage!, userPreferences);
 
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
@@ -341,7 +355,8 @@ export async function POST(request: NextRequest) {
     const { protocol: modifiedProtocol, reasoning, citations: modifyCitations } = await modifyProtocol(
       protocolData,
       modifyConfig,
-      effectiveUserMessage
+      effectiveUserMessage,
+      userPreferences
     );
 
     const { verification, citations: verifyCitations } = await verifyProtocol(modifiedProtocol, modifyConfig);
@@ -375,7 +390,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract and save preference notes (non-blocking)
-    saveExtractedNotes(supabase, user.id, effectiveProtocolId!, effectiveUserMessage);
+    saveExtractedNotes(supabase, user.id, effectiveProtocolId!, effectiveUserMessage, userPreferences);
 
     return NextResponse.json({
       modificationId: modification?.id,

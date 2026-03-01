@@ -3,6 +3,13 @@ import { useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp, X, Wand2 } from 'lucide-react-native';
 import type { Critique } from '@protocol/shared/schemas';
 import { fetchApi } from '@/lib/api';
+import { CritiqueQuestionsSheet } from './CritiqueQuestionsSheet';
+
+interface CritiqueAnswer {
+  critiqueIndex: number;
+  questionId: string;
+  answer: string;
+}
 
 type Props = {
   critiques: Critique[];
@@ -24,6 +31,7 @@ export function CritiquesSection({
   const [dismissing, setDismissing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [displayCritiques, setDisplayCritiques] = useState<Critique[]>(critiques);
+  const [showQuestionsSheet, setShowQuestionsSheet] = useState(false);
 
   const activeCritiques = displayCritiques;
   if (activeCritiques.length === 0) return null;
@@ -59,8 +67,8 @@ export function CritiquesSection({
     }
   };
 
-  const handleApply = async () => {
-    if (selectedCritiques.size === 0) return;
+  // Submit the apply request to the API
+  const submitApply = async (answers: CritiqueAnswer[] = []) => {
     setApplying(true);
     try {
       const data = await fetchApi<{ critiques: Critique[] }>('/api/protocol/critiques', {
@@ -69,10 +77,12 @@ export function CritiquesSection({
           protocolId,
           critiqueIndices: Array.from(selectedCritiques),
           action: 'apply',
+          answers,
         }),
       });
       setDisplayCritiques(data.critiques);
       setSelectedCritiques(new Set());
+      setShowQuestionsSheet(false);
       onCritiquesUpdated?.(data.critiques);
       onProtocolUpdated?.();
     } catch {
@@ -81,6 +91,29 @@ export function CritiquesSection({
       setApplying(false);
     }
   };
+
+  const handleApply = () => {
+    if (selectedCritiques.size === 0) return;
+
+    // Check if any selected critique has questions
+    const selectedWithQuestions = Array.from(selectedCritiques)
+      .map((i) => ({ index: i, critique: activeCritiques[i] }))
+      .filter(({ critique }) => critique.questions && critique.questions.length > 0);
+
+    if (selectedWithQuestions.length > 0) {
+      // Show sheet to collect answers
+      setShowQuestionsSheet(true);
+      return;
+    }
+
+    // No questions - apply directly
+    submitApply([]);
+  };
+
+  // Get critiques with questions for the sheet
+  const critiquesForSheet = Array.from(selectedCritiques)
+    .map((i) => ({ index: i, critique: activeCritiques[i] }))
+    .filter(({ critique }) => critique.questions && critique.questions.length > 0);
 
   const majorCount = activeCritiques.filter((c) => c.severity === 'major').length;
   const moderateCount = activeCritiques.filter((c) => c.severity === 'moderate').length;
@@ -119,107 +152,121 @@ export function CritiquesSection({
   };
 
   return (
-    <View style={[styles.container, !verified && styles.containerUnverified]}>
-      <Pressable style={styles.header} onPress={() => setExpanded(!expanded)}>
-        <View style={styles.headerLeft}>
-          <AlertCircle size={16} color="#f9a825" />
-          <Text style={styles.headerTitle}>
-            {activeCritiques.length} area{activeCritiques.length !== 1 ? 's' : ''} for improvement
-          </Text>
-          {majorCount > 0 && (
-            <View style={[styles.countBadge, styles.countBadgeMajor]}>
-              <Text style={styles.countBadgeMajorText}>{majorCount} major</Text>
-            </View>
+    <>
+      <View style={[styles.container, !verified && styles.containerUnverified]}>
+        <Pressable style={styles.header} onPress={() => setExpanded(!expanded)}>
+          <View style={styles.headerLeft}>
+            <AlertCircle size={16} color="#f9a825" />
+            <Text style={styles.headerTitle}>
+              {activeCritiques.length} area{activeCritiques.length !== 1 ? 's' : ''} for improvement
+            </Text>
+            {majorCount > 0 && (
+              <View style={[styles.countBadge, styles.countBadgeMajor]}>
+                <Text style={styles.countBadgeMajorText}>{majorCount} major</Text>
+              </View>
+            )}
+            {moderateCount > 0 && (
+              <View style={[styles.countBadge, styles.countBadgeModerate]}>
+                <Text style={styles.countBadgeModerateText}>{moderateCount} moderate</Text>
+              </View>
+            )}
+          </View>
+          {expanded ? (
+            <ChevronUp size={16} color="#666" />
+          ) : (
+            <ChevronDown size={16} color="#666" />
           )}
-          {moderateCount > 0 && (
-            <View style={[styles.countBadge, styles.countBadgeModerate]}>
-              <Text style={styles.countBadgeModerateText}>{moderateCount} moderate</Text>
-            </View>
-          )}
-        </View>
-        {expanded ? (
-          <ChevronUp size={16} color="#666" />
-        ) : (
-          <ChevronDown size={16} color="#666" />
-        )}
-      </Pressable>
+        </Pressable>
 
-      {expanded && (
-        <View style={styles.content}>
-          {activeCritiques.map((critique, i) => (
-            <Pressable
-              key={i}
-              style={[
-                styles.critiqueItem,
-                { borderLeftColor: getSeverityBorderColor(critique.severity) },
-                selectedCritiques.has(i) && styles.critiqueItemSelected,
-              ]}
-              onPress={() => toggleCritique(i)}
-            >
-              <View style={styles.critiqueCheckbox}>
-                <View
-                  style={[
-                    styles.checkbox,
-                    selectedCritiques.has(i) && styles.checkboxSelected,
-                  ]}
-                >
-                  {selectedCritiques.has(i) && (
-                    <View style={styles.checkboxInner} />
+        {expanded && (
+          <View style={styles.content}>
+            {activeCritiques.map((critique, i) => (
+              <Pressable
+                key={i}
+                style={[
+                  styles.critiqueItem,
+                  { borderLeftColor: getSeverityBorderColor(critique.severity) },
+                  selectedCritiques.has(i) && styles.critiqueItemSelected,
+                ]}
+                onPress={() => toggleCritique(i)}
+              >
+                <View style={styles.critiqueCheckbox}>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      selectedCritiques.has(i) && styles.checkboxSelected,
+                    ]}
+                  >
+                    {selectedCritiques.has(i) && (
+                      <View style={styles.checkboxInner} />
+                    )}
+                  </View>
+                </View>
+                <View style={styles.critiqueContent}>
+                  <View style={styles.critiqueHeader}>
+                    <View style={[styles.severityBadge, getSeverityBadgeStyle(critique.severity)]}>
+                      <Text style={[styles.severityText, getSeverityTextStyle(critique.severity)]}>
+                        {critique.severity}
+                      </Text>
+                    </View>
+                    <Text style={styles.critiqueCategory}>{critique.category}</Text>
+                  </View>
+                  <Text style={styles.critiqueCriticism}>{critique.criticism}</Text>
+                  <Text style={styles.critiqueSuggestion}>
+                    Suggestion: {critique.suggestion}
+                  </Text>
+                  {critique.questions && critique.questions.length > 0 && (
+                    <Text style={styles.questionsHint}>
+                      {critique.questions.length} question{critique.questions.length > 1 ? 's' : ''} to personalize
+                    </Text>
                   )}
                 </View>
-              </View>
-              <View style={styles.critiqueContent}>
-                <View style={styles.critiqueHeader}>
-                  <View style={[styles.severityBadge, getSeverityBadgeStyle(critique.severity)]}>
-                    <Text style={[styles.severityText, getSeverityTextStyle(critique.severity)]}>
-                      {critique.severity}
-                    </Text>
-                  </View>
-                  <Text style={styles.critiqueCategory}>{critique.category}</Text>
-                </View>
-                <Text style={styles.critiqueCriticism}>{critique.criticism}</Text>
-                <Text style={styles.critiqueSuggestion}>
-                  Suggestion: {critique.suggestion}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
+              </Pressable>
+            ))}
 
-          {selectedCritiques.size > 0 && (
-            <View style={styles.actions}>
-              <Pressable
-                style={[styles.actionButton, styles.dismissButton]}
-                onPress={handleDismiss}
-                disabled={dismissing || applying}
-              >
-                {dismissing ? (
-                  <ActivityIndicator size="small" color="#666" />
-                ) : (
-                  <>
-                    <X size={16} color="#666" />
-                    <Text style={styles.dismissButtonText}>Dismiss</Text>
-                  </>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.actionButton, styles.applyButton]}
-                onPress={handleApply}
-                disabled={dismissing || applying}
-              >
-                {applying ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Wand2 size={16} color="#fff" />
-                    <Text style={styles.applyButtonText}>Apply recommendations</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
-          )}
-        </View>
-      )}
-    </View>
+            {selectedCritiques.size > 0 && (
+              <View style={styles.actions}>
+                <Pressable
+                  style={[styles.actionButton, styles.dismissButton]}
+                  onPress={handleDismiss}
+                  disabled={dismissing || applying}
+                >
+                  {dismissing ? (
+                    <ActivityIndicator size="small" color="#666" />
+                  ) : (
+                    <>
+                      <X size={16} color="#666" />
+                      <Text style={styles.dismissButtonText}>Dismiss</Text>
+                    </>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={handleApply}
+                  disabled={dismissing || applying}
+                >
+                  {applying ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Wand2 size={16} color="#fff" />
+                      <Text style={styles.applyButtonText}>Apply recommendations</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
+      <CritiqueQuestionsSheet
+        visible={showQuestionsSheet}
+        onClose={() => setShowQuestionsSheet(false)}
+        critiques={critiquesForSheet}
+        onSubmit={submitApply}
+      />
+    </>
   );
 }
 
@@ -365,6 +412,11 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     lineHeight: 17,
+  },
+  questionsHint: {
+    fontSize: 11,
+    color: '#2d5a2d',
+    marginTop: 4,
   },
   actions: {
     flexDirection: 'row',

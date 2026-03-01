@@ -3,6 +3,26 @@ import { router } from 'expo-router';
 import { fetchApi } from '@/lib/api';
 import type { NotificationData } from './scheduler';
 
+// Push notification data types for modify_complete
+export type ModifyCompleteNotificationData = {
+  type: 'modify_complete';
+  jobId: string;
+  protocolId: string;
+  success: boolean;
+};
+
+// Union type for all notification data types
+export type AnyNotificationData = NotificationData | ModifyCompleteNotificationData;
+
+function isModifyCompleteNotification(data: unknown): data is ModifyCompleteNotificationData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'type' in data &&
+    (data as { type: string }).type === 'modify_complete'
+  );
+}
+
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -87,7 +107,7 @@ async function snoozeNotification(data: NotificationData, minutes: number): Prom
  */
 export function setupNotificationResponseListener(): Notifications.EventSubscription {
   return Notifications.addNotificationResponseReceivedListener(async (response) => {
-    const data = response.notification.request.content.data as NotificationData;
+    const data = response.notification.request.content.data as AnyNotificationData;
     const actionId = response.actionIdentifier;
 
     if (!data || !data.type) {
@@ -95,16 +115,34 @@ export function setupNotificationResponseListener(): Notifications.EventSubscrip
       return;
     }
 
+    // Handle modify_complete push notifications
+    if (isModifyCompleteNotification(data)) {
+      if (actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+        // User tapped notification - navigate to protocol with modify sheet open
+        router.push({
+          pathname: '/(app)/protocol/[id]',
+          params: {
+            id: data.protocolId,
+            openModifyResult: data.jobId,
+          },
+        });
+      }
+      return;
+    }
+
+    // Handle protocol activity notifications (local)
+    const activityData = data as NotificationData;
+
     if (actionId === 'COMPLETE') {
       // iOS action button: Log completion silently (no app open)
-      await logCompletion(data);
+      await logCompletion(activityData);
     } else if (actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
       // User tapped notification body: Log + navigate to Progress tab
-      await logCompletion(data);
+      await logCompletion(activityData);
       router.push('/(app)/(tabs)/progress');
     } else if (actionId === 'SNOOZE') {
       // Reschedule notification for 15 minutes later
-      await snoozeNotification(data, 15);
+      await snoozeNotification(activityData, 15);
     }
   });
 }

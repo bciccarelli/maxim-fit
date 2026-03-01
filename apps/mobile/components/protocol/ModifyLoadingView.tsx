@@ -1,28 +1,19 @@
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { useEffect, useState, useRef, memo } from 'react';
+import { useEffect } from 'react';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSpring,
   withRepeat,
   withSequence,
   Easing,
-  FadeIn,
-  SlideInRight,
-  interpolate,
 } from 'react-native-reanimated';
-import { Check } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { colors } from '@/lib/theme';
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface ModifyLoadingViewProps {
   statusHistory: string[];
 }
-
-const ITEM_HEIGHT = 52;
 
 // Pulsing rings header showing AI activity
 function ProcessingHeader() {
@@ -122,29 +113,6 @@ function ProcessingHeader() {
   );
 }
 
-// Animated vertical connector line
-function TimelineConnector({ itemCount }: { itemCount: number }) {
-  const lineHeight = useSharedValue(0);
-
-  useEffect(() => {
-    if (itemCount > 0) {
-      const targetHeight = (itemCount - 1) * ITEM_HEIGHT + ITEM_HEIGHT / 2;
-      lineHeight.value = withSpring(targetHeight, {
-        damping: 20,
-        stiffness: 90,
-      });
-    }
-  }, [itemCount]);
-
-  const lineStyle = useAnimatedStyle(() => ({
-    height: lineHeight.value,
-  }));
-
-  if (itemCount <= 1) return null;
-
-  return <Animated.View style={[styles.connectorLine, lineStyle]} />;
-}
-
 // Custom SVG spinner with rotating arc
 function SpinnerIndicator() {
   const rotation = useSharedValue(0);
@@ -191,184 +159,29 @@ function SpinnerIndicator() {
   );
 }
 
-// Checkmark with bounce animation
-function CheckmarkIndicator() {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
-
-  useEffect(() => {
-    opacity.value = withTiming(1, { duration: 150 });
-    scale.value = withSpring(1, {
-      damping: 8,
-      stiffness: 200,
-      overshootClamping: false,
-    });
-  }, []);
-
-  const checkStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View style={[styles.checkContainer, checkStyle]}>
-      <Check size={16} color={colors.primary} strokeWidth={3} />
-    </Animated.View>
-  );
-}
-
-// Typewriter text with blinking cursor
-const TypewriterText = memo(function TypewriterText({
-  text,
-  isActive
-}: {
-  text: string;
-  isActive: boolean;
-}) {
-  const [displayedText, setDisplayedText] = useState(isActive ? '' : text);
-  const cursorOpacity = useSharedValue(1);
-  const indexRef = useRef(0);
-
-  useEffect(() => {
-    if (!isActive) {
-      setDisplayedText(text);
-      return;
-    }
-
-    indexRef.current = 0;
-    setDisplayedText('');
-
-    const interval = setInterval(() => {
-      indexRef.current++;
-      if (indexRef.current <= text.length) {
-        setDisplayedText(text.slice(0, indexRef.current));
-      } else {
-        clearInterval(interval);
-      }
-    }, 25);
-
-    return () => clearInterval(interval);
-  }, [text, isActive]);
-
-  useEffect(() => {
-    if (isActive) {
-      cursorOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0, { duration: 400, easing: Easing.linear }),
-          withTiming(1, { duration: 400, easing: Easing.linear })
-        ),
-        -1,
-        false
-      );
-    } else {
-      cursorOpacity.value = 0;
-    }
-  }, [isActive]);
-
-  const cursorStyle = useAnimatedStyle(() => ({
-    opacity: cursorOpacity.value,
-  }));
-
-  return (
-    <View style={styles.textContainer}>
-      <Text
-        style={[
-          styles.statusText,
-          isActive && styles.statusTextActive
-        ]}
-        numberOfLines={1}
-      >
-        {displayedText}
-      </Text>
-      {isActive && <Animated.View style={[styles.cursor, cursorStyle]} />}
-    </View>
-  );
-});
-
-// Individual status item with entrance animation
-const StatusItem = memo(function StatusItem({
-  status,
-  isActive,
-  isComplete,
-  index,
-}: {
-  status: string;
-  isActive: boolean;
-  isComplete: boolean;
-  index: number;
-}) {
-  // Clean up status text (remove trailing "...")
-  const cleanStatus = status.replace(/\.{3}$/, '');
-
-  return (
-    <Animated.View
-      style={styles.statusItem}
-      entering={SlideInRight.duration(250).delay(index === 0 ? 0 : 50).easing(Easing.out(Easing.cubic))}
-    >
-      <View style={styles.indicatorContainer}>
-        {isActive && <SpinnerIndicator />}
-        {isComplete && <CheckmarkIndicator />}
-      </View>
-      <TypewriterText text={cleanStatus} isActive={isActive} />
-    </Animated.View>
-  );
-});
-
-// Collapsed view showing summary with current step
-function CollapsedView({ currentStep }: { currentStep: string }) {
+// Current step view
+function CurrentStepView({ currentStep }: { currentStep: string }) {
   const cleanStep = currentStep.replace(/\.{3}$/, '');
 
   return (
-    <View style={styles.collapsedContainer}>
-      <View style={styles.collapsedRow}>
+    <View style={styles.currentStepContainer}>
+      <View style={styles.currentStepRow}>
         <SpinnerIndicator />
-        <Text style={styles.collapsedTitle}>Making changes...</Text>
+        <Text style={styles.currentStepTitle}>Making changes...</Text>
       </View>
-      <Text style={styles.collapsedSubtitle}>{cleanStep}</Text>
+      <Text style={styles.currentStepSubtitle}>{cleanStep}</Text>
     </View>
   );
 }
 
 export function ModifyLoadingView({ statusHistory }: ModifyLoadingViewProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const hasCollapsedRef = useRef(false);
-
-  // Auto-collapse after 2+ items
-  useEffect(() => {
-    if (statusHistory.length >= 2 && !hasCollapsedRef.current) {
-      hasCollapsedRef.current = true;
-      // Small delay to let the second item animate in
-      const timer = setTimeout(() => {
-        setIsCollapsed(true);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [statusHistory.length]);
-
   const currentStep = statusHistory[statusHistory.length - 1] || 'Researching...';
 
   return (
     <View style={styles.container}>
       <ProcessingHeader />
-
       <View style={styles.divider} />
-
-      {isCollapsed ? (
-        <CollapsedView currentStep={currentStep} />
-      ) : (
-        <View style={styles.timeline}>
-          <TimelineConnector itemCount={statusHistory.length} />
-          {statusHistory.map((status, index) => (
-            <StatusItem
-              key={`${status}-${index}`}
-              status={status}
-              isActive={index === statusHistory.length - 1}
-              isComplete={index < statusHistory.length - 1}
-              index={index}
-            />
-          ))}
-        </View>
-      )}
+      <CurrentStepView currentStep={currentStep} />
     </View>
   );
 }
@@ -436,87 +249,28 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // Timeline
-  timeline: {
-    paddingHorizontal: 20,
-    position: 'relative',
-  },
-  connectorLine: {
-    position: 'absolute',
-    left: 30,
-    top: ITEM_HEIGHT / 2,
-    width: 2,
-    backgroundColor: colors.primary,
-    opacity: 0.25,
-    borderRadius: 1,
-  },
-
-  // Status Item
-  statusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: ITEM_HEIGHT,
-    gap: 14,
-  },
-  indicatorContainer: {
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
+  // Spinner
   spinnerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkContainer: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
-  // Typewriter Text
-  textContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    color: colors.textSecondary,
-  },
-  statusTextActive: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  cursor: {
-    width: 2,
-    height: 16,
-    backgroundColor: colors.primary,
-    marginLeft: 2,
-    borderRadius: 1,
-  },
-
-  // Collapsed View
-  collapsedContainer: {
+  // Current Step View
+  currentStepContainer: {
     paddingHorizontal: 20,
     alignItems: 'center',
   },
-  collapsedRow: {
+  currentStepRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  collapsedTitle: {
+  currentStepTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.primary,
   },
-  collapsedSubtitle: {
+  currentStepSubtitle: {
     fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     color: colors.textMuted,

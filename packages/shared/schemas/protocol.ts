@@ -257,11 +257,30 @@ export const goalEvaluationSchema = z.object({
 
 export type GoalEvaluation = z.infer<typeof goalEvaluationSchema>;
 
+// Note: critiqueQuestionSchema mirrors clarifyingQuestionSchema but is defined
+// separately here to avoid circular dependency issues (critiques defined before
+// clarifying questions in this file).
+export const critiqueQuestionOptionSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+});
+
+export const critiqueQuestionSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  context: z.string().optional().nullable(),  // Why this question matters
+  options: z.array(critiqueQuestionOptionSchema).optional().nullable(),
+  inputType: z.enum(['text', 'select']).default('text'),
+});
+
+export type CritiqueQuestion = z.infer<typeof critiqueQuestionSchema>;
+
 export const critiqueSchema = z.object({
   category: z.string(),
   criticism: z.string(),
   severity: z.enum(['minor', 'moderate', 'major']),
   suggestion: z.string(),
+  questions: z.array(critiqueQuestionSchema).optional().nullable(),
 });
 
 export type Critique = z.infer<typeof critiqueSchema>;
@@ -355,6 +374,13 @@ export type VerificationResult = {
     criticism: string;
     severity: 'minor' | 'moderate' | 'major';
     suggestion: string;
+    questions?: Array<{
+      id: string;
+      question: string;
+      context?: string | null;
+      options?: Array<{ value: string; label: string }> | null;
+      inputType: 'text' | 'select';
+    }> | null;
   }>;
   requirements_met: boolean;
   weighted_goal_score: number;
