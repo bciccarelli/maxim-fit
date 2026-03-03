@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, LogIn, LogOut, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -42,6 +42,10 @@ export function AuthButton() {
   if (user) {
     return (
       <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard')}>
+          <LayoutDashboard className="h-4 w-4 mr-2" />
+          Dashboard
+        </Button>
         <Button variant="ghost" size="sm" onClick={() => router.push('/settings')}>
           <User className="h-4 w-4 mr-2" />
           Settings
