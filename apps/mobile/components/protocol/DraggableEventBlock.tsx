@@ -1,10 +1,9 @@
-import React, { useCallback, useState, useEffect, type ReactNode } from 'react';
+import React, { useCallback, useState, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
   runOnJS,
   cancelAnimation,
 } from 'react-native-reanimated';
@@ -87,6 +86,11 @@ export function DraggableEventBlock({
   const endMin = toMinutes(event.end_time);
   const durationMin = endMin - startMin;
 
+  // Extract positioning from style prop (needed for shared values below)
+  const flatStyle = StyleSheet.flatten(style) as ViewStyle & { top?: number; left?: number; width?: number; height?: number };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { top: styleTop, left, width, height: styleHeight, position, ...innerStyle } = flatStyle;
+
   // Track if long-press activated drag mode (React state for conditional rendering)
   const [isDragActive, setIsDragActive] = useState(false);
   const [currentDragMode, setCurrentDragMode] = useState<DragMode>('none');
@@ -100,25 +104,39 @@ export function DraggableEventBlock({
   const offsetY = useSharedValue(0);
   const blockHeight = useSharedValue(0);
   const originalHeight = useSharedValue(0); // Captured at drag start to avoid feedback loop
+  const baseTop = useSharedValue(styleTop ?? 0);
+  const baseHeight = useSharedValue(styleHeight ?? 0);
+
+  // Shared values for worklet-accessible time data (needed for visual snapping)
+  const startMinShared = useSharedValue(startMin);
+  const endMinShared = useSharedValue(endMin);
 
   // React state for display times (separate values for reliable updates)
   const [displayStartTime, setDisplayStartTime] = useState(event.start_time);
   const [displayEndTime, setDisplayEndTime] = useState(event.end_time);
 
-  // Reset state when event times change (e.g., after undo)
-  useEffect(() => {
+  // Reset state when event times change (e.g., after undo or commit).
+  // useLayoutEffect ensures offsetY resets in the SAME frame as the new CSS top,
+  // preventing a visible snap-back or double-offset between frames.
+  useLayoutEffect(() => {
     // Cancel any ongoing animations before resetting
     cancelAnimation(offsetY);
 
-    // Reset all drag-related state to match the new event props
+    // Reset all drag-related state to match the new event props.
+    // Setting baseTop, baseHeight, and offsetY in the same synchronous JS execution
+    // ensures Reanimated batches them into a single UI thread update — no double-offset.
     offsetY.value = 0;
     isDragging.value = false;
     dragMode.value = 'none';
+    baseTop.value = styleTop ?? 0;
+    baseHeight.value = styleHeight ?? 0;
+    startMinShared.value = toMinutes(event.start_time);
+    endMinShared.value = toMinutes(event.end_time);
     setIsDragActive(false);
     setCurrentDragMode('none');
     setDisplayStartTime(event.start_time);
     setDisplayEndTime(event.end_time);
-  }, [event.start_time, event.end_time]);
+  }, [event.start_time, event.end_time, styleTop, styleHeight]);
 
   // Calculate new times based on drag offset (non-worklet version for JS thread)
   const calculateNewTimes = (
@@ -170,6 +188,10 @@ export function DraggableEventBlock({
     return { newStartMin, newEndMin };
   };
 
+  // Keep ref to always-current calculateNewTimes (avoids stale closures)
+  const calculateNewTimesRef = useRef(calculateNewTimes);
+  calculateNewTimesRef.current = calculateNewTimes;
+
   // JS callbacks for gesture handlers
   const activateDrag = useCallback((mode: DragMode) => {
     setCurrentDragMode(mode);
@@ -179,16 +201,31 @@ export function DraggableEventBlock({
   }, [event.start_time, event.end_time]);
 
   const updatePreview = useCallback((translationY: number, mode: DragMode) => {
-    const { newStartMin, newEndMin } = calculateNewTimes(mode, translationY);
+    const { newStartMin, newEndMin } = calculateNewTimesRef.current(mode, translationY);
     setDisplayStartTime(fromMinutes(newStartMin));
     setDisplayEndTime(fromMinutes(newEndMin));
   }, []);
 
-  const commitDrag = useCallback((finalOffsetY: number, mode: DragMode) => {
-    const { newStartMin, newEndMin } = calculateNewTimes(mode, finalOffsetY);
+  const resetDragState = useCallback(() => {
+    cancelAnimation(offsetY);
+    offsetY.value = 0;
+    isDragging.value = false;
+    dragMode.value = 'none';
+    setIsDragActive(false);
+    setCurrentDragMode('none');
+  }, []);
 
-    // Only update if times actually changed
+  const commitDrag = useCallback((finalOffsetY: number, mode: DragMode) => {
+    const { newStartMin, newEndMin } = calculateNewTimesRef.current(mode, finalOffsetY);
+
     if (newStartMin !== startMin || newEndMin !== endMin) {
+      // Don't reset offsetY here — the animated style keeps the block in place
+      // via the offsetY !== 0 gate. The useLayoutEffect (triggered by the event
+      // time change from onTimeChange) will reset offsetY in the same frame as
+      // the new CSS top is applied, preventing any visible jump.
+      setIsDragActive(false);
+      setCurrentDragMode('none');
+
       const newStartTime = fromMinutes(newStartMin);
       const newEndTime = fromMinutes(newEndMin);
       if (canResize(event.source)) {
@@ -196,18 +233,22 @@ export function DraggableEventBlock({
       } else {
         onTimeChange(newStartTime);
       }
+    } else {
+      // No time change — clean up manually since useLayoutEffect won't fire
+      resetDragState();
     }
-
-    // Reset state
-    setIsDragActive(false);
-    setCurrentDragMode('none');
-  }, [startMin, endMin, event.source, onTimeChange]);
+  }, [startMin, endMin, event.source, onTimeChange, resetDragState]);
 
   // Pan gesture with long-press activation
   const panGesture = Gesture.Pan()
     .activateAfterLongPress(300)
     .enabled(editable)
     .onBegin((e) => {
+      // Guard against starting a new drag while a previous commit is pending
+      // (isDragging is false after onEnd, but offsetY may still be non-zero
+      // until commitDrag runs on JS thread and resets it)
+      if (isDragging.value || offsetY.value !== 0) return;
+
       // Capture original height at drag start to avoid feedback loop from onLayout
       originalHeight.value = blockHeight.value;
 
@@ -224,23 +265,27 @@ export function DraggableEventBlock({
       offsetY.value = e.translationY;
       runOnJS(updatePreview)(e.translationY, dragMode.value);
     })
-    .onEnd((e) => {
+    .onEnd(() => {
+      // Capture final values before any resets
       const finalOffset = offsetY.value;
       const mode = dragMode.value;
 
+      // Set isDragging = false so onFinalize (which fires next) is a no-op.
+      // Keep offsetY and dragMode intact — the animated style uses them
+      // (gated on offsetY !== 0, not isDragging) to hold the block in place
+      // until commitDrag resets offsetY and triggers the state update together.
       isDragging.value = false;
-      dragMode.value = 'none';
-      offsetY.value = withTiming(0, { duration: 150 });
 
       runOnJS(commitDrag)(finalOffset, mode);
     })
     .onFinalize(() => {
-      // Reset if gesture is cancelled
+      // Only fires for cancelled gestures — onEnd already set isDragging = false
       if (isDragging.value) {
         isDragging.value = false;
         dragMode.value = 'none';
-        offsetY.value = withTiming(0, { duration: 150 });
+        offsetY.value = 0;
         runOnJS(setIsDragActive)(false);
+        runOnJS(setCurrentDragMode)('none');
       }
     });
 
@@ -251,39 +296,53 @@ export function DraggableEventBlock({
       runOnJS(onPress)();
     });
 
-  // Animated style for the block
+  // Animated style for the block — uses snapped offsets so visual position matches displayed times.
+  // Gated on offsetY !== 0 (not isDragging) so the block holds its position after onEnd
+  // sets isDragging=false but before commitDrag resets offsetY and triggers the state update.
+  // Animated style outputs `top` and `height` directly from shared values.
+  // This eliminates the double-offset bug: both base position and drag offset
+  // live in Reanimated shared values, so they update atomically on the UI thread.
   const animatedBlockStyle = useAnimatedStyle(() => {
-    if (!isDragging.value) {
-      return {};
+    const active = isDragging.value;
+
+    // No offset — use base position from shared values
+    if (offsetY.value === 0) {
+      return {
+        top: baseTop.value,
+        height: baseHeight.value,
+        ...(active ? { zIndex: 100 } : {}),
+      };
     }
 
-    if (dragMode.value === 'move') {
-      return {
-        transform: [{ translateY: offsetY.value }],
-        zIndex: 100,
-      };
+    const minHeight = MIN_DURATION * (HOUR_HEIGHT / 60);
+    const zIndex = active ? 100 : 1;
+    const deltaMin = (offsetY.value / HOUR_HEIGHT) * 60;
+
+    if (dragMode.value === 'move' || dragMode.value === 'none') {
+      const snappedY = (snapToGrid(deltaMin) / 60) * HOUR_HEIGHT;
+      return { top: baseTop.value + snappedY, height: baseHeight.value, zIndex };
     }
 
     if (dragMode.value === 'resize-top') {
-      // Move top edge: translateY moves the block, height shrinks by same amount
-      const newHeight = Math.max(MIN_DURATION * (HOUR_HEIGHT / 60), originalHeight.value - offsetY.value);
-      return {
-        transform: [{ translateY: offsetY.value }],
-        height: newHeight,
-        zIndex: 100,
-      };
+      const snappedNewStart = snapToGrid(startMinShared.value + deltaMin);
+      const clampedStart = Math.max(
+        Math.min(snappedNewStart, endMinShared.value - MIN_DURATION),
+        0
+      );
+      const snappedTopDelta = ((clampedStart - startMinShared.value) / 60) * HOUR_HEIGHT;
+      const newHeight = Math.max(minHeight, originalHeight.value - snappedTopDelta);
+      return { top: baseTop.value + snappedTopDelta, height: newHeight, zIndex };
     }
 
     if (dragMode.value === 'resize-bottom') {
-      // Move bottom edge: just change height
-      const newHeight = Math.max(MIN_DURATION * (HOUR_HEIGHT / 60), originalHeight.value + offsetY.value);
-      return {
-        height: newHeight,
-        zIndex: 100,
-      };
+      const snappedNewEnd = snapToGrid(endMinShared.value + deltaMin);
+      const clampedEnd = Math.max(snappedNewEnd, startMinShared.value + MIN_DURATION);
+      const snappedHeightDelta = ((clampedEnd - endMinShared.value) / 60) * HOUR_HEIGHT;
+      const newHeight = Math.max(minHeight, originalHeight.value + snappedHeightDelta);
+      return { top: baseTop.value, height: newHeight, zIndex };
     }
 
-    return { zIndex: 100 };
+    return { top: baseTop.value, height: baseHeight.value, zIndex };
   });
 
   // Animated style for selection highlight
@@ -301,11 +360,6 @@ export function DraggableEventBlock({
     opacity: isDragging.value && isResizable ? 0.8 : 0,
   }));
 
-  // Flatten style array and extract positioning for the outer Pressable
-  const flatStyle = StyleSheet.flatten(style) as ViewStyle & { top?: number; left?: number; width?: number; height?: number };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { top, left, width, height, position, ...innerStyle } = flatStyle;
-
   // Compose gestures: pan (with long-press) takes priority over tap
   const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
 
@@ -317,7 +371,7 @@ export function DraggableEventBlock({
     <GestureDetector gesture={composedGesture}>
       <Animated.View
         style={[
-          { position: 'absolute', top, left, width, height },
+          { position: 'absolute', left, width },
           innerStyle,
           animatedBlockStyle,
           animatedHighlightStyle,

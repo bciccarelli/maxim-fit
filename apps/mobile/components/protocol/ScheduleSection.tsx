@@ -597,7 +597,7 @@ export function ScheduleSection({
 
                     return (
                       <DraggableEventBlock
-                        key={index}
+                        key={`${event.source}-${event.sourceIndex}`}
                         event={event}
                         index={index}
                         rangeStartMin={rangeStartMin}

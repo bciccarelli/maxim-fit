@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import {
   researchModification,
   analyzeForQuestions,
@@ -11,6 +12,14 @@ import { normalizeProtocol, type DailyProtocol, type Citation, type QuestionAnsw
 import { userConfigSchema } from '@/lib/schemas/user-config';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
 import { mergeCitations } from '@/lib/gemini/citations';
+
+// Service role client for internal server-to-server calls (bypasses RLS)
+function createServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 type JobStatus = 'pending' | 'researching' | 'research_complete' | 'awaiting_answers' | 'applying' | 'completed' | 'failed';
 
@@ -84,7 +93,7 @@ export async function POST(request: NextRequest) {
   const baseUrl = request.nextUrl.origin;
 
   try {
-    const supabase = await createClient();
+    let supabase = await createClient();
     const body = await request.json() as { jobId?: string; internal?: boolean };
     const { jobId, internal } = body;
 
@@ -92,12 +101,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
     }
 
-    // For internal calls, we skip auth check since the job was already validated
-    // For external calls, we verify ownership
+    // For internal calls, use service role client to bypass RLS
+    // For external calls, use user-scoped client and verify ownership
     let userId: string;
 
     if (internal) {
-      // Internal call - trust the job ID and get user from job
+      // Internal call - use service role client (bypasses RLS)
+      supabase = createServiceClient();
       const { data: job } = await supabase
         .from('modify_jobs')
         .select('user_id')

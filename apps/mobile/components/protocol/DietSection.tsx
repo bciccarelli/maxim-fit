@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, Pressable, Modal, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Keyboard, KeyboardAvoidingView, Platform, InputAccessoryView } from 'react-native';
 import { useState, useCallback, useMemo } from 'react';
 import { Plus, Trash2, X, Utensils } from 'lucide-react-native';
 import type { DietPlan, Meal } from '@protocol/shared/schemas';
 import { EditableField } from './EditableField';
+import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
 
 type Props = {
   diet: DietPlan;
@@ -381,6 +382,20 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
             )}
           </Pressable>
         </Pressable>
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID={KEYBOARD_ACCESSORY_ID}>
+          <View style={styles.accessoryContainer}>
+            <View style={{ flex: 1 }} />
+            <Pressable
+              onPress={() => Keyboard.dismiss()}
+              style={styles.accessoryDoneButton}
+              hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+            >
+              <Text style={styles.accessoryDoneText}>Done</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      )}
       </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -658,5 +673,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#c62828',
+  },
+  accessoryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#d1d1d1',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accessoryDoneButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  accessoryDoneText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2d5a2d',
   },
 });
