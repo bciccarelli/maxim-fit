@@ -3,3 +3,6 @@ export * from './protocol';
 
 // Re-export all user config schemas and types
 export * from './user-config';
+
+// Re-export operation schemas and types
+export * from './operations';

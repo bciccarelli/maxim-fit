@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { generateElementId, ELEMENT_PREFIXES } from '../utils/ids';
 
 // =============================================================================
 // Schedule Schemas
@@ -16,6 +17,7 @@ export type TimeBlock = z.infer<typeof timeBlockSchema>;
 
 // OtherEvent - events that don't fit in diet, supplements, or training
 export const otherEventSchema = z.object({
+  id: z.string().optional(),
   start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
   end_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
   activity: z.string(),
@@ -32,6 +34,7 @@ export const routineSubEventTypeSchema = z.enum(['activity', 'supplement', 'meal
 export type RoutineSubEventType = z.infer<typeof routineSubEventTypeSchema>;
 
 export const routineSubEventSchema = z.object({
+  id: z.string().optional(),
   type: routineSubEventTypeSchema,
   order: z.number().int().min(0),
   duration_min: z.number().int().min(1),
@@ -47,6 +50,7 @@ export const routineSubEventSchema = z.object({
 export type RoutineSubEvent = z.infer<typeof routineSubEventSchema>;
 
 export const routineEventSchema = z.object({
+  id: z.string().optional(),
   name: z.string(),
   start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
   sub_events: z.array(routineSubEventSchema).min(1),
@@ -71,6 +75,7 @@ export const WEEKENDS: DayOfWeek[] = ['saturday', 'sunday'];
 
 // Schedule variant with day assignments - uses other_events for non-meal/supplement/workout activities
 export const scheduleVariantSchema = z.object({
+  id: z.string().optional(),
   label: z.string().optional(),
   days: z.array(dayOfWeekSchema).min(1),
   wake_time: z.string(),
@@ -104,6 +109,7 @@ export const legacyScheduleVariantSchema = z.object({
 // =============================================================================
 
 export const mealSchema = z.object({
+  id: z.string().optional(),
   name: z.string(),
   time: z.string(),
   foods: z.array(z.string()),
@@ -140,6 +146,7 @@ export type DietPlan = z.infer<typeof dietPlanSchema>;
 // =============================================================================
 
 export const supplementSchema = z.object({
+  id: z.string().optional(),
   name: z.string(),
   dosage_amount: z.string(),
   dosage_unit: z.string(),
@@ -164,6 +171,7 @@ export type SupplementationPlan = z.infer<typeof supplementationPlanSchema>;
 // =============================================================================
 
 export const exerciseSchema = z.object({
+  id: z.string().optional(),
   name: z.string(),
   sets: z.number().int().positive().optional().nullable(),
   reps: z.string().optional().nullable(),
@@ -175,6 +183,7 @@ export const exerciseSchema = z.object({
 export type Exercise = z.infer<typeof exerciseSchema>;
 
 export const workoutSchema = z.object({
+  id: z.string().optional(),
   name: z.string(),
   day: z.string(),
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Must be HH:MM format'),
@@ -810,7 +819,77 @@ export function normalizeProtocol(data: unknown): DailyProtocol {
     throw new Error('Invalid protocol format: missing schedule or schedules');
   }
 
+  // Assign IDs to all elements that don't have them
+  assignElementIds(converted);
+
   return dailyProtocolSchema.parse(converted);
+}
+
+/**
+ * Walk all element arrays in the protocol and assign IDs where missing.
+ * Existing IDs are preserved. Only elements without an `id` field get one.
+ */
+function assignElementIds(protocol: Record<string, unknown>): void {
+  const ensureId = (element: Record<string, unknown>, prefix: string) => {
+    if (!element.id) {
+      element.id = generateElementId(prefix);
+    }
+  };
+
+  // Schedules + nested events
+  if (Array.isArray(protocol.schedules)) {
+    for (const schedule of protocol.schedules as Array<Record<string, unknown>>) {
+      ensureId(schedule, ELEMENT_PREFIXES.schedule);
+
+      if (Array.isArray(schedule.other_events)) {
+        for (const event of schedule.other_events as Array<Record<string, unknown>>) {
+          ensureId(event, ELEMENT_PREFIXES.other_event);
+        }
+      }
+
+      if (Array.isArray(schedule.routine_events)) {
+        for (const routine of schedule.routine_events as Array<Record<string, unknown>>) {
+          ensureId(routine, ELEMENT_PREFIXES.routine_event);
+
+          if (Array.isArray(routine.sub_events)) {
+            for (const sub of routine.sub_events as Array<Record<string, unknown>>) {
+              ensureId(sub, ELEMENT_PREFIXES.routine_sub_event);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Meals
+  const diet = protocol.diet as Record<string, unknown> | undefined;
+  if (diet && Array.isArray(diet.meals)) {
+    for (const meal of diet.meals as Array<Record<string, unknown>>) {
+      ensureId(meal, ELEMENT_PREFIXES.meal);
+    }
+  }
+
+  // Supplements
+  const supplementation = protocol.supplementation as Record<string, unknown> | undefined;
+  if (supplementation && Array.isArray(supplementation.supplements)) {
+    for (const supplement of supplementation.supplements as Array<Record<string, unknown>>) {
+      ensureId(supplement, ELEMENT_PREFIXES.supplement);
+    }
+  }
+
+  // Workouts + exercises
+  const training = protocol.training as Record<string, unknown> | undefined;
+  if (training && Array.isArray(training.workouts)) {
+    for (const workout of training.workouts as Array<Record<string, unknown>>) {
+      ensureId(workout, ELEMENT_PREFIXES.workout);
+
+      if (Array.isArray(workout.exercises)) {
+        for (const exercise of workout.exercises as Array<Record<string, unknown>>) {
+          ensureId(exercise, ELEMENT_PREFIXES.exercise);
+        }
+      }
+    }
+  }
 }
 
 /**

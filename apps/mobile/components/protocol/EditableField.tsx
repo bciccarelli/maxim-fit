@@ -53,18 +53,17 @@ export function EditableField({
     }
   };
 
+  const handleTextChange = (text: string) => {
+    setDraft(text);
+    onChange(text);
+  };
+
   const handleBlur = () => {
     setEditing(false);
-    if (draft !== value) {
-      onChange(draft);
-    }
   };
 
   const handleSubmit = () => {
     setEditing(false);
-    if (draft !== value) {
-      onChange(draft);
-    }
   };
 
   const getKeyboardType = (): KeyboardTypeOptions => {
@@ -99,7 +98,7 @@ export function EditableField({
       <TextInput
         ref={inputRef}
         value={draft}
-        onChangeText={setDraft}
+        onChangeText={handleTextChange}
         onBlur={handleBlur}
         onSubmitEditing={handleSubmit}
         keyboardType={getKeyboardType()}

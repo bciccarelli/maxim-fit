@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock, Layers } from 'lucide-react-native';
-import type { DailyProtocol, ScheduleVariant, OtherEvent, DayOfWeek } from '@protocol/shared/schemas';
+import type { DailyProtocol, ScheduleVariant, OtherEvent, RoutineEvent, RoutineSubEvent, DayOfWeek } from '@protocol/shared/schemas';
 import {
   computeScheduleEvents,
   getVariantIndexForDay,
@@ -435,6 +435,96 @@ export function ScheduleSection({
     }
   }, [protocol, variantIndex, updateProtocol]);
 
+  // ── Routine editing handlers ──
+
+  const handleUpdateRoutineName = useCallback(
+    (routineIndex: number, name: string) => {
+      const newSchedules = [...protocol.schedules];
+      const variant = newSchedules[variantIndex];
+      if (!variant) return;
+      const routineEvents = [...(variant.routine_events ?? [])];
+      if (routineEvents[routineIndex]) {
+        routineEvents[routineIndex] = { ...routineEvents[routineIndex], name };
+      }
+      newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+      updateProtocol({ ...protocol, schedules: newSchedules });
+    },
+    [protocol, variantIndex, updateProtocol]
+  );
+
+  const handleUpdateSubEvent = useCallback(
+    (routineIndex: number, subEventIndex: number, updates: Partial<RoutineSubEvent>) => {
+      const newSchedules = [...protocol.schedules];
+      const variant = newSchedules[variantIndex];
+      if (!variant) return;
+      const routineEvents = [...(variant.routine_events ?? [])];
+      const routine = routineEvents[routineIndex];
+      if (!routine) return;
+      const newSubEvents = [...routine.sub_events];
+      if (newSubEvents[subEventIndex]) {
+        newSubEvents[subEventIndex] = { ...newSubEvents[subEventIndex], ...updates };
+      }
+      routineEvents[routineIndex] = { ...routine, sub_events: newSubEvents };
+      newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+      updateProtocol({ ...protocol, schedules: newSchedules });
+    },
+    [protocol, variantIndex, updateProtocol]
+  );
+
+  const handleDeleteSubEvent = useCallback(
+    (routineIndex: number, subEventIndex: number) => {
+      const newSchedules = [...protocol.schedules];
+      const variant = newSchedules[variantIndex];
+      if (!variant) return;
+      const routineEvents = [...(variant.routine_events ?? [])];
+      const routine = routineEvents[routineIndex];
+      if (!routine) return;
+      const newSubEvents = routine.sub_events
+        .filter((_, i) => i !== subEventIndex)
+        .map((se, i) => ({ ...se, order: i }));
+      // Don't allow deleting the last sub-event — delete the routine instead
+      if (newSubEvents.length === 0) return;
+      routineEvents[routineIndex] = { ...routine, sub_events: newSubEvents };
+      newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+      updateProtocol({ ...protocol, schedules: newSchedules });
+    },
+    [protocol, variantIndex, updateProtocol]
+  );
+
+  const handleAddSubEvent = useCallback(
+    (routineIndex: number) => {
+      const newSchedules = [...protocol.schedules];
+      const variant = newSchedules[variantIndex];
+      if (!variant) return;
+      const routineEvents = [...(variant.routine_events ?? [])];
+      const routine = routineEvents[routineIndex];
+      if (!routine) return;
+      const newOrder = routine.sub_events.length;
+      const newSubEvent: RoutineSubEvent = {
+        type: 'activity',
+        order: newOrder,
+        duration_min: 5,
+        activity: 'New activity',
+      };
+      routineEvents[routineIndex] = {
+        ...routine,
+        sub_events: [...routine.sub_events, newSubEvent],
+      };
+      newSchedules[variantIndex] = { ...variant, routine_events: routineEvents };
+      updateProtocol({ ...protocol, schedules: newSchedules });
+    },
+    [protocol, variantIndex, updateProtocol]
+  );
+
+  // Get the raw routine data for editing (viewingRoutine is a computed ScheduleEvent)
+  const editingRoutineData = useMemo(() => {
+    if (!viewingRoutine) return null;
+    const variant = protocol.schedules[variantIndex];
+    if (!variant) return null;
+    const routines = variant.routine_events ?? [];
+    return routines[viewingRoutine.sourceIndex] ?? null;
+  }, [viewingRoutine, protocol.schedules, variantIndex]);
+
   if (!selectedVariant) return null;
 
   return (
@@ -808,51 +898,155 @@ export function ScheduleSection({
         animationType="fade"
         onRequestClose={() => setViewingRoutine(null)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setViewingRoutine(null)}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <Pressable style={styles.routineModalContent} onPress={(e) => e.stopPropagation()}>
-            {viewingRoutine && (
-              <>
-                <View style={styles.modalHeader}>
-                  <View style={styles.modalHeaderLeft}>
-                    <Layers size={16} color="#2d5a2d" />
-                    <Text style={styles.modalTitle}>
-                      {viewingRoutine.activity}
-                    </Text>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              Keyboard.dismiss();
+              setViewingRoutine(null);
+            }}
+          >
+            <Pressable style={styles.routineModalContent} onPress={(e) => e.stopPropagation()}>
+              {viewingRoutine && editingRoutineData && (
+                <>
+                  <View style={styles.modalHeader}>
+                    <View style={styles.modalHeaderLeft}>
+                      <Layers size={16} color="#2d5a2d" />
+                      {editable ? (
+                        <EditableField
+                          value={editingRoutineData.name}
+                          onChange={(name) =>
+                            handleUpdateRoutineName(viewingRoutine.sourceIndex, name)
+                          }
+                          editable
+                          style={styles.modalTitle}
+                        />
+                      ) : (
+                        <Text style={styles.modalTitle}>
+                          {viewingRoutine.activity}
+                        </Text>
+                      )}
+                    </View>
+                    <Pressable
+                      style={styles.modalCloseButton}
+                      onPress={() => setViewingRoutine(null)}
+                    >
+                      <X size={20} color="#666" />
+                    </Pressable>
                   </View>
-                  <Pressable
-                    style={styles.modalCloseButton}
-                    onPress={() => setViewingRoutine(null)}
-                  >
-                    <X size={20} color="#666" />
-                  </Pressable>
-                </View>
 
-                <Text style={styles.routineModalTime}>
-                  {viewingRoutine.start_time} – {viewingRoutine.end_time}
-                </Text>
+                  {editable ? (
+                    <View style={styles.routineModalTimeRow}>
+                      <Text style={styles.modalFieldLabel}>Start time</Text>
+                      <EditableField
+                        value={editingRoutineData.start_time}
+                        onChange={(t) =>
+                          handleUpdateEventTime(viewingRoutine, t)
+                        }
+                        type="time"
+                        editable
+                        mono
+                        style={styles.routineModalTimeEdit}
+                      />
+                    </View>
+                  ) : (
+                    <Text style={styles.routineModalTime}>
+                      {viewingRoutine.start_time} – {viewingRoutine.end_time}
+                    </Text>
+                  )}
 
-                {viewingRoutine.subEvents && viewingRoutine.subEvents.length > 0 && (
-                  <ScrollView style={styles.routineModalSubEvents}>
-                    {viewingRoutine.subEvents.map((subEvent, idx) => (
-                      <View key={idx} style={styles.routineModalSubEvent}>
-                        <SubEventIcon type={subEvent.type} />
-                        <Text style={styles.routineModalSubEventName} numberOfLines={1}>
-                          {subEvent.activity}
-                        </Text>
-                        <Text style={styles.routineModalSubEventTime}>
-                          {subEvent.start_time}
-                        </Text>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
-              </>
-            )}
+                  {viewingRoutine.subEvents && viewingRoutine.subEvents.length > 0 && (
+                    <ScrollView style={styles.routineModalSubEvents} keyboardShouldPersistTaps="always">
+                      {viewingRoutine.subEvents.map((subEvent, idx) => {
+                        const rawSubEvent = editingRoutineData.sub_events[idx];
+                        return (
+                          <View key={idx} style={styles.routineModalSubEvent}>
+                            <SubEventIcon type={subEvent.type} />
+                            {editable && rawSubEvent?.type === 'activity' ? (
+                              <View style={styles.routineSubEventEditName}>
+                                <EditableField
+                                  value={rawSubEvent.activity ?? ''}
+                                  onChange={(activity) =>
+                                    handleUpdateSubEvent(viewingRoutine.sourceIndex, idx, { activity })
+                                  }
+                                  editable
+                                  placeholder="Activity name"
+                                  style={styles.routineModalSubEventName}
+                                />
+                              </View>
+                            ) : (
+                              <Text style={styles.routineModalSubEventName} numberOfLines={1}>
+                                {subEvent.activity}
+                              </Text>
+                            )}
+                            {editable && rawSubEvent ? (
+                              <View style={styles.routineSubEventDuration}>
+                                <EditableField
+                                  value={String(rawSubEvent.duration_min)}
+                                  onChange={(v) => {
+                                    const n = parseInt(v, 10);
+                                    if (!isNaN(n) && n >= 1) {
+                                      handleUpdateSubEvent(viewingRoutine.sourceIndex, idx, { duration_min: n });
+                                    }
+                                  }}
+                                  type="number"
+                                  editable
+                                  mono
+                                  style={styles.routineSubEventDurationInput}
+                                />
+                                <Text style={styles.routineSubEventDurationUnit}>min</Text>
+                              </View>
+                            ) : (
+                              <Text style={styles.routineModalSubEventTime}>
+                                {subEvent.start_time}
+                              </Text>
+                            )}
+                            {editable && editingRoutineData.sub_events.length > 1 && (
+                              <Pressable
+                                style={styles.routineSubEventDelete}
+                                onPress={() =>
+                                  handleDeleteSubEvent(viewingRoutine.sourceIndex, idx)
+                                }
+                              >
+                                <Trash2 size={14} color="#c62828" />
+                              </Pressable>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
+
+                  {editable && (
+                    <>
+                      <Pressable
+                        style={styles.routineAddSubEvent}
+                        onPress={() => handleAddSubEvent(viewingRoutine.sourceIndex)}
+                      >
+                        <Plus size={14} color="#2d5a2d" />
+                        <Text style={styles.routineAddSubEventText}>Add step</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.modalDeleteButton}
+                        onPress={() => {
+                          handleDeleteEvent(viewingRoutine);
+                          setViewingRoutine(null);
+                        }}
+                      >
+                        <Trash2 size={16} color="#c62828" />
+                        <Text style={styles.modalDeleteText}>Delete routine</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </>
+              )}
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1219,6 +1413,15 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     marginBottom: 16,
   },
+  routineModalTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  routineModalTimeEdit: {
+    fontSize: 14,
+  },
   routineModalSubEvents: {
     maxHeight: 300,
   },
@@ -1235,9 +1438,42 @@ const styles = StyleSheet.create({
     color: '#1a2e1a',
     flex: 1,
   },
+  routineSubEventEditName: {
+    flex: 1,
+  },
   routineModalSubEventTime: {
     fontSize: 12,
     color: '#666',
     fontVariant: ['tabular-nums'],
+  },
+  routineSubEventDuration: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  routineSubEventDurationInput: {
+    fontSize: 13,
+    width: 36,
+    textAlign: 'center',
+  },
+  routineSubEventDurationUnit: {
+    fontSize: 11,
+    color: '#666',
+  },
+  routineSubEventDelete: {
+    padding: 4,
+  },
+  routineAddSubEvent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  routineAddSubEventText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#2d5a2d',
   },
 });

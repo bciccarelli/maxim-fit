@@ -10,7 +10,9 @@ import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { ModifySheet } from '@/components/protocol/ModifySheet';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
 import { ChatCitationsDropdown } from '@/components/protocol/ChatCitationsDropdown';
+import { ChatOperationsCard } from '@/components/protocol/ChatOperationsCard';
 import type { Citation } from '@protocol/shared/schemas';
+import type { ProtocolOperation } from '@protocol/shared';
 
 type QuestionAnswer = {
   id: string;
@@ -20,6 +22,7 @@ type QuestionAnswer = {
   citations?: Citation[];
   conversation_id?: string;
   image_url?: string;
+  operations?: ProtocolOperation[];
 };
 
 type Conversation = {
@@ -36,6 +39,7 @@ type AskResult = {
   citations?: Citation[];
   conversationId?: string;
   imageUrl?: string;
+  operations?: ProtocolOperation[];
 };
 
 function formatRelativeDate(dateStr: string): string {
@@ -223,7 +227,7 @@ export default function ChatScreen() {
         setActiveConversationId(finalResult.conversationId);
       }
 
-      // Add to history with citations and image URL
+      // Add to history with citations, image URL, and operations
       setHistory((prev) => [
         ...prev,
         {
@@ -234,6 +238,7 @@ export default function ChatScreen() {
           citations: finalResult.citations,
           conversation_id: finalResult.conversationId,
           image_url: finalResult.imageUrl,
+          operations: finalResult.operations,
         },
       ]);
       setPendingQuestion('');
@@ -504,13 +509,22 @@ export default function ChatScreen() {
                       <ChatCitationsDropdown citations={qa.citations} />
                     )}
                   </View>
-                  <Pressable
-                    style={styles.sparkleButton}
-                    onPress={() => handleModifyFromChat(qa.answer)}
-                  >
-                    <Wand2 size={14} color="#2d5a2d" />
-                    <Text style={styles.sparkleButtonText}>Modify</Text>
-                  </Pressable>
+                  {qa.operations && qa.operations.length > 0 && selectedVersion && parsedProtocol ? (
+                    <ChatOperationsCard
+                      operations={qa.operations}
+                      protocolId={selectedVersion.id}
+                      protocol={parsedProtocol}
+                      onApplied={() => {}}
+                    />
+                  ) : (
+                    <Pressable
+                      style={styles.sparkleButton}
+                      onPress={() => handleModifyFromChat(qa.answer)}
+                    >
+                      <Wand2 size={14} color="#2d5a2d" />
+                      <Text style={styles.sparkleButtonText}>Modify</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             ))}

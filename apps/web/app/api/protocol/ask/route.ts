@@ -6,6 +6,31 @@ import { userConfigSchema } from '@/lib/schemas/user-config';
 import { SSE_HEADERS } from '@/lib/streaming';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
 import { mergeCitations } from '@/lib/gemini/citations';
+import { validateOperations, protocolOperationSchema, type ProtocolOperation } from '@protocol/shared';
+import type { DailyProtocol } from '@protocol/shared/schemas/protocol';
+
+/**
+ * Parse raw Gemini operations through Zod, then validate element IDs exist.
+ */
+function parseAndValidateOperations(
+  rawOps: Array<Record<string, unknown>> | undefined,
+  protocol: DailyProtocol
+): ProtocolOperation[] | undefined {
+  if (!rawOps || rawOps.length === 0) return undefined;
+
+  const parsed: ProtocolOperation[] = [];
+  for (const raw of rawOps) {
+    const result = protocolOperationSchema.safeParse(raw);
+    if (result.success) {
+      parsed.push(result.data);
+    }
+  }
+
+  if (parsed.length === 0) return undefined;
+
+  const valid = validateOperations(protocol, parsed);
+  return valid.length > 0 ? valid : undefined;
+}
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB base64 (approximately 3MB image)
 const VALID_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -253,7 +278,7 @@ export async function POST(request: NextRequest) {
             );
 
             const generator = askAboutProtocolStream(protocolData, askConfig, question, history, imageData);
-            let genResult: IteratorResult<string, { answer: string; suggestsModification: boolean; citations: Citation[] }>;
+            let genResult: IteratorResult<string, Awaited<ReturnType<typeof askAboutProtocol>>>;
             do {
               genResult = await generator.next();
               if (!genResult.done && genResult.value) {
@@ -263,7 +288,10 @@ export async function POST(request: NextRequest) {
               }
             } while (!genResult.done);
 
-            const { answer, suggestsModification, citations: newCitations } = genResult.value;
+            const { answer, suggestsModification, citations: newCitations, operations: rawOperations } = genResult.value;
+
+            // Parse and validate operations against the current protocol
+            const operations = parseAndValidateOperations(rawOperations, protocolData);
 
             // Upload image to storage if present
             let imageUrl: string | null = null;
@@ -301,7 +329,14 @@ export async function POST(request: NextRequest) {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 done: true,
-                result: { answer, suggestsModification, citations: newCitations, conversationId: activeConversationId, imageUrl },
+                result: {
+                  answer,
+                  suggestsModification,
+                  citations: newCitations,
+                  conversationId: activeConversationId,
+                  imageUrl,
+                  operations: operations && operations.length > 0 ? operations : undefined,
+                },
               })}\n\n`)
             );
           } catch (error) {
@@ -319,8 +354,11 @@ export async function POST(request: NextRequest) {
       return new Response(stream, { headers: SSE_HEADERS });
     }
 
-    // Non-streaming path - now captures citations
-    const { answer, suggestsModification, citations: newCitations } = await askAboutProtocol(protocolData, askConfig, question, history, imageData);
+    // Non-streaming path - now captures citations and operations
+    const { answer, suggestsModification, citations: newCitations, operations: rawOps } = await askAboutProtocol(protocolData, askConfig, question, history, imageData);
+
+    // Parse and validate operations against the current protocol
+    const validOps = parseAndValidateOperations(rawOps, protocolData);
 
     // Merge new citations with existing ones on the protocol
     const existingCitations = (protocol.citations as Citation[]) || [];
@@ -359,7 +397,14 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id);
     }
 
-    return NextResponse.json({ answer, suggestsModification, citations: mergedCitations, conversationId: activeConversationId, imageUrl });
+    return NextResponse.json({
+      answer,
+      suggestsModification,
+      citations: mergedCitations,
+      conversationId: activeConversationId,
+      imageUrl,
+      operations: validOps && validOps.length > 0 ? validOps : undefined,
+    });
   } catch (error) {
     console.error('Protocol ask error:', error);
     return NextResponse.json(

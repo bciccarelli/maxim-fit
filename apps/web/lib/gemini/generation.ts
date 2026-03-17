@@ -1169,13 +1169,51 @@ export async function modifyProtocol(
   };
 }
 
+const chatOperationGeminiSchema = {
+  type: 'object',
+  properties: {
+    op: {
+      type: 'string',
+      enum: ['modify', 'delete', 'create'],
+      description: 'The type of operation: modify (change fields), delete (remove element), create (add new element)',
+    },
+    elementId: {
+      type: 'string',
+      description: 'The ID of the element to modify or delete (e.g., "ml_a1b2c3d4"). Required for modify and delete ops. Omit for create.',
+    },
+    elementType: {
+      type: 'string',
+      enum: ['meal', 'supplement', 'workout', 'exercise', 'other_event', 'routine_event'],
+      description: 'The type of protocol element this operation targets.',
+    },
+    parentId: {
+      type: 'string',
+      description: 'For create operations on nested elements (e.g., exercise within workout), the parent element ID.',
+    },
+    fields: {
+      type: 'object',
+      description: 'For modify: the specific fields to change (partial update). For create: the complete element data (without id). Use the same field names as the protocol schema.',
+    },
+    reason: {
+      type: 'string',
+      description: 'Brief human-readable explanation of why this change is suggested.',
+    },
+  },
+  required: ['op', 'elementType', 'reason'],
+} as const;
+
 const askResultSchema = {
   type: 'object',
   properties: {
     answer: { type: 'string', description: 'Direct, conversational answer to the user question about their protocol. Prefer brevity but expand when the question warrants a fuller explanation.' },
     suggestsModification: { type: 'boolean', description: 'True if the answer implies the user might want to modify their protocol' },
+    operations: {
+      type: 'array',
+      description: 'Array of specific operations to modify the protocol. IMPORTANT: You MUST include operations whenever the user asks to change, add, remove, swap, replace, adjust, or modify anything in their protocol. Each operation targets a specific element by its ID. Return an empty array only if the user is asking a pure information question with no implied change.',
+      items: chatOperationGeminiSchema,
+    },
   },
-  required: ['answer', 'suggestsModification'],
+  required: ['answer', 'suggestsModification', 'operations'],
 } as const;
 
 export type QAHistoryItem = { question: string; answer: string };
@@ -1212,16 +1250,41 @@ ${JSON.stringify(config, null, 2)}
 ## Current Protocol
 ${JSON.stringify(protocol, null, 2)}
 
+## Inline Protocol Operations (IMPORTANT)
+Every element in the protocol has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "sp_x7k2p9qr" for a supplement).
+
+**You MUST populate the "operations" array whenever the user asks to change, add, remove, swap, replace, update, or adjust anything in their protocol.** This includes requests like "change X to Y", "add Z", "remove W", "swap A for B", "increase my protein", etc. The user expects actionable changes, not just advice.
+
+Operation types:
+- **modify**: Change specific fields of an existing element. Set elementId to the element's id. Only include the fields that change in "fields".
+- **delete**: Remove an element. Set elementId to the element's id.
+- **create**: Add a new element. Set elementType and provide complete data in "fields" (no id — it's auto-assigned). For exercises, set parentId to the workout's id.
+
+Examples:
+- User: "Swap creatine for beta-alanine" → delete the creatine supplement by id + create a new supplement with beta-alanine data
+- User: "Change my bench press to 4 sets" → modify the bench press exercise by id, fields: {"sets": 4}
+- User: "Add a 10-minute morning walk" → create a new other_event with the walk data
+- User: "Remove the evening stretching" → delete the stretching event by id
+
+Return an empty operations array only for pure information questions like "why is creatine beneficial?" or "what are the benefits of my current schedule?".
+
 ${historySection}## User's Question
 ${question}
 
 Answer now, using Google Search to verify your claims.`;
 }
 
+export type AskAboutProtocolResult = {
+  answer: string;
+  suggestsModification: boolean;
+  citations: Citation[];
+  operations?: Array<Record<string, unknown>>;
+};
+
 /**
  * Answer a question about a protocol, optionally using search grounding.
  * Supports multimodal input with optional image.
- * Returns answer, modification suggestion flag, and citations from grounding.
+ * Returns answer, modification suggestion flag, citations, and optional inline operations.
  */
 export async function askAboutProtocol(
   protocol: DailyProtocol,
@@ -1229,7 +1292,7 @@ export async function askAboutProtocol(
   question: string,
   history: QAHistoryItem[] = [],
   image?: ImageData | null
-): Promise<{ answer: string; suggestsModification: boolean; citations: Citation[] }> {
+): Promise<AskAboutProtocolResult> {
   const client = getGeminiClient();
 
   const prompt = buildAskPrompt(protocol, config, question, history, !!image);
@@ -1260,10 +1323,24 @@ export async function askAboutProtocol(
   const citations = extractCitations(groundingMetadata, 'ask');
 
   const parsed = JSON.parse(text);
+
+  // Normalize Gemini operations: map "fields" to "data" for create ops
+  let operations: Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(parsed.operations) && parsed.operations.length > 0) {
+    operations = parsed.operations.map((op: Record<string, unknown>) => {
+      if (op.op === 'create' && op.fields && !op.data) {
+        const { fields, ...rest } = op;
+        return { ...rest, data: fields };
+      }
+      return op;
+    });
+  }
+
   return {
     answer: parsed.answer,
     suggestsModification: parsed.suggestsModification,
     citations,
+    operations,
   };
 }
 
@@ -1621,7 +1698,7 @@ export async function* askAboutProtocolStream(
   question: string,
   history: QAHistoryItem[] = [],
   image?: ImageData | null
-): AsyncGenerator<string, { answer: string; suggestsModification: boolean; citations: Citation[] }, unknown> {
+): AsyncGenerator<string, AskAboutProtocolResult, unknown> {
   // Use non-streaming call to get citations (streaming API doesn't provide grounding metadata)
   const result = await askAboutProtocol(protocol, config, question, history, image);
 

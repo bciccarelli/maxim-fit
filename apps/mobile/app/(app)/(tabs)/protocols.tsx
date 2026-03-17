@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, Wand2, Plus, ShieldCheck, Pencil, Trash2, Upload, History } from 'lucide-react-native';
+import { ChevronDown, Plus, Pencil, Trash2, Upload, History } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,7 +15,6 @@ import { ImportProtocolSheet } from '@/components/protocol/ImportProtocolSheet';
 import { VersionHistorySheet } from '@/components/protocol/VersionHistorySheet';
 import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
 import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
-import { ProFeatureButton } from '@/components/subscription/ProFeatureButton';
 import { useUserConfig } from '@/hooks/useUserConfig';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 
@@ -43,7 +42,6 @@ export default function ProtocolsScreen() {
   // Local UI state
   const [showChainDropdown, setShowChainDropdown] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   // Name editing
   const [isEditingName, setIsEditingName] = useState(false);
@@ -161,22 +159,6 @@ export default function ProtocolsScreen() {
       Alert.alert('Error', 'Failed to update name.');
     }
     setIsEditingName(false);
-  };
-
-  const handleVerify = async () => {
-    if (!selectedVersion || isVerifying || selectedVersion.verified) return;
-
-    setIsVerifying(true);
-    try {
-      await fetchApi('/api/protocol/verify', {
-        method: 'POST',
-        body: JSON.stringify({ protocolId: selectedVersion.id }),
-      });
-      await refreshVersions();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to verify protocol.');
-    }
-    setIsVerifying(false);
   };
 
   const handleNewProtocol = () => {
@@ -313,6 +295,22 @@ export default function ProtocolsScreen() {
           )}
         </View>
 
+        {/* Score + History */}
+        {selectedVersion?.weighted_goal_score != null && (
+          <View style={styles.scoreChip}>
+            <Text style={styles.scoreChipValue}>
+              {selectedVersion.weighted_goal_score.toFixed(1)}
+            </Text>
+            <Text style={styles.scoreChipLabel}>goal</Text>
+          </View>
+        )}
+        <Pressable
+          style={styles.iconButton}
+          onPress={() => setShowVersionHistory(true)}
+        >
+          <History size={18} color="#666" />
+        </Pressable>
+
         {/* Protocol Dropdown Button */}
         <View style={[styles.dropdownButtonWrapper, { zIndex: 20 }]}>
           <Pressable
@@ -408,67 +406,6 @@ export default function ProtocolsScreen() {
           )}
         </View>
       </View>
-
-      {/* Actions Bar */}
-      {selectedVersion && (
-        <View style={styles.actionsBar}>
-          {/* Scores */}
-          <View style={styles.scoresInline}>
-            {selectedVersion.weighted_goal_score !== null && (
-              <View style={styles.scoreChip}>
-                <Text style={styles.scoreChipValue}>
-                  {selectedVersion.weighted_goal_score.toFixed(1)}
-                </Text>
-                <Text style={styles.scoreChipLabel}>goal</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Actions */}
-          <View style={styles.actionsRow}>
-            {/* Modify Button */}
-            <ProFeatureButton feature="modify" onPress={() => openModifyWithContext()}>
-              <View style={styles.actionButton} pointerEvents="none">
-                <Wand2 size={16} color="#fff" />
-                <Text style={styles.actionButtonText}>Modify</Text>
-              </View>
-            </ProFeatureButton>
-
-            {/* Verified Button */}
-            <ProFeatureButton feature="verify" onPress={handleVerify} disabled={selectedVersion.verified}>
-              <View
-                style={[
-                  styles.verifyButton,
-                  selectedVersion.verified && styles.verifyButtonVerified,
-                ]}
-                pointerEvents="none"
-              >
-                {isVerifying ? (
-                  <ActivityIndicator size="small" color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
-                ) : (
-                  <>
-                    <ShieldCheck size={16} color={selectedVersion.verified ? '#2d5a2d' : '#666'} />
-                    <Text style={[
-                      styles.verifyButtonText,
-                      selectedVersion.verified && styles.verifyButtonTextVerified,
-                    ]}>
-                      {selectedVersion.verified ? 'Verified' : 'Verify'}
-                    </Text>
-                  </>
-                )}
-              </View>
-            </ProFeatureButton>
-
-            {/* History Button */}
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => setShowVersionHistory(true)}
-            >
-              <History size={18} color="#666" />
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       {/* Protocol Content */}
       {parsedData && selectedVersion ? (
@@ -687,20 +624,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
-  actionsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-    gap: 8,
-  },
-  scoresInline: {
-    flexDirection: 'row',
-    gap: 6,
-  },
   scoreChip: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -720,11 +643,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: '#666',
   },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
   iconButton: {
     width: 32,
     height: 32,
@@ -732,41 +650,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f0',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  verifyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    gap: 4,
-  },
-  verifyButtonVerified: {
-    borderColor: '#2d5a2d',
-    backgroundColor: '#e8f5e9',
-  },
-  verifyButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#666',
-  },
-  verifyButtonTextVerified: {
-    color: '#2d5a2d',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2d5a2d',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
-  },
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#fff',
   },
 });
