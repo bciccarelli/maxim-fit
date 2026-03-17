@@ -1179,7 +1179,7 @@ const chatOperationGeminiSchema = {
     },
     elementId: {
       type: 'string',
-      description: 'The ID of the element to modify or delete (e.g., "ml_a1b2c3d4"). Required for modify and delete ops. Omit for create.',
+      description: 'The ID of the existing element to modify or delete (e.g., "ex_a1b2c3d4"). REQUIRED for modify and delete. Set to "" for create.',
     },
     elementType: {
       type: 'string',
@@ -1188,18 +1188,18 @@ const chatOperationGeminiSchema = {
     },
     parentId: {
       type: 'string',
-      description: 'For create operations on nested elements (e.g., exercise within workout), the parent element ID.',
+      description: 'For create operations on nested elements (e.g., exercise within workout), the parent element ID. Set to "" if not applicable.',
     },
     fields: {
       type: 'object',
-      description: 'For modify: the specific fields to change (partial update). For create: the complete element data (without id). Use the same field names as the protocol schema.',
+      description: 'For modify: the fields to change (partial update, e.g. {"name": "New Name", "sets": 4}). For create: the complete element data. For delete: set to empty object {}. Use the same field names as the protocol JSON above.',
     },
     reason: {
       type: 'string',
       description: 'Brief human-readable explanation of why this change is suggested.',
     },
   },
-  required: ['op', 'elementType', 'reason'],
+  required: ['op', 'elementId', 'elementType', 'parentId', 'fields', 'reason'],
 } as const;
 
 const askResultSchema = {
@@ -1324,16 +1324,35 @@ export async function askAboutProtocol(
 
   const parsed = JSON.parse(text);
 
-  // Normalize Gemini operations: map "fields" to "data" for create ops
+  // Normalize Gemini operations to match our Zod schemas
   let operations: Array<Record<string, unknown>> | undefined;
   if (Array.isArray(parsed.operations) && parsed.operations.length > 0) {
-    operations = parsed.operations.map((op: Record<string, unknown>) => {
-      if (op.op === 'create' && op.fields && !op.data) {
-        const { fields, ...rest } = op;
-        return { ...rest, data: fields };
-      }
-      return op;
-    });
+    const normalized = parsed.operations
+      .map((op: Record<string, unknown>) => {
+        // Strip empty sentinel strings Gemini uses for non-applicable fields
+        const clean = { ...op };
+        if (clean.elementId === '') delete clean.elementId;
+        if (clean.parentId === '') delete clean.parentId;
+
+        // Map "fields" to "data" for create ops
+        if (clean.op === 'create' && clean.fields && !clean.data) {
+          const { fields, ...rest } = clean;
+          return { ...rest, data: fields };
+        }
+        return clean;
+      })
+      // Filter out delete/modify ops that have no elementId, and modify ops with empty fields
+      .filter((op: Record<string, unknown>) => {
+        if (op.op === 'modify' || op.op === 'delete') {
+          if (!op.elementId) return false;
+        }
+        if (op.op === 'modify' && op.fields && Object.keys(op.fields as object).length === 0) {
+          return false;
+        }
+        return true;
+      });
+
+    if (normalized.length > 0) operations = normalized;
   }
 
   return {

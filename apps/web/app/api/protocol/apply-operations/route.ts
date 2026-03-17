@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { dailyProtocolSchema, normalizeProtocol } from '@/lib/schemas/protocol';
+import { normalizeProtocol } from '@/lib/schemas/protocol';
 import { getUserTier, isPro } from '@/lib/stripe/subscription';
 import {
   applyOperations,
@@ -71,12 +71,14 @@ export async function POST(request: NextRequest) {
     // Apply operations
     const modified = applyOperations(protocolData, validOps);
 
-    // Validate the resulting protocol
-    const validateResult = dailyProtocolSchema.safeParse(modified);
-    if (!validateResult.success) {
-      console.error('Apply-operations produced invalid protocol:', validateResult.error.flatten());
+    // Normalize the resulting protocol (handles type coercion, assigns IDs, validates)
+    let normalizedResult;
+    try {
+      normalizedResult = normalizeProtocol(modified);
+    } catch (err) {
+      console.error('Apply-operations produced invalid protocol:', err);
       return NextResponse.json(
-        { error: 'Operations produced an invalid protocol', details: validateResult.error.flatten() },
+        { error: 'Operations produced an invalid protocol', message: err instanceof Error ? err.message : 'Validation failed' },
         { status: 422 }
       );
     }
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         config_id: current.config_id,
-        protocol_data: validateResult.data,
+        protocol_data: normalizedResult,
         name: current.name,
         version: (current.version ?? 1) + 1,
         version_chain_id: current.version_chain_id ?? current.id,

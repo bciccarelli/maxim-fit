@@ -28,14 +28,15 @@ function OperationIcon({ op }: { op: string }) {
 }
 
 function getOperationLabel(op: ProtocolOperation, protocol: DailyProtocol): string {
+  const typeName = op.elementType.replace('_', ' ');
+
   if (op.op === 'create') {
-    const typeName = op.elementType.replace('_', ' ');
-    const dataName = (op.data as Record<string, unknown>).name ||
-      (op.data as Record<string, unknown>).activity || '';
+    const data = op.data as Record<string, unknown>;
+    const dataName = data.name || data.activity || '';
     return dataName ? `Add ${dataName}` : `Add new ${typeName}`;
   }
 
-  const name = getElementNameById(protocol, op.elementId) || op.elementType.replace('_', ' ');
+  const name = getElementNameById(protocol, op.elementId) || typeName;
 
   if (op.op === 'delete') {
     return `Remove ${name}`;
@@ -43,7 +44,7 @@ function getOperationLabel(op: ProtocolOperation, protocol: DailyProtocol): stri
 
   // modify
   const fieldKeys = Object.keys(op.fields);
-  if (fieldKeys.length <= 2) {
+  if (fieldKeys.length > 0 && fieldKeys.length <= 2) {
     return `Update ${name} (${fieldKeys.join(', ')})`;
   }
   return `Update ${name}`;
