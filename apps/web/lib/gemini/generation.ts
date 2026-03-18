@@ -1403,7 +1403,7 @@ async function askPhase2(
     const client = getGeminiClient();
     const opsPrompt = buildOperationsPrompt(protocol, question, answer);
     const opsResponse = await client.models.generateContent({
-      model: MODEL_GROUNDED,
+      model: MODEL_STRUCTURED,
       contents: [{ role: 'user', parts: [{ text: opsPrompt }] }],
       config: {
         responseMimeType: 'application/json',
