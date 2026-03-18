@@ -1202,18 +1202,27 @@ const chatOperationGeminiSchema = {
   required: ['op', 'elementId', 'elementType', 'parentId', 'fields', 'reason'],
 } as const;
 
-const askResultSchema = {
+// Phase 1 schema: grounded answer only (no operations — keeps grounded call fast)
+const askAnswerSchema = {
   type: 'object',
   properties: {
     answer: { type: 'string', description: 'Direct, conversational answer to the user question about their protocol. Prefer brevity but expand when the question warrants a fuller explanation.' },
-    suggestsModification: { type: 'boolean', description: 'True if the answer implies the user might want to modify their protocol' },
+    suggestsModification: { type: 'boolean', description: 'True if the user is asking to change, add, remove, swap, or modify their protocol in any way. False for pure information questions.' },
+  },
+  required: ['answer', 'suggestsModification'],
+} as const;
+
+// Phase 2 schema: operations only (no grounding — structured output with element IDs)
+const askOperationsSchema = {
+  type: 'object',
+  properties: {
     operations: {
       type: 'array',
-      description: 'Array of specific operations to modify the protocol. IMPORTANT: You MUST include operations whenever the user asks to change, add, remove, swap, replace, adjust, or modify anything in their protocol. Each operation targets a specific element by its ID. Return an empty array only if the user is asking a pure information question with no implied change.',
+      description: 'Array of specific operations to modify the protocol.',
       items: chatOperationGeminiSchema,
     },
   },
-  required: ['answer', 'suggestsModification', 'operations'],
+  required: ['operations'],
 } as const;
 
 export type QAHistoryItem = { question: string; answer: string };
@@ -1242,31 +1251,15 @@ The user has attached an image to this question. Analyze the image in the contex
 
 IMPORTANT: Use Google Search to verify any health claims, supplement recommendations, exercise science, or nutritional guidance. Ground your response in current research and cite your sources.
 
-Be direct and conversational — no bullet points or formal structure unless specifically asked. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, research, or nuance, give a fuller answer. If the question suggests a protocol change, note the trade-off but focus on answering the question directly.${imageContext}
+Be direct and conversational — no bullet points or formal structure unless specifically asked. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, research, or nuance, give a fuller answer.
+
+Set suggestsModification to true if the user is asking to change, add, remove, swap, or modify anything in their protocol. Set it to false for pure information questions.${imageContext}
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
 
 ## Current Protocol
 ${JSON.stringify(protocol, null, 2)}
-
-## Inline Protocol Operations (IMPORTANT)
-Every element in the protocol has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "sp_x7k2p9qr" for a supplement).
-
-**You MUST populate the "operations" array whenever the user asks to change, add, remove, swap, replace, update, or adjust anything in their protocol.** This includes requests like "change X to Y", "add Z", "remove W", "swap A for B", "increase my protein", etc. The user expects actionable changes, not just advice.
-
-Operation types:
-- **modify**: Change specific fields of an existing element. Set elementId to the element's id. Only include the fields that change in "fields".
-- **delete**: Remove an element. Set elementId to the element's id.
-- **create**: Add a new element. Set elementType and provide complete data in "fields" (no id — it's auto-assigned). For exercises, set parentId to the workout's id.
-
-Examples:
-- User: "Swap creatine for beta-alanine" → delete the creatine supplement by id + create a new supplement with beta-alanine data
-- User: "Change my bench press to 4 sets" → modify the bench press exercise by id, fields: {"sets": 4}
-- User: "Add a 10-minute morning walk" → create a new other_event with the walk data
-- User: "Remove the evening stretching" → delete the stretching event by id
-
-Return an empty operations array only for pure information questions like "why is creatine beneficial?" or "what are the benefits of my current schedule?".
 
 ${historySection}## User's Question
 ${question}
@@ -1282,22 +1275,90 @@ export type AskAboutProtocolResult = {
 };
 
 /**
- * Answer a question about a protocol, optionally using search grounding.
- * Supports multimodal input with optional image.
- * Returns answer, modification suggestion flag, citations, and optional inline operations.
+ * Build the Phase 2 prompt for generating protocol operations (no grounding).
  */
-export async function askAboutProtocol(
+function buildOperationsPrompt(
+  protocol: DailyProtocol,
+  question: string,
+  answer: string
+): string {
+  return `You are a health protocol assistant. Based on the user's question and the answer already provided, generate the specific operations needed to modify their protocol.
+
+## Current Protocol (with element IDs)
+${JSON.stringify(protocol, null, 2)}
+
+## User's Question
+${question}
+
+## Answer Already Given
+${answer}
+
+## Instructions
+Generate operations to implement the changes discussed above. Every element has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "ex_x7k2p9qr" for an exercise).
+
+Operation types:
+- **modify**: Change specific fields of an existing element. Set elementId to the element's id. Only include the fields that change in "fields".
+- **delete**: Remove an element. Set elementId to the element's id.
+- **create**: Add a new element. Set elementType and provide complete data in "fields" (no id — it's auto-assigned). For exercises, set parentId to the workout's id.
+
+Examples:
+- "Swap creatine for beta-alanine" → delete creatine by id + create new supplement
+- "Change bench press to 4 sets" → modify exercise by id, fields: {"sets": 4}
+- "Add a morning walk" → create other_event with walk data
+- "Remove evening stretching" → delete event by id
+
+Generate the operations array now.`;
+}
+
+/**
+ * Normalize raw Gemini operations to match our Zod schemas.
+ * Strips sentinel values, maps fields→data for create ops, filters invalid ops.
+ */
+function normalizeGeminiOperations(
+  rawOps: unknown[]
+): Array<Record<string, unknown>> | undefined {
+  const normalized = rawOps
+    .map((op: unknown) => {
+      const raw = op as Record<string, unknown>;
+      const clean = { ...raw };
+      // Strip empty sentinel strings Gemini uses for non-applicable fields
+      if (clean.elementId === '') delete clean.elementId;
+      if (clean.parentId === '') delete clean.parentId;
+
+      // Map "fields" to "data" for create ops
+      if (clean.op === 'create' && clean.fields && !clean.data) {
+        const { fields, ...rest } = clean;
+        return { ...rest, data: fields };
+      }
+      return clean;
+    })
+    // Filter out delete/modify ops that have no elementId, and modify ops with empty fields
+    .filter((op: Record<string, unknown>) => {
+      if (op.op === 'modify' || op.op === 'delete') {
+        if (!op.elementId) return false;
+      }
+      if (op.op === 'modify' && op.fields && Object.keys(op.fields as object).length === 0) {
+        return false;
+      }
+      return true;
+    });
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+/**
+ * Phase 1: Get grounded answer with Google Search (simple schema, fast).
+ */
+async function askPhase1(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
-  history: QAHistoryItem[] = [],
+  history: QAHistoryItem[],
   image?: ImageData | null
-): Promise<AskAboutProtocolResult> {
+): Promise<{ answer: string; suggestsModification: boolean; citations: Citation[] }> {
   const client = getGeminiClient();
-
   const prompt = buildAskPrompt(protocol, config, question, history, !!image);
 
-  // Build multimodal content with text and optional image
   const parts: Part[] = [{ text: prompt }];
   if (image) {
     parts.push(createPartFromBase64(image.base64, image.mimeType));
@@ -1309,7 +1370,7 @@ export async function askAboutProtocol(
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: 'application/json',
-      responseSchema: askResultSchema as any,
+      responseSchema: askAnswerSchema as any,
     },
   });
 
@@ -1318,49 +1379,72 @@ export async function askAboutProtocol(
     throw new Error('No response from Gemini when answering question');
   }
 
-  // Extract citations from grounding metadata
   const groundingMetadata = getGroundingMetadata(response);
   const citations = extractCitations(groundingMetadata, 'ask');
-
   const parsed = JSON.parse(text);
-
-  // Normalize Gemini operations to match our Zod schemas
-  let operations: Array<Record<string, unknown>> | undefined;
-  if (Array.isArray(parsed.operations) && parsed.operations.length > 0) {
-    const normalized = parsed.operations
-      .map((op: Record<string, unknown>) => {
-        // Strip empty sentinel strings Gemini uses for non-applicable fields
-        const clean = { ...op };
-        if (clean.elementId === '') delete clean.elementId;
-        if (clean.parentId === '') delete clean.parentId;
-
-        // Map "fields" to "data" for create ops
-        if (clean.op === 'create' && clean.fields && !clean.data) {
-          const { fields, ...rest } = clean;
-          return { ...rest, data: fields };
-        }
-        return clean;
-      })
-      // Filter out delete/modify ops that have no elementId, and modify ops with empty fields
-      .filter((op: Record<string, unknown>) => {
-        if (op.op === 'modify' || op.op === 'delete') {
-          if (!op.elementId) return false;
-        }
-        if (op.op === 'modify' && op.fields && Object.keys(op.fields as object).length === 0) {
-          return false;
-        }
-        return true;
-      });
-
-    if (normalized.length > 0) operations = normalized;
-  }
 
   return {
     answer: parsed.answer,
     suggestsModification: parsed.suggestsModification,
     citations,
-    operations,
   };
+}
+
+/**
+ * Phase 2: Generate operations for protocol modification (no grounding, structured output).
+ * Best-effort — returns undefined on failure.
+ */
+async function askPhase2(
+  protocol: DailyProtocol,
+  question: string,
+  answer: string
+): Promise<Array<Record<string, unknown>> | undefined> {
+  try {
+    const client = getGeminiClient();
+    const opsPrompt = buildOperationsPrompt(protocol, question, answer);
+    const opsResponse = await client.models.generateContent({
+      model: MODEL_GROUNDED,
+      contents: [{ role: 'user', parts: [{ text: opsPrompt }] }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: askOperationsSchema as any,
+      },
+    });
+
+    const opsText = opsResponse.text;
+    if (opsText) {
+      const opsParsed = JSON.parse(opsText);
+      if (Array.isArray(opsParsed.operations) && opsParsed.operations.length > 0) {
+        return normalizeGeminiOperations(opsParsed.operations);
+      }
+    }
+  } catch (err) {
+    console.error('Phase 2 operations generation failed:', err);
+  }
+  return undefined;
+}
+
+/**
+ * Answer a question about a protocol using two-phase approach:
+ * Phase 1: Grounded answer with Google Search (simple schema, fast)
+ * Phase 2: Operations generation if modification suggested (no grounding, structured output)
+ */
+export async function askAboutProtocol(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  question: string,
+  history: QAHistoryItem[] = [],
+  image?: ImageData | null
+): Promise<AskAboutProtocolResult> {
+  const phase1 = await askPhase1(protocol, config, question, history, image);
+
+  const result: AskAboutProtocolResult = { ...phase1 };
+
+  if (phase1.suggestsModification) {
+    result.operations = await askPhase2(protocol, question, phase1.answer);
+  }
+
+  return result;
 }
 
 // Combined schema for parsing protocol text with inferred goals
@@ -1718,21 +1802,33 @@ export async function* askAboutProtocolStream(
   history: QAHistoryItem[] = [],
   image?: ImageData | null
 ): AsyncGenerator<string, AskAboutProtocolResult, unknown> {
-  // Use non-streaming call to get citations (streaming API doesn't provide grounding metadata)
-  const result = await askAboutProtocol(protocol, config, question, history, image);
+  // Phase 1: Get grounded answer
+  const phase1 = await askPhase1(protocol, config, question, history, image);
 
-  // Simulate streaming by yielding the answer in chunks for better UX
-  const chunkSize = 15; // Characters per chunk - balances smoothness vs overhead
-  const answer = result.answer;
+  // Kick off Phase 2 (operations) in parallel with text streaming
+  const phase2Promise = phase1.suggestsModification
+    ? askPhase2(protocol, question, phase1.answer)
+    : Promise.resolve(undefined);
+
+  // Stream answer text in chunks while Phase 2 runs
+  const chunkSize = 15;
+  const answer = phase1.answer;
 
   for (let i = 0; i < answer.length; i += chunkSize) {
     const chunk = answer.slice(i, i + chunkSize);
     yield chunk;
-    // Small delay between chunks for natural streaming appearance
     await new Promise(resolve => setTimeout(resolve, 15));
   }
 
-  return result;
+  // Wait for Phase 2 to complete
+  const operations = await phase2Promise;
+
+  return {
+    answer: phase1.answer,
+    suggestsModification: phase1.suggestsModification,
+    citations: phase1.citations,
+    operations,
+  };
 }
 
 // ---------------------------------------------------------------------------
