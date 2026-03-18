@@ -550,7 +550,7 @@ export default function ChatScreen() {
                       <View style={styles.thinkingContainer}>
                         <ActivityIndicator size="small" color="#2d5a2d" />
                         <Text style={styles.thinkingText}>
-                          {stage === 'researching' ? 'Researching...' : 'Thinking...'}
+                          {stage === 'researching' ? 'Researching...' : stage === 'generating' ? 'Generating...' : 'Thinking...'}
                         </Text>
                       </View>
                     )}

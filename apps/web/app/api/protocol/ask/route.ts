@@ -282,9 +282,17 @@ export async function POST(request: NextRequest) {
             do {
               genResult = await generator.next();
               if (!genResult.done && genResult.value) {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ chunk: genResult.value })}\n\n`)
-                );
+                // Check for stage markers from the generator
+                if (genResult.value.startsWith('\x00stage:')) {
+                  const stage = genResult.value.slice(7);
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ stage })}\n\n`)
+                  );
+                } else {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: genResult.value })}\n\n`)
+                  );
+                }
               }
             } while (!genResult.done);
 

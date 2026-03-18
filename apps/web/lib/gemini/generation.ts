@@ -1202,32 +1202,28 @@ const chatOperationGeminiSchema = {
   required: ['op', 'elementId', 'elementType', 'parentId', 'fields', 'reason'],
 } as const;
 
-// Phase 1 schema: grounded answer only (no operations — keeps grounded call fast)
-const askAnswerSchema = {
+// Phase 2 schema: Pro generates answer + operations together
+const askResultSchema = {
   type: 'object',
   properties: {
-    answer: { type: 'string', description: 'Direct, conversational answer to the user question about their protocol. Prefer brevity but expand when the question warrants a fuller explanation.' },
-    suggestsModification: { type: 'boolean', description: 'True if the user is asking to change, add, remove, swap, or modify their protocol in any way. False for pure information questions.' },
-  },
-  required: ['answer', 'suggestsModification'],
-} as const;
-
-// Phase 2 schema: operations only (no grounding — structured output with element IDs)
-const askOperationsSchema = {
-  type: 'object',
-  properties: {
+    answer: { type: 'string', description: 'Direct, conversational answer to the user question about their protocol. Prefer brevity but expand when the question warrants a fuller explanation. Base your answer on the research findings provided.' },
+    suggestsModification: { type: 'boolean', description: 'True if the user is asking to change, add, remove, swap, or modify their protocol. False for pure information questions.' },
     operations: {
       type: 'array',
-      description: 'Array of specific operations to modify the protocol.',
+      description: 'Array of specific operations to modify the protocol. MUST be populated whenever the user asks to change, add, remove, swap, replace, update, or adjust anything. Return an empty array for pure information questions.',
       items: chatOperationGeminiSchema,
     },
   },
-  required: ['operations'],
+  required: ['answer', 'suggestsModification', 'operations'],
 } as const;
 
 export type QAHistoryItem = { question: string; answer: string };
 
-function buildAskPrompt(
+/**
+ * Phase 1 prompt: lightweight research with Google Search grounding.
+ * Returns free-form prose — no structured output.
+ */
+function buildAskResearchPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
@@ -1235,36 +1231,88 @@ function buildAskPrompt(
   hasImage = false
 ): string {
   const historySection = history.length > 0
-    ? `## Previous Conversation
-${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n')}
-
-`
+    ? `\n## Previous Conversation\n${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n')}\n`
     : '';
 
   const imageContext = hasImage
-    ? `
-
-The user has attached an image to this question. Analyze the image in the context of their health protocol and question. If the image shows food, a nutrition label, a workout, supplements, or any health-related content, provide relevant analysis. Consider how the image relates to their goals and current protocol.`
+    ? '\n\nThe user has attached an image. Analyze it in the context of their health protocol and question.'
     : '';
 
-  return `You are a knowledgeable health coach. Answer questions about the user's protocol using current research and evidence.
+  return `You are a health research specialist. Research the user's question about their protocol using Google Search.
 
-IMPORTANT: Use Google Search to verify any health claims, supplement recommendations, exercise science, or nutritional guidance. Ground your response in current research and cite your sources.
+## User Configuration
+${JSON.stringify(config, null, 2)}
 
-Be direct and conversational — no bullet points or formal structure unless specifically asked. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, research, or nuance, give a fuller answer.
+## Current Protocol Summary
+- Wake: ${protocol.schedules[0]?.wake_time || 'N/A'}, Sleep: ${protocol.schedules[0]?.sleep_time || 'N/A'}
+- Daily calories: ${protocol.diet.daily_calories}, Protein: ${protocol.diet.protein_target_g}g
+- Training: ${protocol.training.program_name} (${protocol.training.days_per_week}x/week)
+- Supplements: ${protocol.supplementation.supplements.map(s => s.name).join(', ') || 'None'}
+- Meals: ${protocol.diet.meals.map(m => m.name).join(', ') || 'None'}
+${historySection}
+## User's Question
+${question}${imageContext}
 
-Set suggestsModification to true if the user is asking to change, add, remove, swap, or modify anything in their protocol. Set it to false for pure information questions.${imageContext}
+## Instructions
+
+Use Google Search to research the user's question. Provide:
+
+**Research Findings**: Current evidence-based information relevant to the question. Include dosages, timings, or protocols from studies if applicable.
+
+**Recommendations**: If the question implies changes, provide specific evidence-based recommendations. If it's a pure information question, provide a thorough answer.
+
+**Cautions**: Any risks, contraindications, or things to monitor.
+
+Output clear, organized prose. Do NOT output JSON.`;
+}
+
+/**
+ * Phase 2 prompt: Pro model generates answer + operations from research.
+ */
+function buildAskApplyPrompt(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  question: string,
+  history: QAHistoryItem[],
+  researchText: string
+): string {
+  const historySection = history.length > 0
+    ? `\n## Previous Conversation\n${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n')}\n`
+    : '';
+
+  return `You are a knowledgeable health coach. Answer the user's question and, if they're requesting changes, generate the specific operations to modify their protocol.
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
 
 ## Current Protocol
 ${JSON.stringify(protocol, null, 2)}
+${historySection}
+## Research Findings
+${researchText}
 
-${historySection}## User's Question
+## User's Question
 ${question}
 
-Answer now, using Google Search to verify your claims.`;
+## Instructions
+
+1. **Answer**: Be direct and conversational. Base your answer on the research findings above. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, give a fuller answer. Do NOT tell the user you are making changes — the operations will be shown separately as a suggestion they can accept or dismiss.
+
+2. **Operations**: Every element in the protocol has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "ex_x7k2p9qr" for an exercise).
+
+   If the user is asking to change, add, remove, swap, or adjust anything, you MUST generate operations:
+   - **modify**: Change specific fields of an existing element. Set elementId to the element's id. Only include fields that change in "fields".
+   - **delete**: Remove an element. Set elementId to the element's id.
+   - **create**: Add a new element. Set elementType and provide complete data in "fields" (no id). For exercises, set parentId to the workout's id.
+
+   Examples:
+   - "Swap creatine for beta-alanine" → delete creatine by id + create new supplement
+   - "Change bench press to 4 sets" → modify exercise by id, fields: {"sets": 4}
+   - "Add a morning walk" → create other_event with walk data
+
+   Return an empty operations array only for pure information questions.
+
+Generate the answer and operations now.`;
 }
 
 export type AskAboutProtocolResult = {
@@ -1273,42 +1321,6 @@ export type AskAboutProtocolResult = {
   citations: Citation[];
   operations?: Array<Record<string, unknown>>;
 };
-
-/**
- * Build the Phase 2 prompt for generating protocol operations (no grounding).
- */
-function buildOperationsPrompt(
-  protocol: DailyProtocol,
-  question: string,
-  answer: string
-): string {
-  return `You are a health protocol assistant. Based on the user's question and the answer already provided, generate the specific operations needed to modify their protocol.
-
-## Current Protocol (with element IDs)
-${JSON.stringify(protocol, null, 2)}
-
-## User's Question
-${question}
-
-## Answer Already Given
-${answer}
-
-## Instructions
-Generate operations to implement the changes discussed above. Every element has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "ex_x7k2p9qr" for an exercise).
-
-Operation types:
-- **modify**: Change specific fields of an existing element. Set elementId to the element's id. Only include the fields that change in "fields".
-- **delete**: Remove an element. Set elementId to the element's id.
-- **create**: Add a new element. Set elementType and provide complete data in "fields" (no id — it's auto-assigned). For exercises, set parentId to the workout's id.
-
-Examples:
-- "Swap creatine for beta-alanine" → delete creatine by id + create new supplement
-- "Change bench press to 4 sets" → modify exercise by id, fields: {"sets": 4}
-- "Add a morning walk" → create other_event with walk data
-- "Remove evening stretching" → delete event by id
-
-Generate the operations array now.`;
-}
 
 /**
  * Normalize raw Gemini operations to match our Zod schemas.
@@ -1321,7 +1333,6 @@ function normalizeGeminiOperations(
     .map((op: unknown) => {
       const raw = op as Record<string, unknown>;
       const clean = { ...raw };
-      // Strip empty sentinel strings Gemini uses for non-applicable fields
       if (clean.elementId === '') delete clean.elementId;
       if (clean.parentId === '') delete clean.parentId;
 
@@ -1332,7 +1343,6 @@ function normalizeGeminiOperations(
       }
       return clean;
     })
-    // Filter out delete/modify ops that have no elementId, and modify ops with empty fields
     .filter((op: Record<string, unknown>) => {
       if (op.op === 'modify' || op.op === 'delete') {
         if (!op.elementId) return false;
@@ -1347,17 +1357,18 @@ function normalizeGeminiOperations(
 }
 
 /**
- * Phase 1: Get grounded answer with Google Search (simple schema, fast).
+ * Phase 1: Research with Google Search grounding (flash-lite).
+ * Returns free-form prose + citations. No structured output.
  */
-async function askPhase1(
+async function askResearch(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
   history: QAHistoryItem[],
   image?: ImageData | null
-): Promise<{ answer: string; suggestsModification: boolean; citations: Citation[] }> {
+): Promise<{ researchText: string; citations: Citation[] }> {
   const client = getGeminiClient();
-  const prompt = buildAskPrompt(protocol, config, question, history, !!image);
+  const prompt = buildAskResearchPrompt(protocol, config, question, history, !!image);
 
   const parts: Part[] = [{ text: prompt }];
   if (image) {
@@ -1365,69 +1376,69 @@ async function askPhase1(
   }
 
   const response = await client.models.generateContent({
-    model: MODEL_GROUNDED,
+    model: MODEL_RESEARCH,
     contents: [{ role: 'user', parts }],
     config: {
       tools: [{ googleSearch: {} }],
+      thinkingConfig: { thinkingBudget: 8192 },
+    },
+  });
+
+  const researchText = response.text || '';
+  if (!researchText) {
+    throw new Error('No response from Gemini during ask research phase');
+  }
+
+  const groundingMetadata = getGroundingMetadata(response);
+  const citations = extractCitations(groundingMetadata, 'ask');
+
+  return { researchText, citations };
+}
+
+/**
+ * Phase 2: Generate answer + operations (Pro model, structured output, no grounding).
+ */
+async function askApply(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  question: string,
+  history: QAHistoryItem[],
+  researchText: string
+): Promise<{ answer: string; suggestsModification: boolean; operations?: Array<Record<string, unknown>> }> {
+  const client = getGeminiClient();
+  const prompt = buildAskApplyPrompt(protocol, config, question, history, researchText);
+
+  const response = await client.models.generateContent({
+    model: MODEL_STRUCTURED,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
       responseMimeType: 'application/json',
-      responseSchema: askAnswerSchema as any,
+      responseSchema: askResultSchema as any,
     },
   });
 
   const text = response.text;
   if (!text) {
-    throw new Error('No response from Gemini when answering question');
+    throw new Error('No response from Gemini during ask apply phase');
   }
 
-  const groundingMetadata = getGroundingMetadata(response);
-  const citations = extractCitations(groundingMetadata, 'ask');
   const parsed = JSON.parse(text);
+
+  const operations = Array.isArray(parsed.operations) && parsed.operations.length > 0
+    ? normalizeGeminiOperations(parsed.operations)
+    : undefined;
 
   return {
     answer: parsed.answer,
     suggestsModification: parsed.suggestsModification,
-    citations,
+    operations,
   };
 }
 
 /**
- * Phase 2: Generate operations for protocol modification (no grounding, structured output).
- * Best-effort — returns undefined on failure.
- */
-async function askPhase2(
-  protocol: DailyProtocol,
-  question: string,
-  answer: string
-): Promise<Array<Record<string, unknown>> | undefined> {
-  try {
-    const client = getGeminiClient();
-    const opsPrompt = buildOperationsPrompt(protocol, question, answer);
-    const opsResponse = await client.models.generateContent({
-      model: MODEL_STRUCTURED,
-      contents: [{ role: 'user', parts: [{ text: opsPrompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: askOperationsSchema as any,
-      },
-    });
-
-    const opsText = opsResponse.text;
-    if (opsText) {
-      const opsParsed = JSON.parse(opsText);
-      if (Array.isArray(opsParsed.operations) && opsParsed.operations.length > 0) {
-        return normalizeGeminiOperations(opsParsed.operations);
-      }
-    }
-  } catch (err) {
-    console.error('Phase 2 operations generation failed:', err);
-  }
-  return undefined;
-}
-
-/**
  * Answer a question about a protocol using two-phase approach:
- * Phase 1: Grounded answer with Google Search (simple schema, fast)
- * Phase 2: Operations generation if modification suggested (no grounding, structured output)
+ * Phase 1 (flash-lite): Google Search grounding → free-form research prose + citations
+ * Phase 2 (pro): Answer + operations as structured JSON from research context
  */
 export async function askAboutProtocol(
   protocol: DailyProtocol,
@@ -1436,15 +1447,13 @@ export async function askAboutProtocol(
   history: QAHistoryItem[] = [],
   image?: ImageData | null
 ): Promise<AskAboutProtocolResult> {
-  const phase1 = await askPhase1(protocol, config, question, history, image);
+  const research = await askResearch(protocol, config, question, history, image);
+  const result = await askApply(protocol, config, question, history, research.researchText);
 
-  const result: AskAboutProtocolResult = { ...phase1 };
-
-  if (phase1.suggestsModification) {
-    result.operations = await askPhase2(protocol, question, phase1.answer);
-  }
-
-  return result;
+  return {
+    ...result,
+    citations: research.citations,
+  };
 }
 
 // Combined schema for parsing protocol text with inferred goals
@@ -1802,17 +1811,18 @@ export async function* askAboutProtocolStream(
   history: QAHistoryItem[] = [],
   image?: ImageData | null
 ): AsyncGenerator<string, AskAboutProtocolResult, unknown> {
-  // Phase 1: Get grounded answer
-  const phase1 = await askPhase1(protocol, config, question, history, image);
+  // Phase 1: Research with grounding (flash-lite)
+  // Caller sends SSE stage "researching" before invoking this generator
+  const research = await askResearch(protocol, config, question, history, image);
 
-  // Kick off Phase 2 (operations) in parallel with text streaming
-  const phase2Promise = phase1.suggestsModification
-    ? askPhase2(protocol, question, phase1.answer)
-    : Promise.resolve(undefined);
+  // Phase 2: Answer + operations (Pro model)
+  // Yield a stage marker so the API route can send "generating" to the client
+  yield '\x00stage:generating';
+  const result = await askApply(protocol, config, question, history, research.researchText);
 
-  // Stream answer text in chunks while Phase 2 runs
+  // Stream answer text in chunks
   const chunkSize = 15;
-  const answer = phase1.answer;
+  const answer = result.answer;
 
   for (let i = 0; i < answer.length; i += chunkSize) {
     const chunk = answer.slice(i, i + chunkSize);
@@ -1820,14 +1830,9 @@ export async function* askAboutProtocolStream(
     await new Promise(resolve => setTimeout(resolve, 15));
   }
 
-  // Wait for Phase 2 to complete
-  const operations = await phase2Promise;
-
   return {
-    answer: phase1.answer,
-    suggestsModification: phase1.suggestsModification,
-    citations: phase1.citations,
-    operations,
+    ...result,
+    citations: research.citations,
   };
 }
 
