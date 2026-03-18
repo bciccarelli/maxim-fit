@@ -23,12 +23,20 @@ function parseAndValidateOperations(
     const result = protocolOperationSchema.safeParse(raw);
     if (result.success) {
       parsed.push(result.data);
+    } else {
+      console.error('[Ask] Operation failed Zod parse:', JSON.stringify(raw), result.error.flatten());
     }
   }
 
-  if (parsed.length === 0) return undefined;
+  if (parsed.length === 0) {
+    console.error('[Ask] All operations failed Zod parsing. Raw count:', rawOps.length);
+    return undefined;
+  }
 
   const valid = validateOperations(protocol, parsed);
+  if (valid.length < parsed.length) {
+    console.warn('[Ask] Some operations failed ID validation:', parsed.length, '→', valid.length);
+  }
   return valid.length > 0 ? valid : undefined;
 }
 

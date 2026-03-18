@@ -1424,9 +1424,17 @@ async function askApply(
 
   const parsed = JSON.parse(text);
 
+  console.log('[Ask Phase 2] suggestsModification:', parsed.suggestsModification,
+    'operations count:', Array.isArray(parsed.operations) ? parsed.operations.length : 'not array');
+  if (Array.isArray(parsed.operations) && parsed.operations.length > 0) {
+    console.log('[Ask Phase 2] First operation:', JSON.stringify(parsed.operations[0]));
+  }
+
   const operations = Array.isArray(parsed.operations) && parsed.operations.length > 0
     ? normalizeGeminiOperations(parsed.operations)
     : undefined;
+
+  console.log('[Ask Phase 2] After normalization:', operations ? operations.length + ' ops' : 'none');
 
   return {
     answer: parsed.answer,
