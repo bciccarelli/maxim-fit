@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react-native';
 import type { RequirementsStepProps } from './types';
 import { EXAMPLE_REQUIREMENTS } from './types';
 import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 export function RequirementsStep({ requirements, onChange }: RequirementsStepProps) {
   const [newReqText, setNewReqText] = useState('');
@@ -46,7 +47,7 @@ export function RequirementsStep({ requirements, onChange }: RequirementsStepPro
                 onPress={() => removeRequirement(index)}
                 hitSlop={8}
               >
-                <Trash2 size={18} color="#c62828" />
+                <Trash2 size={18} color={colors.destructive} />
               </Pressable>
             </View>
           ))}
@@ -60,7 +61,7 @@ export function RequirementsStep({ requirements, onChange }: RequirementsStepPro
           value={newReqText}
           onChangeText={setNewReqText}
           placeholder="Add a requirement..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.onSurfaceVariant}
           onSubmitEditing={() => addRequirement(newReqText)}
           returnKeyType="done"
           inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
@@ -70,7 +71,7 @@ export function RequirementsStep({ requirements, onChange }: RequirementsStepPro
           onPress={() => addRequirement(newReqText)}
           disabled={!newReqText.trim()}
         >
-          <Plus size={20} color={newReqText.trim() ? '#fff' : '#999'} />
+          <Plus size={20} color={newReqText.trim() ? colors.onPrimary : colors.onSurfaceVariant} />
         </Pressable>
       </View>
 
@@ -85,7 +86,7 @@ export function RequirementsStep({ requirements, onChange }: RequirementsStepPro
                 style={styles.exampleChip}
                 onPress={() => addRequirement(example)}
               >
-                <Plus size={14} color="#2d5a2d" />
+                <Plus size={14} color={colors.primaryContainer} />
                 <Text style={styles.exampleChipText}>{example}</Text>
               </Pressable>
             ))}
@@ -102,13 +103,13 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
     marginBottom: 8,
   },
   optionalNote: {
     fontSize: 12,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     fontStyle: 'italic',
     marginBottom: 20,
   },
@@ -119,16 +120,16 @@ const styles = StyleSheet.create({
   requirementItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
   },
   requirementText: {
     flex: 1,
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginRight: 12,
   },
   removeButton: {
@@ -141,25 +142,25 @@ const styles = StyleSheet.create({
   },
   addInput: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
   },
   addButton: {
     width: 44,
     height: 44,
-    borderRadius: 10,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 0,
+    backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addButtonDisabled: {
-    backgroundColor: '#e5e5e5',
+    backgroundColor: colors.outlineVariant,
   },
   examplesSection: {
     marginTop: 4,
@@ -167,7 +168,7 @@ const styles = StyleSheet.create({
   examplesLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -183,11 +184,11 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 20,
+    backgroundColor: colors.selectedBg,
+    borderRadius: 0,
   },
   exampleChipText: {
     fontSize: 13,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 });

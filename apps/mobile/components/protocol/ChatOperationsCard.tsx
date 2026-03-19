@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useState, useCallback } from 'react';
 import { Pencil, Trash2, PlusCircle, Check, X } from 'lucide-react-native';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 import { useProtocol } from '@/contexts/ProtocolContext';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { getElementNameById } from '@protocol/shared';
@@ -17,11 +18,11 @@ type Props = {
 function OperationIcon({ op }: { op: string }) {
   switch (op) {
     case 'modify':
-      return <Pencil size={14} color="#2d5a2d" />;
+      return <Pencil size={14} color={colors.primaryContainer} />;
     case 'delete':
-      return <Trash2 size={14} color="#c62828" />;
+      return <Trash2 size={14} color={colors.destructive} />;
     case 'create':
-      return <PlusCircle size={14} color="#2d5a2d" />;
+      return <PlusCircle size={14} color={colors.primaryContainer} />;
     default:
       return null;
   }
@@ -53,10 +54,12 @@ function getOperationLabel(op: ProtocolOperation, protocol: DailyProtocol): stri
 export function ChatOperationsCard({ operations, protocolId, protocol, onApplied }: Props) {
   const { refreshVersions, refreshChains } = useProtocol();
   const [status, setStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   const handleAccept = useCallback(async () => {
     setStatus('applying');
+    setErrorMessage(null);
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(apiUrl('/api/protocol/apply-operations'), {
@@ -66,8 +69,8 @@ export function ChatOperationsCard({ operations, protocolId, protocol, onApplied
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to apply');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || `Request failed (${response.status})`);
       }
 
       setStatus('applied');
@@ -76,6 +79,7 @@ export function ChatOperationsCard({ operations, protocolId, protocol, onApplied
       onApplied();
     } catch (err) {
       console.error('Error applying operations:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
       setStatus('error');
     }
   }, [protocolId, operations, refreshVersions, refreshChains, onApplied]);
@@ -86,7 +90,7 @@ export function ChatOperationsCard({ operations, protocolId, protocol, onApplied
     return (
       <View style={[styles.card, styles.cardApplied]}>
         <View style={styles.appliedHeader}>
-          <Check size={16} color="#2d5a2d" />
+          <Check size={16} color={colors.primaryContainer} />
           <Text style={styles.appliedText}>Changes applied</Text>
         </View>
       </View>
@@ -121,7 +125,7 @@ export function ChatOperationsCard({ operations, protocolId, protocol, onApplied
       </View>
 
       {status === 'error' && (
-        <Text style={styles.errorText}>Failed to apply. Try again.</Text>
+        <Text style={styles.errorText}>{errorMessage || 'Failed to apply. Try again.'}</Text>
       )}
 
       <View style={styles.actions}>
@@ -131,7 +135,7 @@ export function ChatOperationsCard({ operations, protocolId, protocol, onApplied
           disabled={status === 'applying'}
         >
           {status === 'applying' ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
             <Text style={styles.acceptButtonText}>Accept all</Text>
           )}
@@ -150,15 +154,15 @@ export function ChatOperationsCard({ operations, protocolId, protocol, onApplied
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
     padding: 12,
     marginTop: 8,
   },
   cardApplied: {
-    borderLeftColor: '#4caf50',
+    borderLeftColor: colors.success,
     opacity: 0.7,
   },
   appliedHeader: {
@@ -169,7 +173,7 @@ const styles = StyleSheet.create({
   appliedText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   header: {
     flexDirection: 'row',
@@ -180,18 +184,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   badge: {
-    backgroundColor: '#e8f5e9',
-    borderRadius: 10,
+    backgroundColor: colors.selectedBg,
+    borderRadius: 0,
     paddingHorizontal: 7,
     paddingVertical: 1,
   },
   badgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   operationsList: {
     gap: 8,
@@ -209,16 +213,16 @@ const styles = StyleSheet.create({
   operationLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#333',
+    color: colors.onSurface,
   },
   operationReason: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginTop: 1,
   },
   errorText: {
     fontSize: 12,
-    color: '#c62828',
+    color: colors.destructive,
     marginBottom: 8,
   },
   actions: {
@@ -226,8 +230,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   acceptButton: {
-    backgroundColor: '#2d5a2d',
-    borderRadius: 8,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 0,
     paddingHorizontal: 16,
     paddingVertical: 8,
     alignItems: 'center',
@@ -237,10 +241,10 @@ const styles = StyleSheet.create({
   acceptButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   dismissButton: {
-    borderRadius: 8,
+    borderRadius: 0,
     paddingHorizontal: 16,
     paddingVertical: 8,
     alignItems: 'center',
@@ -249,6 +253,6 @@ const styles = StyleSheet.create({
   dismissButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
 });

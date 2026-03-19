@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { X, RotateCcw, ShieldCheck, AlertCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '@/lib/theme';
 import { fetchApi } from '@/lib/api';
 import type { ProtocolVersion } from '@/contexts/ProtocolContext';
 
@@ -117,7 +119,7 @@ export function VersionHistorySheet({
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={handleClose} style={styles.closeButton}>
-            <X size={24} color="#666" />
+            <X size={24} color={colors.onSurfaceVariant} />
           </Pressable>
           <Text style={styles.title}>Version History</Text>
           <View style={styles.placeholder} />
@@ -126,14 +128,14 @@ export function VersionHistorySheet({
         <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
           {error && (
             <View style={styles.errorCard}>
-              <AlertCircle size={18} color="#c62828" />
+              <AlertCircle size={18} color={colors.destructive} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2d5a2d" />
+              <ActivityIndicator size="large" color={colors.primaryContainer} />
             </View>
           ) : versions.length === 0 && !error ? (
             <View style={styles.emptyContainer}>
@@ -225,7 +227,7 @@ function VersionItem({
           </Text>
         </View>
         {version.verified && (
-          <ShieldCheck size={14} color="#2d5a2d" />
+          <ShieldCheck size={14} color={colors.primaryContainer} />
         )}
         {isCurrent && (
           <View style={styles.currentBadge}>
@@ -262,7 +264,7 @@ function VersionItem({
                 disabled={isReverting}
               >
                 {isReverting ? (
-                  <ActivityIndicator size="small" color="#c62828" />
+                  <ActivityIndicator size="small" color={colors.destructive} />
                 ) : (
                   <Text style={styles.confirmButtonText}>Confirm Revert</Text>
                 )}
@@ -273,11 +275,17 @@ function VersionItem({
             </>
           ) : (
             <Pressable
-              style={styles.revertButton}
               onPress={() => onRevert(version.id)}
             >
-              <RotateCcw size={14} color="#2d5a2d" />
-              <Text style={styles.revertButtonText}>Revert</Text>
+              <LinearGradient
+                colors={[colors.primary, colors.primaryContainer]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.revertButton}
+              >
+                <RotateCcw size={14} color={colors.onPrimary} />
+                <Text style={styles.revertButtonText}>Revert</Text>
+              </LinearGradient>
             </Pressable>
           )}
         </View>
@@ -289,7 +297,7 @@ function VersionItem({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -297,9 +305,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   closeButton: {
     padding: 4,
@@ -307,7 +313,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   placeholder: {
     width: 32,
@@ -322,10 +328,10 @@ const styles = StyleSheet.create({
   errorCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffebee',
+    backgroundColor: colors.errorContainer,
     borderLeftWidth: 3,
-    borderLeftColor: '#c62828',
-    borderRadius: 8,
+    borderLeftColor: colors.destructive,
+    borderRadius: 0,
     padding: 12,
     gap: 10,
     marginBottom: 16,
@@ -333,7 +339,7 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     fontSize: 14,
-    color: '#c62828',
+    color: colors.destructive,
   },
   loadingContainer: {
     flex: 1,
@@ -347,19 +353,19 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginBottom: 4,
   },
   emptySubtext: {
     fontSize: 12,
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   singleVersionContainer: {
     gap: 16,
   },
   singleVersionText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -367,15 +373,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   versionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
   },
   versionCardCurrent: {
-    backgroundColor: '#e8f5e9',
-    borderColor: '#a5d6a7',
+    backgroundColor: colors.selectedBg,
+    borderColor: colors.primaryFixedDim,
   },
   versionContent: {
     gap: 8,
@@ -389,34 +395,34 @@ const styles = StyleSheet.create({
   versionNumber: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   versionBadge: {
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   versionBadgeText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   currentBadge: {
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   currentBadgeText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   changeNote: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   versionMeta: {
     flexDirection: 'row',
@@ -425,7 +431,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 11,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   revertActions: {
@@ -439,36 +445,35 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#f5f5f0',
+    borderRadius: 0,
   },
   revertButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.onPrimary,
   },
   confirmButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#ffebee',
+    borderRadius: 0,
+    backgroundColor: colors.errorContainer,
     minWidth: 100,
     alignItems: 'center',
   },
   confirmButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#c62828',
+    color: colors.destructive,
   },
   cancelButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 0,
   },
   cancelButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   buttonDisabled: {
     opacity: 0.6,

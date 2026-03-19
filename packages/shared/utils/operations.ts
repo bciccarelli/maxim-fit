@@ -10,6 +10,118 @@ import type {
 import type { ProtocolOperation, CreateOperation } from '../schemas/operations';
 import { generateElementId, ELEMENT_PREFIXES } from './ids';
 
+// ---------------------------------------------------------------------------
+// Coercion helpers — fix common Gemini output issues before Zod validation
+// ---------------------------------------------------------------------------
+
+const NUMERIC_FIELDS: Record<string, string[]> = {
+  meal: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'target_calories', 'target_protein_g', 'target_carbs_g', 'target_fat_g'],
+  supplement: [],
+  exercise: ['sets', 'duration_min', 'rest_sec'],
+  workout: ['duration_min'],
+  other_event: [],
+  routine_event: [],
+};
+
+const TIME_FIELDS: Record<string, string[]> = {
+  meal: ['time'],
+  supplement: ['time'],
+  exercise: [],
+  workout: ['time'],
+  other_event: ['start_time', 'end_time'],
+  routine_event: ['start_time'],
+};
+
+/**
+ * Normalize a time string to HH:MM 24-hour format.
+ * Handles: "7:00" → "07:00", "7:00 AM" → "07:00", "2:30 PM" → "14:30"
+ */
+export function normalizeTimeFormat(time: unknown): string | undefined {
+  if (typeof time !== 'string') return undefined;
+  const trimmed = time.trim();
+  if (!trimmed) return undefined;
+
+  // Already valid HH:MM
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) return trimmed;
+
+  // Try to parse AM/PM format: "2:30 PM", "12:00AM", etc.
+  const amPmMatch = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm|a\.m\.|p\.m\.)$/);
+  if (amPmMatch) {
+    let hours = parseInt(amPmMatch[1], 10);
+    const minutes = amPmMatch[2];
+    const period = amPmMatch[3].toLowerCase().replace(/\./g, '');
+    if (period === 'pm' && hours !== 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${minutes}`;
+  }
+
+  // Try to fix missing leading zero: "7:00" → "07:00"
+  const shortMatch = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (shortMatch) {
+    const hours = parseInt(shortMatch[1], 10);
+    if (hours >= 0 && hours <= 23) {
+      return `${String(hours).padStart(2, '0')}:${shortMatch[2]}`;
+    }
+  }
+
+  return trimmed; // Return as-is if we can't parse
+}
+
+/**
+ * Coerce element data to match Zod schema expectations.
+ * Fixes common Gemini issues: string numbers, bad time formats, missing required fields.
+ */
+export function coerceElement(
+  elementType: string,
+  data: Record<string, unknown>,
+  isCreate = false
+): Record<string, unknown> {
+  const result = { ...data };
+
+  // Coerce numeric fields from strings to numbers
+  const numericKeys = NUMERIC_FIELDS[elementType] || [];
+  for (const key of numericKeys) {
+    if (key in result && typeof result[key] === 'string') {
+      const parsed = Number(result[key]);
+      if (!isNaN(parsed)) result[key] = parsed;
+    }
+  }
+
+  // Normalize time fields to HH:MM
+  const timeKeys = TIME_FIELDS[elementType] || [];
+  for (const key of timeKeys) {
+    if (key in result) {
+      const normalized = normalizeTimeFormat(result[key]);
+      if (normalized) result[key] = normalized;
+    }
+  }
+
+  // Fill missing required defaults for create operations
+  if (isCreate) {
+    switch (elementType) {
+      case 'meal':
+        if (!('foods' in result)) result.foods = [];
+        if (!('calories' in result)) result.calories = 0;
+        if (!('protein_g' in result)) result.protein_g = 0;
+        if (!('carbs_g' in result)) result.carbs_g = 0;
+        if (!('fat_g' in result)) result.fat_g = 0;
+        break;
+      case 'supplement':
+        if (!('dosage_amount' in result)) result.dosage_amount = '';
+        if (!('dosage_unit' in result)) result.dosage_unit = 'mg';
+        if (!('timing' in result)) result.timing = 'as directed';
+        if (!('purpose' in result)) result.purpose = 'general health';
+        if (!('time' in result)) result.time = '08:00';
+        break;
+      case 'workout':
+        if (!('exercises' in result)) result.exercises = [];
+        break;
+    }
+  }
+
+  return result;
+}
+
 /**
  * Apply a list of operations to a protocol, returning a new protocol.
  * Pure function — does not mutate the input.
@@ -43,6 +155,7 @@ export function applyOperations(
 
 /**
  * Find an element by ID in the protocol and merge fields into it.
+ * Coerces the merged result to fix common Gemini type issues.
  */
 function applyModify(
   protocol: DailyProtocol,
@@ -50,16 +163,17 @@ function applyModify(
   elementType: string,
   fields: Record<string, unknown>
 ): DailyProtocol {
+  const coercedFields = coerceElement(elementType, fields);
   switch (elementType) {
     case 'meal': {
       const meals = protocol.diet.meals.map(m =>
-        m.id === elementId ? { ...m, ...fields, id: m.id } as Meal : m
+        m.id === elementId ? coerceElement(elementType, { ...m, ...coercedFields, id: m.id }) as unknown as Meal : m
       );
       return { ...protocol, diet: { ...protocol.diet, meals } };
     }
     case 'supplement': {
       const supplements = protocol.supplementation.supplements.map(s =>
-        s.id === elementId ? { ...s, ...fields, id: s.id } as Supplement : s
+        s.id === elementId ? coerceElement(elementType, { ...s, ...coercedFields, id: s.id }) as unknown as Supplement : s
       );
       return { ...protocol, supplementation: { ...protocol.supplementation, supplements } };
     }
@@ -67,14 +181,14 @@ function applyModify(
       const workouts = protocol.training.workouts.map(w => ({
         ...w,
         exercises: w.exercises.map(e =>
-          e.id === elementId ? { ...e, ...fields, id: e.id } as Exercise : e
+          e.id === elementId ? coerceElement(elementType, { ...e, ...coercedFields, id: e.id }) as unknown as Exercise : e
         ),
       }));
       return { ...protocol, training: { ...protocol.training, workouts } };
     }
     case 'workout': {
       const workouts = protocol.training.workouts.map(w =>
-        w.id === elementId ? { ...w, ...fields, id: w.id } as Workout : w
+        w.id === elementId ? coerceElement(elementType, { ...w, ...coercedFields, id: w.id }) as unknown as Workout : w
       );
       return { ...protocol, training: { ...protocol.training, workouts } };
     }
@@ -82,7 +196,7 @@ function applyModify(
       const schedules = protocol.schedules.map(s => ({
         ...s,
         other_events: s.other_events.map(e =>
-          e.id === elementId ? { ...e, ...fields, id: e.id } as OtherEvent : e
+          e.id === elementId ? coerceElement(elementType, { ...e, ...coercedFields, id: e.id }) as unknown as OtherEvent : e
         ),
       }));
       return { ...protocol, schedules };
@@ -91,7 +205,7 @@ function applyModify(
       const schedules = protocol.schedules.map(s => ({
         ...s,
         routine_events: (s.routine_events ?? []).map(r =>
-          r.id === elementId ? { ...r, ...fields, id: r.id } as RoutineEvent : r
+          r.id === elementId ? coerceElement(elementType, { ...r, ...coercedFields, id: r.id }) as unknown as RoutineEvent : r
         ),
       }));
       return { ...protocol, schedules };
@@ -150,13 +264,13 @@ function applyDelete(
 
 /**
  * Create a new element and add it to the protocol.
- * Assigns a server-generated ID.
+ * Assigns a server-generated ID. Coerces data to fix common Gemini type issues.
  */
 function applyCreate(
   protocol: DailyProtocol,
   op: CreateOperation
 ): DailyProtocol {
-  const data = { ...op.data };
+  const data = coerceElement(op.elementType, { ...op.data }, true);
 
   switch (op.elementType) {
     case 'meal': {

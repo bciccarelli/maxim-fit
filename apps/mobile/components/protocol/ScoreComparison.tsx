@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 interface Scores {
   weighted_goal_score?: number | null;
@@ -21,7 +22,7 @@ export function ScoreComparison({ currentScores, proposedScores }: ScoreComparis
     if (isNeutral) {
       return (
         <View style={styles.changeIndicator}>
-          <Minus size={14} color="#666" />
+          <Minus size={14} color={colors.onSurfaceVariant} />
           <Text style={styles.changeNeutral}>No change</Text>
         </View>
       );
@@ -30,9 +31,9 @@ export function ScoreComparison({ currentScores, proposedScores }: ScoreComparis
     return (
       <View style={styles.changeIndicator}>
         {isPositive ? (
-          <TrendingUp size={14} color="#2d5a2d" />
+          <TrendingUp size={14} color={colors.primaryContainer} />
         ) : (
-          <TrendingDown size={14} color="#c62828" />
+          <TrendingDown size={14} color={colors.destructive} />
         )}
         <Text style={[styles.changeText, isPositive ? styles.changePositive : styles.changeNegative]}>
           {isPositive ? '+' : ''}{diff.toFixed(1)}
@@ -87,7 +88,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 12,
@@ -101,23 +102,23 @@ const styles = StyleSheet.create({
   },
   columnLabel: {
     fontSize: 11,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
     textAlign: 'center',
   },
   scoreCard: {
-    backgroundColor: '#f5f5f0',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: 16,
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
   scoreCardProposed: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
     borderWidth: 1,
-    borderColor: '#2d5a2d',
+    borderColor: colors.primaryContainer,
   },
   scoreItem: {
     alignItems: 'center',
@@ -125,15 +126,15 @@ const styles = StyleSheet.create({
   scoreValue: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#333',
+    color: colors.onSurface,
     fontVariant: ['tabular-nums'],
   },
   scoreValueProposed: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   scoreLabel: {
     fontSize: 10,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 4,
@@ -150,13 +151,13 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   changePositive: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   changeNegative: {
-    color: '#c62828',
+    color: colors.destructive,
   },
   changeNeutral: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
 });

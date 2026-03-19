@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndic
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Send, ChevronDown, Plus, Wand2, Lock, MessageSquare, ImageIcon, X } from 'lucide-react-native';
+import { colors } from '@/lib/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { useProtocol } from '@/contexts/ProtocolContext';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
@@ -402,11 +403,11 @@ export default function ChatScreen() {
             style={styles.selector}
             onPress={() => setShowDropdown(!showDropdown)}
           >
-            <MessageSquare size={16} color="#2d5a2d" style={{ marginRight: 8 }} />
+            <MessageSquare size={16} color={colors.primaryContainer} style={{ marginRight: 8 }} />
             <Text style={styles.selectorText} numberOfLines={1}>
               {dropdownLabel}
             </Text>
-            <ChevronDown size={18} color="#666" />
+            <ChevronDown size={18} color={colors.onSurfaceVariant} />
           </Pressable>
 
           {showDropdown && (
@@ -416,7 +417,7 @@ export default function ChatScreen() {
                 style={[styles.dropdownItem, !selectedConversation && styles.dropdownItemSelected]}
                 onPress={handleNewChat}
               >
-                <Plus size={16} color="#2d5a2d" />
+                <Plus size={16} color={colors.primaryContainer} />
                 <Text style={[styles.dropdownItemText, styles.newChatText]}>New Conversation</Text>
               </Pressable>
 
@@ -462,7 +463,7 @@ export default function ChatScreen() {
 
         {/* New Chat Button */}
         <Pressable style={styles.newChatButton} onPress={handleNewChat}>
-          <Plus size={20} color="#2d5a2d" />
+          <Plus size={20} color={colors.primaryContainer} />
         </Pressable>
       </View>
 
@@ -480,7 +481,7 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messagesContent}
       >
         {isLoadingHistory || isLoadingConversations ? (
-          <ActivityIndicator size="small" color="#2d5a2d" style={styles.loadingIndicator} />
+          <ActivityIndicator size="small" color={colors.primaryContainer} style={styles.loadingIndicator} />
         ) : history.length === 0 && !isStreaming ? (
           <View style={styles.welcomeContainer}>
             <Text style={styles.welcomeTitle}>Ask about your protocol</Text>
@@ -521,7 +522,7 @@ export default function ChatScreen() {
                       style={styles.sparkleButton}
                       onPress={() => handleModifyFromChat(qa.answer)}
                     >
-                      <Wand2 size={14} color="#2d5a2d" />
+                      <Wand2 size={14} color={colors.primaryContainer} />
                       <Text style={styles.sparkleButtonText}>Modify</Text>
                     </Pressable>
                   )}
@@ -548,7 +549,7 @@ export default function ChatScreen() {
                       <Text style={styles.answerText}>{streamedText}</Text>
                     ) : (
                       <View style={styles.thinkingContainer}>
-                        <ActivityIndicator size="small" color="#2d5a2d" />
+                        <ActivityIndicator size="small" color={colors.primaryContainer} />
                         <Text style={styles.thinkingText}>
                           {stage === 'researching' ? 'Researching...' : stage === 'generating' ? 'Generating...' : 'Thinking...'}
                         </Text>
@@ -579,7 +580,7 @@ export default function ChatScreen() {
             style={styles.removeImageButton}
             onPress={() => setSelectedImage(null)}
           >
-            <X size={14} color="#fff" />
+            <X size={14} color={colors.onPrimary} />
           </Pressable>
         </View>
       )}
@@ -591,14 +592,14 @@ export default function ChatScreen() {
           onPress={showImagePicker}
           disabled={isStreaming}
         >
-          <ImageIcon size={20} color={isStreaming ? '#ccc' : '#2d5a2d'} />
+          <ImageIcon size={20} color={isStreaming ? colors.outlineVariant : colors.primaryContainer} />
         </Pressable>
         <TextInput
           style={styles.input}
           value={question}
           onChangeText={setQuestion}
           placeholder={selectedImage ? 'Ask about this image...' : 'Ask a question...'}
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.onSurfaceVariant}
           multiline
           maxLength={500}
           editable={!isStreaming}
@@ -613,11 +614,11 @@ export default function ChatScreen() {
           disabled={(!question.trim() && !selectedImage) || isStreaming}
         >
           {isStreaming ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : !hasAskAccess && !isBypassEnabled ? (
-            <Lock size={18} color="#fff" />
+            <Lock size={18} color={colors.onPrimary} />
           ) : (
-            <Send size={20} color="#fff" />
+            <Send size={20} color={colors.onPrimary} />
           )}
         </Pressable>
       </View>
@@ -647,45 +648,43 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
     padding: 32,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginBottom: 20,
   },
   generateButton: {
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 0,
   },
   generateButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerHigh,
     gap: 8,
   },
   selectorWrapper: {
@@ -695,22 +694,22 @@ const styles = StyleSheet.create({
   selector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   selectorText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   newChatButton: {
     width: 40,
     height: 40,
-    borderRadius: 8,
-    backgroundColor: '#e8f5e9',
+    borderRadius: 0,
+    backgroundColor: colors.selectedBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -719,21 +718,14 @@ const styles = StyleSheet.create({
     top: '100%',
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     marginTop: 4,
     maxHeight: 300,
   },
   dropdownDivider: {
-    height: 1,
-    backgroundColor: '#e5e5e5',
+    height: 8,
+    backgroundColor: colors.surfaceContainerLow,
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -743,19 +735,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dropdownItemSelected: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
   },
   dropdownItemText: {
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     flex: 1,
   },
   dropdownItemTextSelected: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
   },
   newChatText: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
   },
   conversationList: {
@@ -771,26 +763,24 @@ const styles = StyleSheet.create({
   },
   conversationDate: {
     fontSize: 11,
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   conversationCount: {
     fontSize: 11,
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   protocolIndicator: {
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surfaceContainerLow,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
   },
   protocolIndicatorText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   messagesContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   messagesContent: {
     padding: 16,
@@ -800,21 +790,23 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   welcomeContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 24,
     alignItems: 'center',
     marginTop: 32,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primaryContainer,
   },
   welcomeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 8,
   },
   welcomeText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -823,9 +815,8 @@ const styles = StyleSheet.create({
   },
   questionBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 16,
-    borderBottomRightRadius: 4,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 10,
     maxWidth: '80%',
@@ -833,7 +824,7 @@ const styles = StyleSheet.create({
   },
   questionText: {
     fontSize: 14,
-    color: '#fff',
+    color: colors.onPrimary,
     lineHeight: 20,
   },
   answerWrapper: {
@@ -841,13 +832,12 @@ const styles = StyleSheet.create({
     maxWidth: '85%',
   },
   answerBubble: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   sparkleButton: {
     alignSelf: 'flex-start',
@@ -856,18 +846,18 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#e8f5e9',
+    borderRadius: 0,
+    backgroundColor: colors.selectedBg,
     marginTop: 6,
   },
   sparkleButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   answerText: {
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   thinkingContainer: {
@@ -877,65 +867,65 @@ const styles = StyleSheet.create({
   },
   thinkingText: {
     fontSize: 14,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     fontStyle: 'italic',
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
+    backgroundColor: colors.errorContainer,
+    borderRadius: 0,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error,
     padding: 12,
     marginTop: 8,
   },
   errorText: {
     fontSize: 14,
-    color: '#c62828',
+    color: colors.destructive,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   input: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
-    borderRadius: 20,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 0,
     paddingHorizontal: 16,
     paddingVertical: 10,
     paddingRight: 12,
     fontSize: 14,
     maxHeight: 100,
-    color: '#333',
+    color: colors.onSurface,
   },
   sendButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 9999,
+    backgroundColor: colors.primaryContainer,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.outlineVariant,
   },
   sendButtonLocked: {
-    backgroundColor: '#8B6914',
+    backgroundColor: colors.warning,
   },
   // Image picker styles
   photoButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e8f5e9',
+    borderRadius: 9999,
+    backgroundColor: colors.selectedBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
   photoButtonDisabled: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceContainerLow,
   },
   imagePreviewContainer: {
     position: 'relative',
@@ -946,21 +936,21 @@ const styles = StyleSheet.create({
   imagePreview: {
     width: 100,
     height: 75,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f0',
+    borderRadius: 0,
+    backgroundColor: colors.surface,
   },
   removeImageButton: {
     position: 'absolute',
     top: -6,
     right: -6,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 10,
+    borderRadius: 9999,
     padding: 4,
   },
   questionImage: {
     width: '100%',
     height: 120,
-    borderRadius: 8,
+    borderRadius: 0,
     marginBottom: 8,
   },
 });

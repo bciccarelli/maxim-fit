@@ -17,13 +17,13 @@ const OTHER_VALUE = '__other__';
 
 // Map well-known domains to display colors
 const DOMAIN_COLORS: Record<string, string> = {
-  'pubmed.gov': '#1a73e8',
-  'ncbi.nlm.nih.gov': '#1a73e8',
-  'nih.gov': '#0071bc',
-  'examine.com': '#2d5a2d',
-  'mayoclinic.org': '#c41230',
-  'healthline.com': '#00adef',
-  'webmd.com': '#d92228',
+  'pubmed.gov': colors.info,
+  'ncbi.nlm.nih.gov': colors.info,
+  'nih.gov': colors.info,
+  'examine.com': colors.primaryContainer,
+  'mayoclinic.org': colors.destructive,
+  'healthline.com': colors.info,
+  'webmd.com': colors.destructive,
 };
 
 interface QuestionsCardProps {
@@ -39,7 +39,7 @@ interface QuestionsCardProps {
 
 function CitationBadge({ citation }: { citation: Citation }) {
   const domain = citation.domain || new URL(citation.url).hostname.replace('www.', '');
-  const color = DOMAIN_COLORS[domain] || colors.textSecondary;
+  const color = DOMAIN_COLORS[domain] || colors.onSurfaceVariant;
 
   return (
     <View style={[styles.citationBadge, { backgroundColor: color + '15' }]}>
@@ -193,7 +193,7 @@ export function QuestionsCard({
                       value={answers[question.id] || ''}
                       onChangeText={(text) => onAnswerChange(question.id, text)}
                       placeholder="Enter your answer..."
-                      placeholderTextColor={colors.textMuted}
+                      placeholderTextColor={colors.onSurfaceVariant}
                       multiline
                       numberOfLines={2}
                       autoFocus
@@ -206,7 +206,7 @@ export function QuestionsCard({
                   value={answers[question.id] || ''}
                   onChangeText={(text) => onAnswerChange(question.id, text)}
                   placeholder="Type your answer..."
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.onSurfaceVariant}
                   multiline
                   numberOfLines={2}
                 />
@@ -231,11 +231,11 @@ export function QuestionsCard({
           disabled={!allAnswered || isSubmitting}
         >
           {isSubmitting ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
             <>
               <Text style={styles.continueButtonText}>Continue</Text>
-              <ArrowRight size={18} color="#fff" />
+              <ArrowRight size={18} color={colors.onPrimary} />
             </>
           )}
         </Pressable>
@@ -251,11 +251,11 @@ const styles = StyleSheet.create({
 
   // Research Card
   researchCard: {
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: spacing.md,
     borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
+    borderLeftColor: colors.primaryContainer,
     marginBottom: spacing.lg,
   },
   researchHeader: {
@@ -271,18 +271,17 @@ const styles = StyleSheet.create({
   },
   researchSummary: {
     fontSize: fontSize.sm,
-    color: colors.text,
+    color: colors.onSurface,
     lineHeight: 20,
   },
   citationsContainer: {
     marginTop: spacing.md,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    backgroundColor: colors.surfaceContainerLow,
   },
   citationsLabel: {
     fontSize: fontSize.xs,
-    color: colors.textSecondary,
+    color: colors.onSurfaceVariant,
     marginBottom: spacing.sm,
   },
   citationsList: {
@@ -293,7 +292,7 @@ const styles = StyleSheet.create({
   citationBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
+    borderRadius: 0,
   },
   citationBadgeText: {
     fontSize: fontSize.xs,
@@ -301,7 +300,7 @@ const styles = StyleSheet.create({
   },
   moreCount: {
     fontSize: fontSize.xs,
-    color: colors.textMuted,
+    color: colors.onSurfaceVariant,
     alignSelf: 'center',
     marginLeft: spacing.xs,
   },
@@ -313,26 +312,26 @@ const styles = StyleSheet.create({
   questionsTitle: {
     fontSize: fontSize.lg,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.onSurface,
     marginBottom: spacing.xs,
   },
   questionsSubtitle: {
     fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.onSurfaceVariant,
     marginBottom: spacing.md,
   },
   questionsList: {
     flex: 1,
   },
   questionCard: {
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: spacing.md,
     marginBottom: spacing.md,
   },
   questionNumber: {
     fontSize: fontSize.xs,
-    color: colors.textMuted,
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: spacing.sm,
@@ -340,13 +339,13 @@ const styles = StyleSheet.create({
   questionText: {
     fontSize: fontSize.base,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.onSurface,
     lineHeight: 22,
     marginBottom: spacing.sm,
   },
   questionContext: {
     fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.onSurfaceVariant,
     fontStyle: 'italic',
     marginBottom: spacing.md,
   },
@@ -359,12 +358,12 @@ const styles = StyleSheet.create({
   optionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: spacing.md,
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.outlineVariant,
   },
   optionButtonSelected: {
     backgroundColor: colors.primary + '10',
@@ -373,9 +372,9 @@ const styles = StyleSheet.create({
   optionRadio: {
     width: 20,
     height: 20,
-    borderRadius: 10,
+    borderRadius: 9999,
     borderWidth: 2,
-    borderColor: colors.borderLight,
+    borderColor: colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -385,12 +384,12 @@ const styles = StyleSheet.create({
   optionRadioInner: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: 9999,
     backgroundColor: colors.primary,
   },
   optionLabel: {
     fontSize: fontSize.sm,
-    color: colors.text,
+    color: colors.onSurface,
     flex: 1,
   },
   optionLabelSelected: {
@@ -400,23 +399,23 @@ const styles = StyleSheet.create({
 
   // Text Input
   answerInput: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: spacing.md,
     fontSize: fontSize.sm,
-    color: colors.text,
+    color: colors.onSurface,
     minHeight: 60,
     textAlignVertical: 'top',
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.outlineVariant,
     marginTop: spacing.sm,
   },
   otherInput: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: spacing.md,
     fontSize: fontSize.sm,
-    color: colors.text,
+    color: colors.onSurface,
     minHeight: 60,
     textAlignVertical: 'top',
     borderWidth: 1,
@@ -436,14 +435,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.background,
+    borderRadius: 0,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.outlineVariant,
   },
   skipButtonText: {
     fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.onSurfaceVariant,
     fontWeight: '500',
   },
   continueButton: {
@@ -453,15 +452,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: 0,
     backgroundColor: colors.primary,
   },
   continueButtonDisabled: {
-    backgroundColor: colors.textMuted,
+    backgroundColor: colors.onSurfaceVariant,
   },
   continueButtonText: {
     fontSize: fontSize.sm,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
 });

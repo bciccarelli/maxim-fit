@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Keyboard, Keyboar
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock, Layers } from 'lucide-react-native';
 import type { DailyProtocol, ScheduleVariant, OtherEvent, RoutineEvent, RoutineSubEvent, DayOfWeek } from '@protocol/shared/schemas';
+import { colors } from '@/lib/theme';
 import {
   computeScheduleEvents,
   getVariantIndexForDay,
@@ -129,15 +130,15 @@ function computeBlockLayout(
 function getEventBlockStyle(source: ScheduleEventSource) {
   switch (source) {
     case 'meal':
-      return { backgroundColor: 'rgba(45, 90, 45, 0.15)', borderLeftColor: '#2d5a2d' };
+      return { backgroundColor: 'rgba(45, 90, 45, 0.15)', borderLeftColor: colors.primaryContainer };
     case 'supplement':
-      return { backgroundColor: 'rgba(2, 132, 199, 0.1)', borderLeftColor: '#0284c7' };
+      return { backgroundColor: 'rgba(2, 132, 199, 0.1)', borderLeftColor: colors.info };
     case 'workout':
-      return { backgroundColor: 'rgba(217, 119, 6, 0.1)', borderLeftColor: '#d97706' };
+      return { backgroundColor: 'rgba(217, 119, 6, 0.1)', borderLeftColor: colors.warning };
     case 'routine':
-      return { backgroundColor: 'rgba(45, 90, 45, 0.12)', borderLeftColor: '#2d5a2d' };
+      return { backgroundColor: 'rgba(45, 90, 45, 0.12)', borderLeftColor: colors.primaryContainer };
     case 'other':
-      return { backgroundColor: 'rgba(102, 102, 102, 0.1)', borderLeftColor: '#666' };
+      return { backgroundColor: 'rgba(66, 73, 63, 0.1)', borderLeftColor: colors.onSurfaceVariant };
   }
 }
 
@@ -145,15 +146,15 @@ function SourceIcon({ source }: { source: ScheduleEventSource }) {
   const iconProps = { size: 14 };
   switch (source) {
     case 'meal':
-      return <Utensils {...iconProps} color="#2d5a2d" />;
+      return <Utensils {...iconProps} color={colors.primaryContainer} />;
     case 'supplement':
-      return <Pill {...iconProps} color="#0284c7" />;
+      return <Pill {...iconProps} color={colors.info} />;
     case 'workout':
-      return <Dumbbell {...iconProps} color="#d97706" />;
+      return <Dumbbell {...iconProps} color={colors.warning} />;
     case 'routine':
-      return <Layers {...iconProps} color="#2d5a2d" />;
+      return <Layers {...iconProps} color={colors.primaryContainer} />;
     case 'other':
-      return <Clock {...iconProps} color="#666" />;
+      return <Clock {...iconProps} color={colors.onSurfaceVariant} />;
   }
 }
 
@@ -161,11 +162,11 @@ function SubEventIcon({ type }: { type: ComputedSubEvent['type'] }) {
   const iconProps = { size: 12 };
   switch (type) {
     case 'meal':
-      return <Utensils {...iconProps} color="#2d5a2d" />;
+      return <Utensils {...iconProps} color={colors.primaryContainer} />;
     case 'supplement':
-      return <Pill {...iconProps} color="#0284c7" />;
+      return <Pill {...iconProps} color={colors.info} />;
     case 'activity':
-      return <Clock {...iconProps} color="#666" />;
+      return <Clock {...iconProps} color={colors.onSurfaceVariant} />;
   }
 }
 
@@ -602,7 +603,7 @@ export function ScheduleSection({
                 style={styles.iconButton}
                 onPress={() => setEditingWakeSleep(false)}
               >
-                <X size={18} color="#666" />
+                <X size={18} color={colors.onSurfaceVariant} />
               </Pressable>
             )}
           </View>
@@ -619,23 +620,23 @@ export function ScheduleSection({
         {/* Legend */}
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <Utensils size={12} color="#2d5a2d" />
+            <Utensils size={12} color={colors.primaryContainer} />
             <Text style={styles.legendText}>Meal</Text>
           </View>
           <View style={styles.legendItem}>
-            <Pill size={12} color="#0284c7" />
+            <Pill size={12} color={colors.info} />
             <Text style={styles.legendText}>Supplement</Text>
           </View>
           <View style={styles.legendItem}>
-            <Dumbbell size={12} color="#d97706" />
+            <Dumbbell size={12} color={colors.warning} />
             <Text style={styles.legendText}>Workout</Text>
           </View>
           <View style={styles.legendItem}>
-            <Layers size={12} color="#2d5a2d" />
+            <Layers size={12} color={colors.primaryContainer} />
             <Text style={styles.legendText}>Routine</Text>
           </View>
           <View style={styles.legendItem}>
-            <Clock size={12} color="#666" />
+            <Clock size={12} color={colors.onSurfaceVariant} />
             <Text style={styles.legendText}>Other</Text>
           </View>
         </View>
@@ -777,7 +778,7 @@ export function ScheduleSection({
 
             {editable && (
               <Pressable style={styles.addButton} onPress={handleAddOtherEvent}>
-                <Plus size={16} color="#2d5a2d" />
+                <Plus size={16} color={colors.primaryContainer} />
                 <Text style={styles.addButtonText}>Add other event</Text>
               </Pressable>
             )}
@@ -787,7 +788,7 @@ export function ScheduleSection({
             <Text style={styles.noEvents}>No events scheduled for this day</Text>
             {editable && (
               <Pressable style={styles.addButton} onPress={handleAddOtherEvent}>
-                <Plus size={16} color="#2d5a2d" />
+                <Plus size={16} color={colors.primaryContainer} />
                 <Text style={styles.addButtonText}>Add other event</Text>
               </Pressable>
             )}
@@ -827,7 +828,7 @@ export function ScheduleSection({
                       style={styles.modalCloseButton}
                       onPress={() => setEditingEvent(null)}
                     >
-                      <X size={20} color="#666" />
+                      <X size={20} color={colors.onSurfaceVariant} />
                     </Pressable>
                   </View>
 
@@ -881,7 +882,7 @@ export function ScheduleSection({
                     style={styles.modalDeleteButton}
                     onPress={() => handleDeleteEvent(editingEventData)}
                   >
-                    <Trash2 size={16} color="#c62828" />
+                    <Trash2 size={16} color={colors.destructive} />
                     <Text style={styles.modalDeleteText}>Delete event</Text>
                   </Pressable>
                 </>
@@ -914,7 +915,7 @@ export function ScheduleSection({
                 <>
                   <View style={styles.modalHeader}>
                     <View style={styles.modalHeaderLeft}>
-                      <Layers size={16} color="#2d5a2d" />
+                      <Layers size={16} color={colors.primaryContainer} />
                       {editable ? (
                         <EditableField
                           value={editingRoutineData.name}
@@ -934,7 +935,7 @@ export function ScheduleSection({
                       style={styles.modalCloseButton}
                       onPress={() => setViewingRoutine(null)}
                     >
-                      <X size={20} color="#666" />
+                      <X size={20} color={colors.onSurfaceVariant} />
                     </Pressable>
                   </View>
 
@@ -1011,7 +1012,7 @@ export function ScheduleSection({
                                   handleDeleteSubEvent(viewingRoutine.sourceIndex, idx)
                                 }
                               >
-                                <Trash2 size={14} color="#c62828" />
+                                <Trash2 size={14} color={colors.destructive} />
                               </Pressable>
                             )}
                           </View>
@@ -1026,7 +1027,7 @@ export function ScheduleSection({
                         style={styles.routineAddSubEvent}
                         onPress={() => handleAddSubEvent(viewingRoutine.sourceIndex)}
                       >
-                        <Plus size={14} color="#2d5a2d" />
+                        <Plus size={14} color={colors.primaryContainer} />
                         <Text style={styles.routineAddSubEventText}>Add step</Text>
                       </Pressable>
 
@@ -1037,7 +1038,7 @@ export function ScheduleSection({
                           setViewingRoutine(null);
                         }}
                       >
-                        <Trash2 size={16} color="#c62828" />
+                        <Trash2 size={16} color={colors.destructive} />
                         <Text style={styles.modalDeleteText}>Delete routine</Text>
                       </Pressable>
                     </>
@@ -1059,7 +1060,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 8,
@@ -1074,41 +1075,41 @@ const styles = StyleSheet.create({
   daySelectorButton: {
     paddingVertical: 8,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: 0,
     alignItems: 'center',
     position: 'relative',
   },
   daySelectorButtonActive: {
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
   },
   daySelectorText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   daySelectorTextActive: {
-    color: '#fff',
+    color: colors.surfaceContainerLowest,
   },
   todayDot: {
     position: 'absolute',
     bottom: 2,
     width: 4,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 9999,
+    backgroundColor: colors.primaryContainer,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
     marginBottom: 12,
   },
   scheduleLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 12,
   },
   timesRow: {
@@ -1120,14 +1121,14 @@ const styles = StyleSheet.create({
   timeItem: {},
   timeLabel: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   timeValue: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontVariant: ['tabular-nums'],
   },
   timeEditValue: {
@@ -1140,15 +1141,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   dayBadge: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   dayText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   legend: {
     flexDirection: 'row',
@@ -1156,8 +1157,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   legendItem: {
     flexDirection: 'row',
@@ -1166,7 +1165,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
 
   // Timeline grid
@@ -1185,21 +1184,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     fontSize: 10,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   eventsColumn: {
     flex: 1,
     position: 'relative',
     borderLeftWidth: 1,
-    borderLeftColor: '#e5e5e5',
+    borderLeftColor: colors.outlineVariant,
   },
   hourLine: {
     position: 'absolute',
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceContainerLow,
   },
   nowLine: {
     position: 'absolute',
@@ -1212,13 +1211,13 @@ const styles = StyleSheet.create({
   nowDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ef4444',
+    borderRadius: 9999,
+    backgroundColor: colors.error,
   },
   nowLineBar: {
     flex: 1,
     height: 2,
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.error,
   },
   emptyTimeline: {
     paddingTop: 12,
@@ -1228,7 +1227,7 @@ const styles = StyleSheet.create({
   eventBlock: {
     position: 'absolute',
     borderLeftWidth: 3,
-    borderRadius: 6,
+    borderRadius: 0,
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginLeft: 4,
@@ -1260,23 +1259,23 @@ const styles = StyleSheet.create({
   eventBlockName: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   eventBlockTime: {
     fontSize: 10,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   eventBlockTimeRange: {
     fontSize: 10,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
     marginTop: 2,
   },
   eventBlockSubCount: {
     fontSize: 10,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
 
   // Routine sub-events
@@ -1295,12 +1294,12 @@ const styles = StyleSheet.create({
   },
   routineSubEventName: {
     fontSize: 10,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   routineSubEventTime: {
     fontSize: 9,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
 
@@ -1309,7 +1308,7 @@ const styles = StyleSheet.create({
   },
   noEvents: {
     textAlign: 'center',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontSize: 14,
     paddingVertical: 24,
   },
@@ -1324,7 +1323,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 
   // Modal styles
@@ -1336,8 +1335,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 20,
     width: '100%',
     maxWidth: 340,
@@ -1357,7 +1356,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   modalCloseButton: {
@@ -1372,14 +1371,14 @@ const styles = StyleSheet.create({
   modalFieldLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   modalFieldInput: {
     fontSize: 16,
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: 12,
   },
   modalDeleteButton: {
@@ -1389,19 +1388,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 20,
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    paddingTop: 12,
   },
   modalDeleteText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#c62828',
+    color: colors.destructive,
   },
 
   // Routine modal styles
   routineModalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 20,
     width: '100%',
     maxWidth: 340,
@@ -1409,7 +1407,7 @@ const styles = StyleSheet.create({
   },
   routineModalTime: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
     marginBottom: 16,
   },
@@ -1430,12 +1428,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginTop: 4,
   },
   routineModalSubEventName: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   routineSubEventEditName: {
@@ -1443,7 +1440,7 @@ const styles = StyleSheet.create({
   },
   routineModalSubEventTime: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   routineSubEventDuration: {
@@ -1458,7 +1455,7 @@ const styles = StyleSheet.create({
   },
   routineSubEventDurationUnit: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   routineSubEventDelete: {
     padding: 4,
@@ -1474,6 +1471,6 @@ const styles = StyleSheet.create({
   routineAddSubEventText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 });

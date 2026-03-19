@@ -7,6 +7,7 @@ import { useRatingPromptContext } from '@/contexts/RatingPromptContext';
 import type { DailyProtocol, DayOfWeek } from '@protocol/shared/schemas';
 import { useComplianceTracking, ActivityType } from '@/hooks/useComplianceTracking';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 interface TodayActivity {
   type: ActivityType;
@@ -196,7 +197,7 @@ export default function ProgressScreen() {
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#2d5a2d" />
+        <ActivityIndicator size="large" color={colors.primaryContainer} />
       </View>
     );
   }
@@ -207,7 +208,7 @@ export default function ProgressScreen() {
         style={[styles.container, { paddingTop: insets.top }]}
         contentContainerStyle={styles.emptyContent}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#2d5a2d" />
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />
         }
       >
         <View style={styles.emptyState}>
@@ -250,7 +251,7 @@ export default function ProgressScreen() {
             <Text style={styles.dropdownButtonText} numberOfLines={1}>
               {selectedChain?.name || 'Select'}
             </Text>
-            <ChevronDown size={16} color="#666" />
+            <ChevronDown size={16} color={colors.onSurfaceVariant} />
           </Pressable>
 
           {showDropdown && (
@@ -284,7 +285,7 @@ export default function ProgressScreen() {
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#2d5a2d" />
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />
         }
         showsVerticalScrollIndicator={false}
       >
@@ -300,26 +301,26 @@ export default function ProgressScreen() {
           {summary && todayActivities && (
             <View style={styles.categorySummary}>
               <View style={styles.categoryChip}>
-                <Clock size={12} color="#666" />
+                <Clock size={12} color={colors.onSurfaceVariant} />
                 <Text style={styles.categoryChipText}>
                   {summary.scheduleCompleted}/{todayActivities.scheduleBlocks.length}
                 </Text>
               </View>
               <View style={styles.categoryChip}>
-                <Utensils size={12} color="#666" />
+                <Utensils size={12} color={colors.onSurfaceVariant} />
                 <Text style={styles.categoryChipText}>
                   {summary.mealsCompleted}/{todayActivities.meals.length}
                 </Text>
               </View>
               <View style={styles.categoryChip}>
-                <Pill size={12} color="#666" />
+                <Pill size={12} color={colors.onSurfaceVariant} />
                 <Text style={styles.categoryChipText}>
                   {summary.supplementsCompleted}/{todayActivities.supplements.length}
                 </Text>
               </View>
               {todayActivities.workout && (
                 <View style={styles.categoryChip}>
-                  <Dumbbell size={12} color="#666" />
+                  <Dumbbell size={12} color={colors.onSurfaceVariant} />
                   <Text style={styles.categoryChipText}>
                     {summary.workoutsCompleted}/1
                   </Text>
@@ -333,7 +334,7 @@ export default function ProgressScreen() {
         {stats && stats.currentStreak > 0 && (
           <View style={styles.streakCard}>
             <View style={styles.streakContent}>
-              <Flame size={24} color="#f59e0b" />
+              <Flame size={24} color={colors.warning} />
               <Text style={styles.streakNumber}>{stats.currentStreak}</Text>
               <Text style={styles.streakLabel}>day streak</Text>
             </View>
@@ -349,18 +350,19 @@ export default function ProgressScreen() {
             {/* Meals Section */}
             <CategorySection
               title="Meals"
-              icon={<Utensils size={16} color="#2d5a2d" />}
+              icon={<Utensils size={16} color={colors.primaryContainer} />}
               expanded={expandedSections.meals}
               onToggle={() => toggleSection('meals')}
               completed={summary?.mealsCompleted || 0}
               total={todayActivities.meals.length}
             >
-              {todayActivities.meals.map((meal) => (
+              {todayActivities.meals.map((meal, i) => (
                 <ActivityChecklistItem
                   key={`meal-${meal.index}`}
                   activity={meal}
                   completed={isCompleted('meal', meal.index)}
                   onToggle={() => handleActivityToggle(meal)}
+                  rowIndex={i}
                 />
               ))}
             </CategorySection>
@@ -368,18 +370,19 @@ export default function ProgressScreen() {
             {/* Supplements Section */}
             <CategorySection
               title="Supplements"
-              icon={<Pill size={16} color="#2d5a2d" />}
+              icon={<Pill size={16} color={colors.primaryContainer} />}
               expanded={expandedSections.supplements}
               onToggle={() => toggleSection('supplements')}
               completed={summary?.supplementsCompleted || 0}
               total={todayActivities.supplements.length}
             >
-              {todayActivities.supplements.map((supp) => (
+              {todayActivities.supplements.map((supp, i) => (
                 <ActivityChecklistItem
                   key={`supp-${supp.index}`}
                   activity={supp}
                   completed={isCompleted('supplement', supp.index)}
                   onToggle={() => handleActivityToggle(supp)}
+                  rowIndex={i}
                 />
               ))}
             </CategorySection>
@@ -388,7 +391,7 @@ export default function ProgressScreen() {
             {todayActivities.workout && (
               <CategorySection
                 title="Workout"
-                icon={<Dumbbell size={16} color="#2d5a2d" />}
+                icon={<Dumbbell size={16} color={colors.primaryContainer} />}
                 expanded={expandedSections.workouts}
                 onToggle={() => toggleSection('workouts')}
                 completed={summary?.workoutsCompleted || 0}
@@ -398,6 +401,7 @@ export default function ProgressScreen() {
                   activity={todayActivities.workout}
                   completed={isCompleted('workout', 0)}
                   onToggle={() => handleActivityToggle(todayActivities.workout!)}
+                  rowIndex={0}
                 />
               </CategorySection>
             )}
@@ -405,7 +409,7 @@ export default function ProgressScreen() {
             {/* Hydration Section */}
             <CategorySection
               title="Hydration"
-              icon={<Droplets size={16} color="#2d5a2d" />}
+              icon={<Droplets size={16} color={colors.primaryContainer} />}
               expanded={expandedSections.hydration}
               onToggle={() => toggleSection('hydration')}
               completed={summary?.hydrationCompleted ? 1 : 0}
@@ -424,6 +428,7 @@ export default function ProgressScreen() {
                   index: 0,
                   name: 'Hydration goal',
                 })}
+                rowIndex={0}
               />
             </CategorySection>
 
@@ -431,18 +436,19 @@ export default function ProgressScreen() {
             {todayActivities.scheduleBlocks.length > 0 && (
               <CategorySection
                 title="Schedule"
-                icon={<Clock size={16} color="#2d5a2d" />}
+                icon={<Clock size={16} color={colors.primaryContainer} />}
                 expanded={expandedSections.schedule}
                 onToggle={() => toggleSection('schedule')}
                 completed={summary?.scheduleCompleted || 0}
                 total={todayActivities.scheduleBlocks.length}
               >
-                {todayActivities.scheduleBlocks.map((block) => (
+                {todayActivities.scheduleBlocks.map((block, i) => (
                   <ActivityChecklistItem
                     key={`block-${block.index}`}
                     activity={block}
                     completed={isCompleted('schedule_block', block.index)}
                     onToggle={() => handleActivityToggle(block)}
+                    rowIndex={i}
                   />
                 ))}
               </CategorySection>
@@ -509,7 +515,7 @@ function CategorySection({ title, icon, expanded, onToggle, completed, total, ch
           </Text>
           <ChevronRight
             size={16}
-            color="#999"
+            color={colors.onSurfaceVariant}
             style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
           />
         </View>
@@ -524,13 +530,21 @@ interface ActivityChecklistItemProps {
   activity: TodayActivity;
   completed: boolean;
   onToggle: () => void;
+  rowIndex: number;
 }
 
-function ActivityChecklistItem({ activity, completed, onToggle }: ActivityChecklistItemProps) {
+function ActivityChecklistItem({ activity, completed, onToggle, rowIndex }: ActivityChecklistItemProps) {
+  const isEvenRow = rowIndex % 2 === 0;
   return (
-    <Pressable style={styles.checklistItem} onPress={onToggle}>
+    <Pressable
+      style={[
+        styles.checklistItem,
+        { backgroundColor: isEvenRow ? colors.surface : colors.surfaceContainerLow },
+      ]}
+      onPress={onToggle}
+    >
       <View style={[styles.checkbox, completed && styles.checkboxChecked]}>
-        {completed && <Check size={14} color="#fff" strokeWidth={3} />}
+        {completed && <Check size={14} color={colors.surfaceContainerLowest} strokeWidth={3} />}
       </View>
       <View style={styles.checklistContent}>
         <Text style={[styles.checklistName, completed && styles.checklistNameCompleted]}>
@@ -550,68 +564,66 @@ function ActivityChecklistItem({ activity, completed, onToggle }: ActivityCheckl
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   emptyContent: {
     flex: 1,
     justifyContent: 'center',
-    padding: 16,
+    padding: spacing.md,
   },
   emptyState: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 32,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: fontSize.lg,
     fontWeight: '600',
-    color: '#1a2e1a',
-    marginBottom: 8,
+    color: colors.onSurface,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: fontSize.sm,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginBottom: 20,
   },
   generateButton: {
-    backgroundColor: '#2d5a2d',
-    paddingHorizontal: 24,
+    backgroundColor: colors.primaryContainer,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: borderRadius.md,
   },
   generateButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    padding: spacing.md,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   headerLeft: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: fontSize.xl,
     fontWeight: '700',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   headerDate: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   dropdownWrapper: {
@@ -621,33 +633,26 @@ const styles = StyleSheet.create({
   dropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 4,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
     maxWidth: 160,
   },
   dropdownButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   dropdownMenu: {
     position: 'absolute',
     top: '100%',
     right: 0,
     minWidth: 200,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    marginTop: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.xs,
     overflow: 'hidden',
   },
   dropdownItem: {
@@ -655,30 +660,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   dropdownItemSelected: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
   },
   dropdownItemText: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: fontSize.sm,
+    color: colors.onSurface,
   },
   dropdownItemTextSelected: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    padding: spacing.md,
     gap: 12,
   },
   heroCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     alignItems: 'center',
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   progressCircle: {
     flexDirection: 'row',
@@ -687,71 +692,73 @@ const styles = StyleSheet.create({
   progressPercentage: {
     fontSize: 56,
     fontWeight: '700',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontVariant: ['tabular-nums'],
   },
   progressPercentSign: {
-    fontSize: 24,
+    fontSize: fontSize['2xl'],
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   progressLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    fontSize: fontSize.sm,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.xs,
   },
   categorySummary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
+    borderRadius: borderRadius.full,
+    gap: spacing.xs,
   },
   categoryChipText: {
-    fontSize: 12,
+    fontSize: fontSize.xs,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontVariant: ['tabular-nums'],
   },
   streakCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
   },
   streakContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   streakNumber: {
-    fontSize: 28,
+    fontSize: fontSize['3xl'],
     fontWeight: '700',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontVariant: ['tabular-nums'],
   },
   streakLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: fontSize.sm,
+    color: colors.onSurfaceVariant,
   },
   bestStreak: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: fontSize.xs,
+    color: colors.onSurfaceVariant,
   },
   section: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
     overflow: 'hidden',
   },
   sectionHeader: {
@@ -763,86 +770,82 @@ const styles = StyleSheet.create({
   sectionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   sectionRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   sectionCount: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   sectionCountComplete: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   sectionContent: {
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
   },
   checklistItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
     gap: 12,
   },
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: borderRadius.full,
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#2d5a2d',
-    borderColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
+    borderColor: colors.primaryContainer,
   },
   checklistContent: {
     flex: 1,
   },
   checklistName: {
-    fontSize: 14,
+    fontSize: fontSize.sm,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   checklistNameCompleted: {
-    color: '#999',
+    color: colors.onSurfaceVariant,
     textDecorationLine: 'line-through',
   },
   checklistDetails: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: fontSize.xs,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
   checklistTime: {
-    fontSize: 12,
+    fontSize: fontSize.xs,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   weeklyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
   },
   weeklyTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 12,
   },
   weeklyBars: {
@@ -854,32 +857,32 @@ const styles = StyleSheet.create({
   barContainer: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
   },
   barWrapper: {
     width: 24,
     height: 60,
-    backgroundColor: '#f5f5f0',
-    borderRadius: 4,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   bar: {
     width: '100%',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 4,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 0,
     minHeight: 2,
   },
   barToday: {
-    backgroundColor: '#4d8a4d',
+    backgroundColor: colors.primaryFixed,
   },
   barLabel: {
     fontSize: 10,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     fontWeight: '500',
   },
   barLabelToday: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '600',
   },
 });

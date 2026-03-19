@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert
 import { useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogOut, User, Target, CheckSquare, CreditCard, MessageSquare, ExternalLink, Pencil, X, Check } from 'lucide-react-native';
+import { colors } from '@/lib/theme';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
@@ -139,7 +140,7 @@ export default function SettingsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#2d5a2d" />
+        <ActivityIndicator size="large" color={colors.primaryContainer} />
       </View>
     );
   }
@@ -149,7 +150,7 @@ export default function SettingsScreen() {
       {/* Subscription Status */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <CreditCard size={20} color="#2d5a2d" />
+          <CreditCard size={20} color={colors.primaryContainer} />
           <Text style={styles.cardTitle}>Subscription</Text>
         </View>
         <View style={styles.subscriptionRow}>
@@ -171,7 +172,7 @@ export default function SettingsScreen() {
             disabled={isBillingLoading}
           >
             {isBillingLoading ? (
-              <ActivityIndicator size="small" color="#2d5a2d" />
+              <ActivityIndicator size="small" color={colors.primaryContainer} />
             ) : (
               <Text style={styles.billingButtonText}>Manage Billing</Text>
             )}
@@ -186,25 +187,25 @@ export default function SettingsScreen() {
       {config?.personal_info && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <User size={20} color="#2d5a2d" />
+            <User size={20} color={colors.primaryContainer} />
             <Text style={styles.cardTitle}>Personal Info</Text>
             <View style={styles.cardHeaderSpacer} />
             {editingSection === 'personal' ? (
               <View style={styles.editActions}>
                 <Pressable style={styles.cancelButton} onPress={cancelEditing} disabled={isSaving}>
-                  <X size={18} color="#666" />
+                  <X size={18} color={colors.onSurfaceVariant} />
                 </Pressable>
                 <Pressable style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
                   {isSaving ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
                   ) : (
-                    <Check size={18} color="#fff" />
+                    <Check size={18} color={colors.onPrimary} />
                   )}
                 </Pressable>
               </View>
             ) : (
               <Pressable style={styles.editButton} onPress={() => startEditing('personal')}>
-                <Pencil size={16} color="#666" />
+                <Pencil size={16} color={colors.onSurfaceVariant} />
               </Pressable>
             )}
           </View>
@@ -262,25 +263,25 @@ export default function SettingsScreen() {
       {(config?.goals && config.goals.length > 0) || editingSection === 'goals' ? (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Target size={20} color="#2d5a2d" />
+            <Target size={20} color={colors.primaryContainer} />
             <Text style={styles.cardTitle}>Goals</Text>
             <View style={styles.cardHeaderSpacer} />
             {editingSection === 'goals' ? (
               <View style={styles.editActions}>
                 <Pressable style={styles.cancelButton} onPress={cancelEditing} disabled={isSaving}>
-                  <X size={18} color="#666" />
+                  <X size={18} color={colors.onSurfaceVariant} />
                 </Pressable>
                 <Pressable style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
                   {isSaving ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
                   ) : (
-                    <Check size={18} color="#fff" />
+                    <Check size={18} color={colors.onPrimary} />
                   )}
                 </Pressable>
               </View>
             ) : (
               <Pressable style={styles.editButton} onPress={() => startEditing('goals')}>
-                <Pencil size={16} color="#666" />
+                <Pencil size={16} color={colors.onSurfaceVariant} />
               </Pressable>
             )}
           </View>
@@ -309,25 +310,25 @@ export default function SettingsScreen() {
       {(config?.requirements && config.requirements.length > 0) || editingSection === 'requirements' ? (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <CheckSquare size={20} color="#2d5a2d" />
+            <CheckSquare size={20} color={colors.primaryContainer} />
             <Text style={styles.cardTitle}>Requirements</Text>
             <View style={styles.cardHeaderSpacer} />
             {editingSection === 'requirements' ? (
               <View style={styles.editActions}>
                 <Pressable style={styles.cancelButton} onPress={cancelEditing} disabled={isSaving}>
-                  <X size={18} color="#666" />
+                  <X size={18} color={colors.onSurfaceVariant} />
                 </Pressable>
                 <Pressable style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
                   {isSaving ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
                   ) : (
-                    <Check size={18} color="#fff" />
+                    <Check size={18} color={colors.onPrimary} />
                   )}
                 </Pressable>
               </View>
             ) : (
               <Pressable style={styles.editButton} onPress={() => startEditing('requirements')}>
-                <Pencil size={16} color="#666" />
+                <Pencil size={16} color={colors.onSurfaceVariant} />
               </Pressable>
             )}
           </View>
@@ -353,7 +354,7 @@ export default function SettingsScreen() {
       {/* Feedback */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <MessageSquare size={20} color="#2d5a2d" />
+          <MessageSquare size={20} color={colors.primaryContainer} />
           <Text style={styles.cardTitle}>Feedback</Text>
         </View>
         <Text style={styles.feedbackDescription}>
@@ -364,13 +365,13 @@ export default function SettingsScreen() {
           onPress={() => WebBrowser.openBrowserAsync('https://maximfit.featurebase.app')}
         >
           <Text style={styles.feedbackButtonText}>Share feedback</Text>
-          <ExternalLink size={14} color="#2d5a2d" />
+          <ExternalLink size={14} color={colors.primaryContainer} />
         </Pressable>
       </View>
 
       {/* Sign Out */}
       <Pressable style={styles.signOutButton} onPress={signOut}>
-        <LogOut size={20} color="#c62828" />
+        <LogOut size={20} color={colors.destructive} />
         <Text style={styles.signOutText}>Sign Out</Text>
       </Pressable>
 
@@ -383,7 +384,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   content: {
     padding: 16,
@@ -393,15 +394,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginLeft: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -421,8 +422,8 @@ const styles = StyleSheet.create({
   },
   editButton: {
     padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#f5f5f0',
+    borderRadius: 0,
+    backgroundColor: colors.surfaceContainerLow,
   },
   editActions: {
     flexDirection: 'row',
@@ -430,13 +431,13 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#f5f5f0',
+    borderRadius: 0,
+    backgroundColor: colors.surfaceContainerLow,
   },
   saveButton: {
     padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 0,
+    backgroundColor: colors.primaryContainer,
     minWidth: 34,
     alignItems: 'center',
     justifyContent: 'center',
@@ -447,37 +448,38 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tierBadge: {
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surfaceContainerLow,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 0,
   },
   tierBadgePro: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
   },
   tierText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   tierTextPro: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   renewalText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginLeft: 12,
+    fontVariant: ['tabular-nums'],
   },
   billingButton: {
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 0,
     paddingVertical: 10,
     alignItems: 'center',
   },
   billingButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   infoGrid: {
     flexDirection: 'row',
@@ -490,33 +492,34 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   infoValue: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontWeight: '500',
     textTransform: 'capitalize',
   },
   listSection: {
     marginTop: 4,
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    backgroundColor: colors.surfaceContainerLow,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
   },
   listLabel: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   listValue: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   goalItem: {
@@ -530,25 +533,25 @@ const styles = StyleSheet.create({
   },
   goalName: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontWeight: '500',
   },
   goalWeight: {
     fontSize: 14,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
   goalBar: {
     height: 6,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 3,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 0,
     overflow: 'hidden',
   },
   goalBarFill: {
     height: '100%',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 3,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 0,
   },
   requirementItem: {
     flexDirection: 'row',
@@ -559,19 +562,19 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
     marginTop: 6,
     marginRight: 10,
   },
   requirementText: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   feedbackDescription: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 18,
     marginBottom: 12,
   },
@@ -579,34 +582,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 0,
     paddingVertical: 10,
     gap: 6,
   },
   feedbackButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.destructive,
   },
   signOutText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#c62828',
+    color: colors.destructive,
     marginLeft: 8,
   },
   emailText: {
     fontSize: 12,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 16,
   },

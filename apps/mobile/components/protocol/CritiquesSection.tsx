@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp, X, Wand2 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 import type { Critique } from '@protocol/shared/schemas';
 import { fetchApi } from '@/lib/api';
 import { CritiqueQuestionsSheet } from './CritiqueQuestionsSheet';
@@ -121,11 +123,11 @@ export function CritiquesSection({
   const getSeverityBorderColor = (severity: string) => {
     switch (severity) {
       case 'major':
-        return '#c62828';
+        return colors.destructive;
       case 'moderate':
-        return '#f9a825';
+        return colors.warning;
       default:
-        return '#e5e5e5';
+        return colors.outlineVariant;
     }
   };
 
@@ -156,7 +158,7 @@ export function CritiquesSection({
       <View style={[styles.container, !verified && styles.containerUnverified]}>
         <Pressable style={styles.header} onPress={() => setExpanded(!expanded)}>
           <View style={styles.headerLeft}>
-            <AlertCircle size={16} color="#f9a825" />
+            <AlertCircle size={16} color={colors.warning} />
             <Text style={styles.headerTitle}>
               {activeCritiques.length} area{activeCritiques.length !== 1 ? 's' : ''} for improvement
             </Text>
@@ -172,9 +174,9 @@ export function CritiquesSection({
             )}
           </View>
           {expanded ? (
-            <ChevronUp size={16} color="#666" />
+            <ChevronUp size={16} color={colors.onSurfaceVariant} />
           ) : (
-            <ChevronDown size={16} color="#666" />
+            <ChevronDown size={16} color={colors.onSurfaceVariant} />
           )}
         </Pressable>
 
@@ -232,27 +234,33 @@ export function CritiquesSection({
                   disabled={dismissing || applying}
                 >
                   {dismissing ? (
-                    <ActivityIndicator size="small" color="#666" />
+                    <ActivityIndicator size="small" color={colors.onSurfaceVariant} />
                   ) : (
                     <>
-                      <X size={16} color="#666" />
+                      <X size={16} color={colors.onSurfaceVariant} />
                       <Text style={styles.dismissButtonText}>Dismiss</Text>
                     </>
                   )}
                 </Pressable>
                 <Pressable
-                  style={[styles.actionButton, styles.applyButton]}
                   onPress={handleApply}
                   disabled={dismissing || applying}
                 >
-                  {applying ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Wand2 size={16} color="#fff" />
-                      <Text style={styles.applyButtonText}>Apply recommendations</Text>
-                    </>
-                  )}
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryContainer]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.actionButton, styles.applyButton]}
+                  >
+                    {applying ? (
+                      <ActivityIndicator size="small" color={colors.onPrimary} />
+                    ) : (
+                      <>
+                        <Wand2 size={16} color={colors.onPrimary} />
+                        <Text style={styles.applyButtonText}>Apply recommendations</Text>
+                      </>
+                    )}
+                  </LinearGradient>
                 </Pressable>
               </View>
             )}
@@ -272,10 +280,8 @@ export function CritiquesSection({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     overflow: 'hidden',
   },
   containerUnverified: {
@@ -297,12 +303,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   countBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   countBadgeMajor: {
     backgroundColor: 'rgba(198, 40, 40, 0.15)',
@@ -310,7 +316,7 @@ const styles = StyleSheet.create({
   countBadgeMajorText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#c62828',
+    color: colors.destructive,
     fontVariant: ['tabular-nums'],
   },
   countBadgeModerate: {
@@ -319,7 +325,7 @@ const styles = StyleSheet.create({
   countBadgeModerateText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#f9a825',
+    color: colors.warning,
     fontVariant: ['tabular-nums'],
   },
   content: {
@@ -335,7 +341,7 @@ const styles = StyleSheet.create({
   },
   critiqueItemSelected: {
     backgroundColor: 'rgba(45, 90, 45, 0.05)',
-    borderRadius: 6,
+    borderRadius: 0,
   },
   critiqueCheckbox: {
     paddingTop: 2,
@@ -344,21 +350,21 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 18,
     height: 18,
-    borderRadius: 4,
+    borderRadius: 0,
     borderWidth: 1.5,
-    borderColor: '#ccc',
+    borderColor: colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxSelected: {
-    borderColor: '#2d5a2d',
-    backgroundColor: '#2d5a2d',
+    borderColor: colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   checkboxInner: {
     width: 8,
     height: 8,
-    borderRadius: 2,
-    backgroundColor: '#fff',
+    borderRadius: 0,
+    backgroundColor: colors.onPrimary,
   },
   critiqueContent: {
     flex: 1,
@@ -372,7 +378,7 @@ const styles = StyleSheet.create({
   severityBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   severityBadgeMajor: {
     backgroundColor: 'rgba(198, 40, 40, 0.15)',
@@ -381,7 +387,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(249, 168, 37, 0.15)',
   },
   severityBadgeMinor: {
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   severityText: {
     fontSize: 11,
@@ -389,33 +395,33 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   severityTextMajor: {
-    color: '#c62828',
+    color: colors.destructive,
   },
   severityTextModerate: {
-    color: '#f9a825',
+    color: colors.warning,
   },
   severityTextMinor: {
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   critiqueCategory: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   critiqueCriticism: {
     fontSize: 13,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     lineHeight: 18,
     marginBottom: 4,
   },
   critiqueSuggestion: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontStyle: 'italic',
     lineHeight: 17,
   },
   questionsHint: {
     fontSize: 11,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     marginTop: 4,
   },
   actions: {
@@ -428,24 +434,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 0,
     gap: 4,
   },
   dismissButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.outlineVariant,
   },
   dismissButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
-  applyButton: {
-    backgroundColor: '#2d5a2d',
-  },
+  applyButton: {},
   applyButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#fff',
+    color: colors.onPrimary,
   },
 });

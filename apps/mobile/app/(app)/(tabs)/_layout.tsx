@@ -1,9 +1,10 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { DynamicColorIOS, Platform } from 'react-native';
+import { colors } from '@/lib/theme';
 
 const tintColor = Platform.OS === 'ios'
-  ? DynamicColorIOS({ dark: '#4d8a4d', light: '#2d5a2d' })
-  : '#2d5a2d';
+  ? DynamicColorIOS({ dark: colors.primaryLight, light: colors.primaryContainer })
+  : colors.primaryContainer;
 
 export default function TabsLayout() {
   return (

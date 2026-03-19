@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback, useEffect } from 'react';
 import { X, ChevronLeft, Sparkles } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '@/lib/theme';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { useRatingPromptContext } from '@/contexts/RatingPromptContext';
@@ -211,7 +213,7 @@ export function GenerateProtocolModal({
         <View style={styles.header}>
           {step > 0 && step < 3 ? (
             <Pressable onPress={handleBack} style={styles.backButton}>
-              <ChevronLeft size={24} color="#666" />
+              <ChevronLeft size={24} color={colors.onSurfaceVariant} />
             </Pressable>
           ) : (
             <View style={styles.placeholder} />
@@ -222,7 +224,7 @@ export function GenerateProtocolModal({
           </View>
           {step < 3 ? (
             <Pressable onPress={handleClose} style={styles.closeButton}>
-              <X size={24} color="#666" />
+              <X size={24} color={colors.onSurfaceVariant} />
             </Pressable>
           ) : (
             <View style={styles.placeholder} />
@@ -242,17 +244,37 @@ export function GenerateProtocolModal({
         {step < 3 && (
           <View style={styles.footer}>
             <Pressable
-              style={[styles.nextButton, !canProceed() && styles.nextButtonDisabled]}
+              style={[!canProceed() && styles.nextButtonDisabled]}
               onPress={handleNext}
               disabled={!canProceed()}
             >
-              {step === 2 ? (
-                <>
-                  <Sparkles size={18} color="#fff" />
-                  <Text style={styles.nextButtonText}>Generate Protocol</Text>
-                </>
+              {canProceed() ? (
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryContainer]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.nextButton}
+                >
+                  {step === 2 ? (
+                    <>
+                      <Sparkles size={18} color={colors.onPrimary} />
+                      <Text style={styles.nextButtonText}>Generate Protocol</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.nextButtonText}>Next</Text>
+                  )}
+                </LinearGradient>
               ) : (
-                <Text style={styles.nextButtonText}>Next</Text>
+                <View style={[styles.nextButton, styles.nextButtonDisabled]}>
+                  {step === 2 ? (
+                    <>
+                      <Sparkles size={18} color={colors.onPrimary} />
+                      <Text style={styles.nextButtonText}>Generate Protocol</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.nextButtonText}>Next</Text>
+                  )}
+                </View>
               )}
             </Pressable>
           </View>
@@ -265,7 +287,7 @@ export function GenerateProtocolModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -273,9 +295,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 8,
     paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   headerCenter: {
     flex: 1,
@@ -284,7 +304,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 6,
   },
   backButton: {
@@ -306,15 +326,15 @@ const styles = StyleSheet.create({
   stepDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ddd',
+    borderRadius: 9999,
+    backgroundColor: colors.outlineVariant,
   },
   stepDotActive: {
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
     width: 20,
   },
   stepDotComplete: {
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
   },
   content: {
     flex: 1,
@@ -326,25 +346,22 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 12,
+    borderRadius: 0,
     paddingVertical: 14,
     gap: 8,
   },
   nextButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.outlineVariant,
   },
   nextButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
 });

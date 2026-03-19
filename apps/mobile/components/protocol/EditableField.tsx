@@ -11,6 +11,7 @@ import {
   type KeyboardTypeOptions,
 } from 'react-native';
 import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 interface EditableFieldProps {
   value: string;
@@ -104,7 +105,7 @@ export function EditableField({
         keyboardType={getKeyboardType()}
         style={[styles.input, mono && styles.mono, style]}
         placeholder={placeholder}
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.onSurfaceVariant}
         multiline={multiline}
         blurOnSubmit={!multiline}
         returnKeyType={multiline ? 'default' : 'done'}
@@ -121,10 +122,10 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   placeholder: {
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   mono: {
     fontVariant: ['tabular-nums'],
@@ -134,13 +135,13 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     borderWidth: 1,
-    borderColor: '#2d5a2d',
-    borderRadius: 6,
+    borderColor: colors.primaryContainer,
+    borderRadius: 0,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
     minHeight: 32,
   },
 });

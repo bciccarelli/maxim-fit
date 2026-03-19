@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { useState } from 'react';
 import { BookOpen, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react-native';
 import type { Citation } from '@protocol/shared/schemas';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 type Props = {
   citations: Citation[];
@@ -37,7 +38,7 @@ export function CitationsSection({ citations }: Props) {
     <View style={styles.container}>
       <Pressable style={styles.header} onPress={() => setExpanded(!expanded)}>
         <View style={styles.headerLeft}>
-          <BookOpen size={16} color="#2d5a2d" />
+          <BookOpen size={16} color={colors.primaryContainer} />
           <Text style={styles.headerTitle}>
             {citations.length} source{citations.length !== 1 ? 's' : ''}
           </Text>
@@ -46,9 +47,9 @@ export function CitationsSection({ citations }: Props) {
           </View>
         </View>
         {expanded ? (
-          <ChevronUp size={16} color="#666" />
+          <ChevronUp size={16} color={colors.onSurfaceVariant} />
         ) : (
-          <ChevronDown size={16} color="#666" />
+          <ChevronDown size={16} color={colors.onSurfaceVariant} />
         )}
       </Pressable>
 
@@ -71,7 +72,7 @@ export function CitationsSection({ citations }: Props) {
                         <Text style={styles.citationTitle} numberOfLines={2}>
                           {citation.title}
                         </Text>
-                        <ExternalLink size={12} color="#666" />
+                        <ExternalLink size={12} color={colors.onSurfaceVariant} />
                       </View>
                       <Text style={styles.citationDomain}>{citation.domain}</Text>
                       {citation.relevantText && (
@@ -93,10 +94,10 @@ export function CitationsSection({ citations }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
     overflow: 'hidden',
   },
   header: {
@@ -115,18 +116,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   evidenceBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 0,
     backgroundColor: 'rgba(45, 90, 45, 0.1)',
   },
   evidenceBadgeText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontVariant: ['tabular-nums'],
   },
   content: {
@@ -142,17 +143,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   citationsList: {
     gap: 1,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: colors.surfaceContainerLow,
   },
   citationItem: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.surfaceContainerLow,
   },
   citationContent: {
     gap: 4,
@@ -166,17 +167,17 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     lineHeight: 18,
   },
   citationDomain: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   citationRelevantText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontStyle: 'italic',
     lineHeight: 16,
     marginTop: 2,

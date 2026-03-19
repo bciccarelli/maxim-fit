@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { FileDown } from 'lucide-react-native';
 import type { DailyProtocol } from '@protocol/shared/schemas';
 import { generateProtocolPdf, type ProtocolMetadata } from '@/lib/pdf/generateProtocolPdf';
+import { colors } from '@/lib/theme';
 
 interface ExportPdfButtonProps {
   protocol: DailyProtocol;
@@ -72,9 +73,9 @@ export function ExportPdfButton({
       disabled={isExporting}
     >
       {isExporting ? (
-        <ActivityIndicator size="small" color="#fff" />
+        <ActivityIndicator size="small" color={colors.onPrimary} />
       ) : (
-        <FileDown size={22} color="#fff" />
+        <FileDown size={22} color={colors.onPrimary} />
       )}
     </Pressable>
   );

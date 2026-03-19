@@ -8,7 +8,7 @@ import {
 import { useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/contexts/AuthContext';
-import { colors, borderRadius } from '@/lib/theme';
+import { colors, borderRadius, fontSize } from '@/lib/theme';
 
 function GoogleLogo() {
   return (
@@ -73,8 +73,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.google,
     borderRadius: borderRadius.md,
     padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
     minHeight: 50,
   },
   buttonDisabled: {
@@ -82,7 +80,7 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.9,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surfaceContainerLow,
   },
   content: {
     flexDirection: 'row',
@@ -91,7 +89,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: colors.googleText,
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: '500',
   },
 });

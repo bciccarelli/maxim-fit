@@ -76,9 +76,20 @@ export async function POST(request: NextRequest) {
     try {
       normalizedResult = normalizeProtocol(modified);
     } catch (err) {
+      // Log detailed Zod validation errors for debugging
+      const zodErrors = (err as { errors?: Array<{ path: (string | number)[]; message: string }> }).errors;
+      if (zodErrors) {
+        console.error('Apply-operations Zod validation errors:', JSON.stringify(zodErrors.map(e => ({
+          path: e.path.join('.'),
+          message: e.message,
+        }))));
+      }
       console.error('Apply-operations produced invalid protocol:', err);
+      const detail = zodErrors
+        ? zodErrors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
+        : (err instanceof Error ? err.message : 'Validation failed');
       return NextResponse.json(
-        { error: 'Operations produced an invalid protocol', message: err instanceof Error ? err.message : 'Validation failed' },
+        { error: `Operations produced an invalid protocol: ${detail}` },
         { status: 422 }
       );
     }

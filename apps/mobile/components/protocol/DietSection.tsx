@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, Modal, Keyboard, KeyboardAvoidingVie
 import { useState, useCallback, useMemo } from 'react';
 import { Plus, Trash2, X, Utensils } from 'lucide-react-native';
 import type { DietPlan, Meal } from '@protocol/shared/schemas';
+import { colors } from '@/lib/theme';
 import { EditableField } from './EditableField';
 import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
 
@@ -72,7 +73,7 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
           <View style={styles.editHeader}>
             <Text style={styles.editLabel}>Edit Daily Targets</Text>
             <Pressable style={styles.iconButton} onPress={() => setEditingMacros(false)}>
-              <X size={18} color="#666" />
+              <X size={18} color={colors.onSurfaceVariant} />
             </Pressable>
           </View>
 
@@ -234,7 +235,7 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
 
         {editable && (
           <Pressable style={styles.addButton} onPress={addMeal}>
-            <Plus size={16} color="#2d5a2d" />
+            <Plus size={16} color={colors.primaryContainer} />
             <Text style={styles.addButtonText}>Add meal</Text>
           </Pressable>
         )}
@@ -274,14 +275,14 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
               <>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalHeaderLeft}>
-                    <Utensils size={16} color="#2d5a2d" />
+                    <Utensils size={16} color={colors.primaryContainer} />
                     <Text style={styles.modalTitle}>{editingMeal.name}</Text>
                   </View>
                   <Pressable
                     style={styles.modalCloseButton}
                     onPress={() => setEditingMealIndex(null)}
                   >
-                    <X size={20} color="#666" />
+                    <X size={20} color={colors.onSurfaceVariant} />
                   </Pressable>
                 </View>
 
@@ -375,7 +376,7 @@ export function DietSection({ diet, editable = false, onChange }: Props) {
                   style={styles.modalDeleteButton}
                   onPress={() => removeMeal(editingMealIndex)}
                 >
-                  <Trash2 size={16} color="#c62828" />
+                  <Trash2 size={16} color={colors.destructive} />
                   <Text style={styles.modalDeleteText}>Delete meal</Text>
                 </Pressable>
               </>
@@ -409,26 +410,24 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 8,
     marginLeft: 4,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   macrosRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   macroItem: {
     alignItems: 'center',
@@ -436,24 +435,24 @@ const styles = StyleSheet.create({
   macroValue: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontVariant: ['tabular-nums'],
   },
   macroTarget: {
     fontSize: 11,
-    color: '#888',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
     marginTop: 1,
   },
   macroLabel: {
     fontSize: 10,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     marginTop: 2,
   },
   macrosEditCard: {
-    backgroundColor: '#f9f9f7',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 0,
     padding: 12,
     marginBottom: 12,
   },
@@ -468,7 +467,7 @@ const styles = StyleSheet.create({
   macroEditLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -477,22 +476,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   hydration: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: 'rgba(2, 132, 199, 0.1)',
     padding: 8,
-    borderRadius: 6,
+    borderRadius: 0,
     marginBottom: 16,
   },
   hydrationText: {
     fontSize: 13,
-    color: '#1565c0',
+    color: colors.info,
     textAlign: 'center',
   },
   meals: {},
   mealItem: {
     marginBottom: 16,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   mealHeader: {
     flexDirection: 'row',
@@ -501,19 +498,19 @@ const styles = StyleSheet.create({
   },
   mealTime: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
     width: 50,
   },
   mealName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   mealCalories: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   mealMacros: {
@@ -522,7 +519,7 @@ const styles = StyleSheet.create({
   },
   mealMacroText: {
     fontSize: 11,
-    color: '#888',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   foodsList: {
@@ -530,25 +527,23 @@ const styles = StyleSheet.create({
   },
   foodItem: {
     fontSize: 13,
-    color: '#444',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   notes: {
     marginTop: 8,
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   notesTitle: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
   noteItem: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
   },
   editHeader: {
@@ -560,7 +555,7 @@ const styles = StyleSheet.create({
   editLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   editActions: {
     flexDirection: 'row',
@@ -579,7 +574,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -590,14 +585,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
     gap: 6,
   },
   addButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 
   // Modal styles
@@ -609,8 +602,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 20,
     width: '100%',
     maxWidth: 340,
@@ -630,7 +623,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   modalCloseButton: {
@@ -648,15 +641,15 @@ const styles = StyleSheet.create({
   modalFieldLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   modalFieldInput: {
     fontSize: 16,
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: 12,
   },
   modalDeleteButton: {
@@ -666,21 +659,19 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 20,
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   modalDeleteText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#c62828',
+    color: colors.destructive,
   },
   accessoryContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    backgroundColor: colors.surfaceContainerLow,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#d1d1d1',
+    borderTopColor: colors.outlineVariant,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -691,6 +682,6 @@ const styles = StyleSheet.create({
   accessoryDoneText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 });

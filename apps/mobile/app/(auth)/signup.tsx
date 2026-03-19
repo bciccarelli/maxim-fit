@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { SocialSignInButtons } from '@/components/auth/SocialSignInButtons';
 import { Divider } from '@/components/auth/Divider';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 export default function SignupScreen() {
@@ -98,7 +99,7 @@ export default function SignupScreen() {
                   value={email}
                   onChangeText={setEmail}
                   placeholder="your@email.com"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.onSurfaceVariant}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -111,7 +112,7 @@ export default function SignupScreen() {
                   value={password}
                   onChangeText={setPassword}
                   placeholder="At least 6 characters"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.onSurfaceVariant}
                   secureTextEntry
                   editable={!isLoading}
                 />
@@ -122,25 +123,31 @@ export default function SignupScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm your password"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.onSurfaceVariant}
                   secureTextEntry
                   editable={!isLoading}
                 />
 
                 <Pressable
                   style={({ pressed }) => [
-                    styles.button,
                     isLoading && styles.buttonDisabled,
                     pressed && styles.buttonPressed,
                   ]}
                   onPress={handleSignup}
                   disabled={isLoading}
                 >
-                  {isLoading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.buttonText}>Create account</Text>
-                  )}
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryContainer]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.button}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color={colors.onPrimary} />
+                    ) : (
+                      <Text style={styles.buttonText}>Create account</Text>
+                    )}
+                  </LinearGradient>
                 </Pressable>
               </View>
             </View>
@@ -166,7 +173,7 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   },
   keyboardView: {
     flex: 1,
@@ -188,46 +195,42 @@ const styles = StyleSheet.create({
   title: {
     fontSize: fontSize['3xl'],
     fontWeight: '700',
-    color: colors.text,
+    color: colors.onSurface,
     marginBottom: spacing.xs,
   },
   subtitle: {
     fontSize: fontSize.base,
-    color: colors.textSecondary,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
   },
   form: {},
   label: {
     fontSize: fontSize.xs,
     fontWeight: '500',
-    color: colors.textSecondary,
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: 14,
     fontSize: fontSize.base,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
+    color: colors.onSurface,
     marginBottom: spacing.md,
   },
   button: {
-    backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     padding: 16,
     alignItems: 'center',
     marginTop: spacing.sm,
+    overflow: 'hidden',
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -236,7 +239,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.onPrimary,
     fontSize: fontSize.base,
     fontWeight: '600',
   },
@@ -245,7 +248,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerText: {
-    color: colors.textSecondary,
+    color: colors.onSurfaceVariant,
     fontSize: fontSize.sm,
   },
   footerLink: {

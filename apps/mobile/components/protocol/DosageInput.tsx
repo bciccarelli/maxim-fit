@@ -2,6 +2,7 @@ import { View, Text, TextInput, StyleSheet, Pressable, Modal, Platform } from 'r
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react-native';
 import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 const DOSAGE_UNITS = ['mg', 'g', 'mcg', 'IU', 'ml', 'drops', 'capsules', 'tablets'];
 
@@ -38,13 +39,13 @@ export function DosageInput({
           onChangeText={onAmountChange}
           keyboardType="numeric"
           placeholder="0"
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.onSurfaceVariant}
           returnKeyType="done"
           inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
         />
         <Pressable style={styles.unitButton} onPress={() => setShowUnitPicker(true)}>
           <Text style={styles.unitText}>{unit || 'mg'}</Text>
-          <ChevronDown size={16} color="#666" />
+          <ChevronDown size={16} color={colors.onSurfaceVariant} />
         </Pressable>
       </View>
 
@@ -53,7 +54,7 @@ export function DosageInput({
         value={notes || ''}
         onChangeText={(text) => onNotesChange(text || null)}
         placeholder="Notes (e.g., standardized to 3%)"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.onSurfaceVariant}
         returnKeyType="done"
         inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
       />
@@ -97,39 +98,39 @@ const styles = StyleSheet.create({
   amountInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#2d5a2d',
-    borderRadius: 6,
+    borderColor: colors.primaryContainer,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 16,
     fontVariant: ['tabular-nums'],
-    color: '#1a2e1a',
-    backgroundColor: '#fff',
+    color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   notesInput: {
     borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 6,
+    borderColor: colors.outlineVariant,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    color: '#1a2e1a',
-    backgroundColor: '#fff',
+    color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   unitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 6,
+    borderColor: colors.outlineVariant,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#f9f9f7',
+    backgroundColor: colors.surfaceContainerLow,
     gap: 4,
   },
   unitText: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontWeight: '500',
   },
   modalOverlay: {
@@ -139,33 +140,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pickerContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     width: 200,
   },
   pickerTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 12,
     textAlign: 'center',
   },
   pickerOption: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 6,
+    borderRadius: 0,
   },
   pickerOptionSelected: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
   },
   pickerOptionText: {
     fontSize: 15,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     textAlign: 'center',
   },
   pickerOptionTextSelected: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '600',
   },
 });

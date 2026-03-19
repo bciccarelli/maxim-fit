@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { X, Wand2, Check, XCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '@/lib/theme';
 import { useModifyJob, type JobStatus } from '@/lib/useModifyJob';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { ScoreComparison } from './ScoreComparison';
@@ -227,7 +229,7 @@ export function ModifySheet({
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={handleClose} style={styles.closeButton}>
-            <X size={24} color="#666" />
+            <X size={24} color={colors.onSurfaceVariant} />
           </Pressable>
           <Text style={styles.title}>Modify Protocol</Text>
           <View style={styles.placeholder} />
@@ -245,19 +247,32 @@ export function ModifySheet({
                 value={message}
                 onChangeText={setMessage}
                 placeholder="e.g., I want to add more protein to my diet, or move my workout to the evening..."
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.onSurfaceVariant}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
               />
 
               <Pressable
-                style={[styles.submitButton, (!message.trim() || isLoading) && styles.submitButtonDisabled]}
                 onPress={handleSubmit}
                 disabled={!message.trim() || isLoading}
               >
-                <Wand2 size={20} color="#fff" />
-                <Text style={styles.submitButtonText}>Generate Modification</Text>
+                {(!message.trim() || isLoading) ? (
+                  <View style={[styles.submitButton, styles.submitButtonDisabled]}>
+                    <Wand2 size={20} color={colors.onPrimary} />
+                    <Text style={styles.submitButtonText}>Generate Modification</Text>
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryContainer]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.submitButton}
+                  >
+                    <Wand2 size={20} color={colors.onPrimary} />
+                    <Text style={styles.submitButtonText}>Generate Modification</Text>
+                  </LinearGradient>
+                )}
               </Pressable>
             </>
           )}
@@ -309,28 +324,35 @@ export function ModifySheet({
                   disabled={isAccepting || isRejecting}
                 >
                   {isRejecting ? (
-                    <ActivityIndicator size="small" color="#c62828" />
+                    <ActivityIndicator size="small" color={colors.destructive} />
                   ) : (
                     <>
-                      <XCircle size={20} color="#c62828" />
+                      <XCircle size={20} color={colors.destructive} />
                       <Text style={styles.rejectButtonText}>Reject</Text>
                     </>
                   )}
                 </Pressable>
 
                 <Pressable
-                  style={[styles.acceptButton, isAccepting && styles.buttonLoading]}
+                  style={[isAccepting && styles.buttonLoading]}
                   onPress={handleAccept}
                   disabled={isAccepting || isRejecting}
                 >
-                  {isAccepting ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Check size={20} color="#fff" />
-                      <Text style={styles.acceptButtonText}>Accept Changes</Text>
-                    </>
-                  )}
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryContainer]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.acceptButton}
+                  >
+                    {isAccepting ? (
+                      <ActivityIndicator size="small" color={colors.onPrimary} />
+                    ) : (
+                      <>
+                        <Check size={20} color={colors.onPrimary} />
+                        <Text style={styles.acceptButtonText}>Accept Changes</Text>
+                      </>
+                    )}
+                  </LinearGradient>
                 </Pressable>
               </View>
             </>
@@ -364,7 +386,7 @@ export function ModifySheet({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -372,9 +394,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   closeButton: {
     padding: 4,
@@ -382,7 +402,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   placeholder: {
     width: 32,
@@ -396,64 +416,61 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
     marginBottom: 16,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     minHeight: 120,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
     marginBottom: 16,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 12,
+    borderRadius: 0,
     paddingVertical: 14,
     gap: 8,
   },
   submitButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.outlineVariant,
   },
   submitButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   reasoningCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   reasoningLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   reasoningText: {
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   comparisonContainer: {
     marginTop: 16,
     marginHorizontal: -16,
     height: 400,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -465,45 +482,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     paddingVertical: 14,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#c62828',
+    borderColor: colors.destructive,
   },
   rejectButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#c62828',
+    color: colors.destructive,
   },
   acceptButton: {
     flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 12,
+    borderRadius: 0,
     paddingVertical: 14,
     gap: 8,
   },
   acceptButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   buttonLoading: {
     opacity: 0.7,
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
-    borderRadius: 12,
+    backgroundColor: colors.errorContainer,
+    borderRadius: 0,
     padding: 16,
     alignItems: 'center',
   },
   errorText: {
     fontSize: 14,
-    color: '#c62828',
+    color: colors.destructive,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -514,6 +530,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 });

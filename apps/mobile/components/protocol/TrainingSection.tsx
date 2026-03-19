@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { Plus, Trash2, X, Dumbbell, GripVertical } from 'lucide-react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import type { TrainingProgram, Workout, Exercise } from '@protocol/shared/schemas';
+import { colors } from '@/lib/theme';
 import { EditableField } from './EditableField';
 
 type Props = {
@@ -148,7 +149,7 @@ export function TrainingSection({
               style={styles.iconButton}
               onPress={() => setEditingProgramHeader(false)}
             >
-              <X size={18} color="#666" />
+              <X size={18} color={colors.onSurfaceVariant} />
             </Pressable>
           </View>
 
@@ -208,7 +209,7 @@ export function TrainingSection({
         >
           {editable && (
             <View style={styles.dragHandle}>
-              <GripVertical size={16} color="#999" />
+              <GripVertical size={16} color={colors.onSurfaceVariant} />
             </View>
           )}
           <Text style={[styles.exerciseName, editable && styles.exerciseNameWithHandle]} numberOfLines={1}>
@@ -270,7 +271,7 @@ export function TrainingSection({
               style={styles.addExerciseButton}
               onPress={() => addExercise(selectedWorkoutIndex)}
             >
-              <Plus size={14} color="#2d5a2d" />
+              <Plus size={14} color={colors.primaryContainer} />
               <Text style={styles.addButtonText}>Add exercise</Text>
             </Pressable>
           )}
@@ -325,7 +326,7 @@ export function TrainingSection({
 
         {editable && (
           <Pressable style={styles.addButton} onPress={addWorkout}>
-            <Plus size={16} color="#2d5a2d" />
+            <Plus size={16} color={colors.primaryContainer} />
             <Text style={styles.addButtonText}>Add workout</Text>
           </Pressable>
         )}
@@ -383,7 +384,7 @@ export function TrainingSection({
               <>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalHeaderLeft}>
-                    <Dumbbell size={16} color="#d97706" />
+                    <Dumbbell size={16} color={colors.warning} />
                     <Text style={styles.modalTitle}>{editingWorkout.name}</Text>
                   </View>
                   <Pressable
@@ -393,7 +394,7 @@ export function TrainingSection({
                       setEditingExerciseIndex(null);
                     }}
                   >
-                    <X size={20} color="#666" />
+                    <X size={20} color={colors.onSurfaceVariant} />
                   </Pressable>
                 </View>
 
@@ -449,7 +450,7 @@ export function TrainingSection({
                   style={styles.modalDeleteButton}
                   onPress={() => removeWorkout(editingWorkoutIndex)}
                 >
-                  <Trash2 size={16} color="#c62828" />
+                  <Trash2 size={16} color={colors.destructive} />
                   <Text style={styles.modalDeleteText}>Delete workout</Text>
                 </Pressable>
               </>
@@ -482,14 +483,14 @@ export function TrainingSection({
               <>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalHeaderLeft}>
-                    <Dumbbell size={16} color="#d97706" />
+                    <Dumbbell size={16} color={colors.warning} />
                     <Text style={styles.modalTitle}>{editingExercise.name}</Text>
                   </View>
                   <Pressable
                     style={styles.modalCloseButton}
                     onPress={() => setEditingExerciseIndex(null)}
                   >
-                    <X size={20} color="#666" />
+                    <X size={20} color={colors.onSurfaceVariant} />
                   </Pressable>
                 </View>
 
@@ -571,7 +572,7 @@ export function TrainingSection({
                   style={styles.modalDeleteButton}
                   onPress={() => removeExercise(editingWorkoutIndex, editingExerciseIndex)}
                 >
-                  <Trash2 size={16} color="#c62828" />
+                  <Trash2 size={16} color={colors.destructive} />
                   <Text style={styles.modalDeleteText}>Delete exercise</Text>
                 </Pressable>
               </>
@@ -591,18 +592,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 8,
     marginLeft: 4,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   programHeader: {
     flexDirection: 'row',
@@ -610,24 +611,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   programName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   programDays: {
     fontSize: 13,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
   programHeaderEdit: {
-    backgroundColor: '#f9f9f7',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 0,
     padding: 12,
     marginBottom: 16,
   },
@@ -644,19 +643,19 @@ const styles = StyleSheet.create({
   workoutChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    borderRadius: 0,
+    backgroundColor: colors.surfaceContainerLow,
   },
   workoutChipActive: {
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
   },
   workoutChipText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   workoutChipTextActive: {
-    color: '#fff',
+    color: colors.surfaceContainerLowest,
   },
 
   // Selected workout content
@@ -678,22 +677,22 @@ const styles = StyleSheet.create({
   workoutName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   workoutDay: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   workoutDuration: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
   workoutTime: {
     fontSize: 12,
-    color: '#888',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
     marginTop: 2,
   },
@@ -708,17 +707,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     minHeight: 44,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   exerciseRowDragging: {
-    backgroundColor: '#f9f9f7',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: colors.surfaceContainerLow,
   },
   dragHandle: {
     paddingRight: 8,
@@ -727,7 +719,7 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
     marginRight: 12,
   },
@@ -737,7 +729,7 @@ const styles = StyleSheet.create({
   exerciseData: {
     fontSize: 13,
     fontVariant: ['tabular-nums'],
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'right',
   },
 
@@ -756,13 +748,13 @@ const styles = StyleSheet.create({
   restDaysLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   restDaysText: {
     fontSize: 13,
-    color: '#444',
+    color: colors.onSurface,
   },
   progression: {
     marginBottom: 12,
@@ -770,29 +762,27 @@ const styles = StyleSheet.create({
   progressionLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   progressionText: {
     fontSize: 13,
-    color: '#444',
+    color: colors.onSurface,
   },
   notes: {
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   notesTitle: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
   noteItem: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
   },
 
@@ -806,7 +796,7 @@ const styles = StyleSheet.create({
   editLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   editActions: {
     flexDirection: 'row',
@@ -825,7 +815,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -836,14 +826,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
     gap: 6,
   },
   addButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 
   // Modal styles
@@ -855,8 +843,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 20,
     width: '100%',
     maxWidth: 340,
@@ -876,7 +864,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flex: 1,
   },
   modalCloseButton: {
@@ -894,15 +882,15 @@ const styles = StyleSheet.create({
   modalFieldLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   modalFieldInput: {
     fontSize: 16,
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: 12,
   },
   modalDeleteButton: {
@@ -912,12 +900,10 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 20,
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   modalDeleteText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#c62828',
+    color: colors.destructive,
   },
 });

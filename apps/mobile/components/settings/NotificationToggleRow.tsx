@@ -1,4 +1,5 @@
 import { View, Text, Switch, StyleSheet } from 'react-native';
+import { colors } from '@/lib/theme';
 
 type Props = {
   label: string;
@@ -22,8 +23,8 @@ export function NotificationToggleRow({
         value={value}
         onValueChange={onChange}
         disabled={disabled}
-        trackColor={{ false: '#e5e5e5', true: '#2d5a2d' }}
-        thumbColor="#fff"
+        trackColor={{ false: colors.outlineVariant, true: colors.primaryContainer }}
+        thumbColor={colors.surfaceContainerLowest}
       />
     </View>
   );
@@ -41,9 +42,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   labelDisabled: {
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
 });

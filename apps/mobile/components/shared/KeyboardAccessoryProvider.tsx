@@ -8,6 +8,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import { colors } from '@/lib/theme';
 
 export const KEYBOARD_ACCESSORY_ID = 'app-keyboard-accessory';
 
@@ -38,9 +39,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#d1d1d1',
+    backgroundColor: colors.surfaceContainerHigh,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -54,6 +53,6 @@ const styles = StyleSheet.create({
   doneText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 });

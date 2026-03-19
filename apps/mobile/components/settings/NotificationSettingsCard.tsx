@@ -14,6 +14,7 @@ import {
 } from 'lucide-react-native';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { NotificationToggleRow } from './NotificationToggleRow';
+import { colors } from '@/lib/theme';
 
 async function requestNotificationPermissions(): Promise<boolean> {
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -77,10 +78,10 @@ export function NotificationSettingsCard() {
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Bell size={20} color="#2d5a2d" />
+          <Bell size={20} color={colors.primaryContainer} />
           <Text style={styles.cardTitle}>Notifications</Text>
         </View>
-        <ActivityIndicator size="small" color="#2d5a2d" />
+        <ActivityIndicator size="small" color={colors.primaryContainer} />
       </View>
     );
   }
@@ -90,7 +91,7 @@ export function NotificationSettingsCard() {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Bell size={20} color="#2d5a2d" />
+        <Bell size={20} color={colors.primaryContainer} />
         <Text style={styles.cardTitle}>Notifications</Text>
       </View>
 
@@ -113,14 +114,14 @@ export function NotificationSettingsCard() {
             }
           }}
         >
-          <AlertCircle size={16} color="#c62828" />
+          <AlertCircle size={16} color={colors.destructive} />
           <Text style={styles.permissionWarningText}>
             Notifications are blocked. Tap to open settings.
           </Text>
         </Pressable>
       )}
 
-      <View style={styles.divider} />
+      <View style={styles.sectionGap} />
 
       {/* Schedule */}
       <View style={[styles.category, masterDisabled && styles.categoryDisabled]}>
@@ -130,14 +131,14 @@ export function NotificationSettingsCard() {
           disabled={masterDisabled}
         >
           <View style={styles.categoryLeft}>
-            <Clock size={16} color={masterDisabled ? '#999' : '#666'} />
+            <Clock size={16} color={colors.onSurfaceVariant} />
             <Text style={[styles.categoryLabel, masterDisabled && styles.categoryLabelDisabled]}>
               Schedule
             </Text>
             {scheduleExpanded ? (
-              <ChevronUp size={16} color={masterDisabled ? '#999' : '#666'} />
+              <ChevronUp size={16} color={colors.onSurfaceVariant} />
             ) : (
-              <ChevronDown size={16} color={masterDisabled ? '#999' : '#666'} />
+              <ChevronDown size={16} color={colors.onSurfaceVariant} />
             )}
           </View>
           <Pressable
@@ -195,7 +196,7 @@ export function NotificationSettingsCard() {
       <View style={[styles.category, masterDisabled && styles.categoryDisabled]}>
         <View style={styles.categoryHeader}>
           <View style={styles.categoryLeft}>
-            <Utensils size={16} color={masterDisabled ? '#999' : '#666'} />
+            <Utensils size={16} color={colors.onSurfaceVariant} />
             <Text style={[styles.categoryLabel, masterDisabled && styles.categoryLabelDisabled]}>
               Meals
             </Text>
@@ -226,7 +227,7 @@ export function NotificationSettingsCard() {
       <View style={[styles.category, masterDisabled && styles.categoryDisabled]}>
         <View style={styles.categoryHeader}>
           <View style={styles.categoryLeft}>
-            <Pill size={16} color={masterDisabled ? '#999' : '#666'} />
+            <Pill size={16} color={colors.onSurfaceVariant} />
             <Text style={[styles.categoryLabel, masterDisabled && styles.categoryLabelDisabled]}>
               Supplements
             </Text>
@@ -259,7 +260,7 @@ export function NotificationSettingsCard() {
       <View style={[styles.category, masterDisabled && styles.categoryDisabled]}>
         <View style={styles.categoryHeader}>
           <View style={styles.categoryLeft}>
-            <Dumbbell size={16} color={masterDisabled ? '#999' : '#666'} />
+            <Dumbbell size={16} color={colors.onSurfaceVariant} />
             <Text style={[styles.categoryLabel, masterDisabled && styles.categoryLabelDisabled]}>
               Workouts
             </Text>
@@ -296,14 +297,14 @@ export function NotificationSettingsCard() {
           disabled={masterDisabled}
         >
           <View style={styles.categoryLeft}>
-            <Droplets size={16} color={masterDisabled ? '#999' : '#666'} />
+            <Droplets size={16} color={colors.onSurfaceVariant} />
             <Text style={[styles.categoryLabel, masterDisabled && styles.categoryLabelDisabled]}>
               Hydration
             </Text>
             {hydrationExpanded ? (
-              <ChevronUp size={16} color={masterDisabled ? '#999' : '#666'} />
+              <ChevronUp size={16} color={colors.onSurfaceVariant} />
             ) : (
-              <ChevronDown size={16} color={masterDisabled ? '#999' : '#666'} />
+              <ChevronDown size={16} color={colors.onSurfaceVariant} />
             )}
           </View>
           <Pressable
@@ -376,12 +377,12 @@ export function NotificationSettingsCard() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -391,15 +392,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginLeft: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginVertical: 8,
+  sectionGap: {
+    height: 12,
   },
   category: {
     paddingVertical: 4,
@@ -421,40 +420,38 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   categoryLabelDisabled: {
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   toggleTrack: {
     width: 44,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#e5e5e5',
+    backgroundColor: colors.outlineVariant,
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   toggleTrackActive: {
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
   },
   toggleTrackDisabled: {
-    backgroundColor: '#e5e5e5',
+    backgroundColor: colors.outlineVariant,
   },
   toggleThumb: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   toggleThumbActive: {
     alignSelf: 'flex-end',
   },
   subOptions: {
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    marginTop: 4,
+    marginTop: 8,
   },
   intervalRow: {
     flexDirection: 'row',
@@ -465,10 +462,10 @@ const styles = StyleSheet.create({
   },
   intervalLabel: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   intervalLabelDisabled: {
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   intervalPicker: {
     flexDirection: 'row',
@@ -477,36 +474,36 @@ const styles = StyleSheet.create({
   intervalOption: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#f5f5f0',
+    borderRadius: 0,
+    backgroundColor: colors.surface,
   },
   intervalOptionActive: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
   },
   intervalOptionText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontVariant: ['tabular-nums'],
   },
   intervalOptionTextActive: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   intervalOptionTextDisabled: {
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   permissionWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffebee',
+    backgroundColor: colors.errorContainer,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 0,
     marginTop: 8,
     gap: 8,
   },
   permissionWarningText: {
     flex: 1,
     fontSize: 13,
-    color: '#c62828',
+    color: colors.destructive,
   },
 });

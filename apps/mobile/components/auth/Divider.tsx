@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, fontSize } from '@/lib/theme';
 
 interface DividerProps {
   text?: string;
@@ -24,12 +24,12 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: colors.outlineVariant,
   },
   text: {
     paddingHorizontal: spacing.md,
-    fontSize: 12,
-    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },

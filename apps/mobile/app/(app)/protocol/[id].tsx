@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'rea
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import { Wand2 } from 'lucide-react-native';
+import { colors } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { normalizeProtocol } from '@protocol/shared/schemas';
 import type { DailyProtocol, Critique, Citation } from '@protocol/shared/schemas';
@@ -96,7 +97,7 @@ export default function ProtocolDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2d5a2d" />
+        <ActivityIndicator size="large" color={colors.primaryContainer} />
       </View>
     );
   }
@@ -134,7 +135,7 @@ export default function ProtocolDetailScreen() {
                   setShowModifySheet(true);
                 }}
               >
-                <Wand2 size={22} color="#fff" />
+                <Wand2 size={22} color={colors.onPrimary} />
               </Pressable>
             </View>
           ),
@@ -205,24 +206,24 @@ export default function ProtocolDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
     padding: 20,
   },
   errorText: {
     fontSize: 16,
-    color: '#c62828',
+    color: colors.destructive,
     textAlign: 'center',
   },
   headerButtons: {
@@ -234,11 +235,11 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   scoresCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primaryContainer,
   },
   scoreRow: {
     flexDirection: 'row',
@@ -250,20 +251,20 @@ const styles = StyleSheet.create({
   scoreValue: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontVariant: ['tabular-nums'],
   },
   scoreLabel: {
     fontSize: 10,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 2,
   },
   verified: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   unverified: {
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
 });

@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react-native';
 import type { Citation } from '@protocol/shared/schemas';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 type Props = {
   citations: Citation[];
@@ -24,9 +25,9 @@ export function ChatCitationsDropdown({ citations }: Props) {
     <View style={styles.container}>
       <Pressable style={styles.header} onPress={() => setExpanded(!expanded)}>
         {expanded ? (
-          <ChevronUp size={12} color="#666" />
+          <ChevronUp size={12} color={colors.onSurfaceVariant} />
         ) : (
-          <ChevronDown size={12} color="#666" />
+          <ChevronDown size={12} color={colors.onSurfaceVariant} />
         )}
         <Text style={styles.headerText}>
           {citations.length} source{citations.length !== 1 ? 's' : ''}
@@ -41,7 +42,7 @@ export function ChatCitationsDropdown({ citations }: Props) {
               style={styles.citationItem}
               onPress={() => handleOpenUrl(citation.url)}
             >
-              <ExternalLink size={10} color="#666" style={styles.linkIcon} />
+              <ExternalLink size={10} color={colors.onSurfaceVariant} style={styles.linkIcon} />
               <Text style={styles.citationDomain} numberOfLines={1}>
                 {citation.title || citation.domain || 'Source'}
               </Text>
@@ -64,13 +65,13 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   content: {
     marginTop: 6,
     paddingLeft: 4,
     borderLeftWidth: 1,
-    borderLeftColor: '#e5e5e5',
+    borderLeftColor: colors.outlineVariant,
     gap: 4,
   },
   citationItem: {
@@ -87,6 +88,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     fontWeight: '500',
-    color: '#333',
+    color: colors.onSurface,
   },
 });

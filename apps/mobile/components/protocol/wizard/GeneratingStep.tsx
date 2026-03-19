@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform } from 'react-native';
 import { CheckCircle2 } from 'lucide-react-native';
 import type { GeneratingStepProps } from './types';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 type Stage = 'generating' | 'evaluating' | 'complete';
 
@@ -53,9 +54,9 @@ export function GeneratingStep({ streamedText, error, onRetry }: GeneratingStepP
             <View key={stage.key} style={styles.stageItem}>
               <View style={styles.stageIconContainer}>
                 {isComplete ? (
-                  <CheckCircle2 size={20} color="#2d5a2d" />
+                  <CheckCircle2 size={20} color={colors.primaryContainer} />
                 ) : isCurrent ? (
-                  <ActivityIndicator size="small" color="#2d5a2d" />
+                  <ActivityIndicator size="small" color={colors.primaryContainer} />
                 ) : (
                   <View style={styles.stageDot} />
                 )}
@@ -85,13 +86,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 32,
@@ -115,35 +116,35 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ddd',
+    backgroundColor: colors.outlineVariant,
   },
   stageText: {
     fontSize: 14,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   stageTextComplete: {
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   stageTextCurrent: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '600',
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
-    borderRadius: 12,
+    backgroundColor: colors.errorContainer,
+    borderRadius: 0,
     padding: 20,
     alignItems: 'center',
   },
   errorTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#c62828',
+    color: colors.destructive,
     marginBottom: 8,
   },
   errorText: {
     fontSize: 14,
-    color: '#c62828',
+    color: colors.destructive,
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 20,
@@ -151,14 +152,14 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#c62828',
+    borderColor: colors.destructive,
   },
   retryButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#c62828',
+    color: colors.destructive,
   },
 });

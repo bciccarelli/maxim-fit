@@ -8,6 +8,7 @@ import Animated, {
   cancelAnimation,
 } from 'react-native-reanimated';
 import type { ScheduleEvent, ScheduleEventSource } from '@protocol/shared';
+import { colors } from '@/lib/theme';
 
 // Timeline constants (must match ScheduleSection)
 const HOUR_HEIGHT = 48;
@@ -348,7 +349,7 @@ export function DraggableEventBlock({
   // Animated style for selection highlight
   const animatedHighlightStyle = useAnimatedStyle(() => ({
     borderWidth: isDragging.value ? 2 : 0,
-    borderColor: isDragging.value ? '#2d5a2d' : 'transparent',
+    borderColor: isDragging.value ? colors.primaryContainer : 'transparent',
   }));
 
   // Animated style for resize handles
@@ -419,7 +420,7 @@ const styles = StyleSheet.create({
   resizeHandleBar: {
     width: 32,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 9999,
+    backgroundColor: colors.primaryContainer,
   },
 });

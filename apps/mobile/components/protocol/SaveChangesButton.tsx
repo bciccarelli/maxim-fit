@@ -1,4 +1,6 @@
-import { Pressable, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { Pressable, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 interface SaveChangesButtonProps {
   onPress: () => void;
@@ -13,17 +15,27 @@ export function SaveChangesButton({
 }: SaveChangesButtonProps) {
   return (
     <Pressable
-      style={[
-        styles.button,
-        (loading || disabled) && styles.buttonDisabled,
-      ]}
+      style={[(loading || disabled) && styles.buttonDisabled]}
       onPress={onPress}
       disabled={loading || disabled}
     >
-      {loading ? (
-        <ActivityIndicator size="small" color="#fff" />
+      {(loading || disabled) ? (
+        <View style={[styles.button, styles.buttonDisabledBg]}>
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.onPrimary} />
+          ) : (
+            <Text style={styles.buttonText}>Save changes</Text>
+          )}
+        </View>
       ) : (
-        <Text style={styles.buttonText}>Save changes</Text>
+        <LinearGradient
+          colors={[colors.primary, colors.primaryContainer]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.button}
+        >
+          <Text style={styles.buttonText}>Save changes</Text>
+        </LinearGradient>
       )}
     </Pressable>
   );
@@ -31,10 +43,9 @@ export function SaveChangesButton({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#2d5a2d',
     paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
@@ -42,8 +53,11 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
+  buttonDisabledBg: {
+    backgroundColor: colors.primaryContainer,
+  },
   buttonText: {
-    color: '#fff',
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '600',
   },

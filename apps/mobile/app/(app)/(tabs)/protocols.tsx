@@ -17,6 +17,8 @@ import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
 import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
 import { useUserConfig } from '@/hooks/useUserConfig';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 export default function ProtocolsScreen() {
   const { user } = useAuth();
@@ -228,7 +230,7 @@ export default function ProtocolsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#2d5a2d" />
+        <ActivityIndicator size="large" color={colors.primaryContainer} />
       </View>
     );
   }
@@ -239,7 +241,7 @@ export default function ProtocolsScreen() {
         style={[styles.container, { paddingTop: insets.top }]}
         contentContainerStyle={styles.emptyContent}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#2d5a2d" />
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />
         }
       >
         <View style={styles.emptyState}>
@@ -248,10 +250,16 @@ export default function ProtocolsScreen() {
             Create your personalized health protocol to get started.
           </Text>
           <Pressable
-            style={styles.generateButton}
             onPress={() => setShowGenerateModal(true)}
           >
-            <Text style={styles.generateButtonText}>Generate Protocol</Text>
+            <LinearGradient
+              colors={[colors.primary, colors.primaryContainer]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.generateButton}
+            >
+              <Text style={styles.generateButtonText}>Generate Protocol</Text>
+            </LinearGradient>
           </Pressable>
         </View>
         <GenerateProtocolModal
@@ -290,7 +298,7 @@ export default function ProtocolsScreen() {
               <Text style={styles.protocolName} numberOfLines={1}>
                 {selectedChain?.name || 'Untitled Protocol'}
               </Text>
-              <Pencil size={14} color="#999" />
+              <Pencil size={14} color={colors.onSurfaceVariant} />
             </Pressable>
           )}
         </View>
@@ -308,7 +316,7 @@ export default function ProtocolsScreen() {
           style={styles.iconButton}
           onPress={() => setShowVersionHistory(true)}
         >
-          <History size={18} color="#666" />
+          <History size={18} color={colors.onSurfaceVariant} />
         </Pressable>
 
         {/* Protocol Dropdown Button */}
@@ -317,7 +325,7 @@ export default function ProtocolsScreen() {
             style={styles.dropdownButton}
             onPress={() => setShowChainDropdown(!showChainDropdown)}
           >
-            <ChevronDown size={20} color="#666" />
+            <ChevronDown size={20} color={colors.onSurfaceVariant} />
           </Pressable>
 
           {showChainDropdown && (
@@ -329,7 +337,7 @@ export default function ProtocolsScreen() {
                   handleNewProtocol();
                 }}
               >
-                <Plus size={16} color="#2d5a2d" />
+                <Plus size={16} color={colors.primaryContainer} />
                 <Text style={[styles.dropdownItemText, styles.newProtocolText]}>
                   New Protocol
                 </Text>
@@ -338,7 +346,7 @@ export default function ProtocolsScreen() {
                 style={styles.dropdownItem}
                 onPress={handleImportPress}
               >
-                <Upload size={16} color="#2d5a2d" />
+                <Upload size={16} color={colors.primaryContainer} />
                 <Text style={[styles.dropdownItemText, styles.newProtocolText]}>
                   Import Protocol
                 </Text>
@@ -378,7 +386,7 @@ export default function ProtocolsScreen() {
                           style={styles.deleteConfirmButton}
                           onPress={() => handleDeleteChain(chain.version_chain_id)}
                         >
-                          <Trash2 size={14} color="#dc2626" />
+                          <Trash2 size={14} color={colors.destructive} />
                         </Pressable>
                         <Pressable
                           onPress={() => setConfirmDeleteChainId(null)}
@@ -393,9 +401,9 @@ export default function ProtocolsScreen() {
                         disabled={isDeleting}
                       >
                         {isDeleting ? (
-                          <ActivityIndicator size="small" color="#999" />
+                          <ActivityIndicator size="small" color={colors.onSurfaceVariant} />
                         ) : (
-                          <Trash2 size={14} color="#999" />
+                          <Trash2 size={14} color={colors.onSurfaceVariant} />
                         )}
                       </Pressable>
                     )}
@@ -423,7 +431,7 @@ export default function ProtocolsScreen() {
         />
       ) : (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2d5a2d" />
+          <ActivityIndicator size="large" color={colors.primaryContainer} />
         </View>
       )}
 
@@ -476,56 +484,54 @@ export default function ProtocolsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   emptyContent: {
     flex: 1,
     justifyContent: 'center',
-    padding: 16,
+    padding: spacing.md,
   },
   emptyState: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 32,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: fontSize.lg,
     fontWeight: '600',
-    color: '#1a2e1a',
-    marginBottom: 8,
+    color: colors.onSurface,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: fontSize.sm,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   generateButton: {
-    backgroundColor: '#2d5a2d',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md / 2 + spacing.sm / 2,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
   },
   generateButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.surfaceContainerLowest,
   },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-    gap: 8,
+    padding: spacing.md / 2 + spacing.sm / 2,
+    backgroundColor: colors.surface,
+    gap: spacing.sm,
   },
   nameContainer: {
     flex: 1,
@@ -534,22 +540,22 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
   },
   protocolName: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     flexShrink: 1,
   },
   nameInput: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     padding: 0,
     margin: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#2d5a2d',
+    borderBottomColor: colors.primaryContainer,
   },
   dropdownButtonWrapper: {
     position: 'relative',
@@ -557,8 +563,8 @@ const styles = StyleSheet.create({
   dropdownButton: {
     width: 40,
     height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f0',
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -567,87 +573,80 @@ const styles = StyleSheet.create({
     top: '100%',
     right: 0,
     minWidth: 220,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    marginTop: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.xs,
     overflow: 'hidden',
   },
   dropdownDivider: {
-    height: 1,
-    backgroundColor: '#e5e5e5',
+    height: spacing.sm,
+    backgroundColor: colors.surfaceContainerLow,
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 8,
+    paddingHorizontal: spacing.md / 2 + spacing.sm / 2,
+    paddingVertical: spacing.md / 2 + spacing.sm / 2,
+    gap: spacing.sm,
   },
   dropdownItemSelected: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
   },
   dropdownItemText: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: fontSize.sm,
+    color: colors.onSurface,
     flex: 1,
   },
   dropdownItemTextSelected: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
   },
   newProtocolText: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
   },
   dropdownItemContent: {
     flex: 1,
   },
   deleteButton: {
-    padding: 4,
+    padding: spacing.xs,
   },
   deleteConfirmRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   deleteConfirmButton: {
-    padding: 4,
+    padding: spacing.xs,
   },
   deleteCancelText: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: fontSize.xs,
+    color: colors.onSurfaceVariant,
   },
   scoreChip: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
     paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
     gap: 2,
   },
   scoreChipValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontVariant: ['tabular-nums'],
   },
   scoreChipLabel: {
     fontSize: 9,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   iconButton: {
     width: 32,
     height: 32,
-    borderRadius: 6,
-    backgroundColor: '#f5f5f0',
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },

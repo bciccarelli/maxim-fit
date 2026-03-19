@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react-native';
 import type { GoalsStepProps } from './types';
 import { EXAMPLE_GOALS } from './types';
 import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 interface WeightSliderProps {
   value: number; // 0-1
@@ -93,7 +94,7 @@ export function GoalsStep({ goals, onChange }: GoalsStepProps) {
                   onPress={() => removeGoal(index)}
                   hitSlop={8}
                 >
-                  <Trash2 size={16} color="#c62828" />
+                  <Trash2 size={16} color={colors.destructive} />
                 </Pressable>
               </View>
               <WeightSlider
@@ -112,7 +113,7 @@ export function GoalsStep({ goals, onChange }: GoalsStepProps) {
           value={newGoalText}
           onChangeText={setNewGoalText}
           placeholder="Add a custom goal..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.onSurfaceVariant}
           onSubmitEditing={() => addGoal(newGoalText)}
           returnKeyType="done"
           inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
@@ -122,7 +123,7 @@ export function GoalsStep({ goals, onChange }: GoalsStepProps) {
           onPress={() => addGoal(newGoalText)}
           disabled={!newGoalText.trim()}
         >
-          <Plus size={20} color={newGoalText.trim() ? '#fff' : '#999'} />
+          <Plus size={20} color={newGoalText.trim() ? colors.onPrimary : colors.onSurfaceVariant} />
         </Pressable>
       </View>
 
@@ -137,7 +138,7 @@ export function GoalsStep({ goals, onChange }: GoalsStepProps) {
                 style={styles.exampleChip}
                 onPress={() => addGoal(example.name)}
               >
-                <Plus size={14} color="#2d5a2d" />
+                <Plus size={14} color={colors.primaryContainer} />
                 <Text style={styles.exampleChipText}>{example.name}</Text>
               </Pressable>
             ))}
@@ -154,7 +155,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
     marginBottom: 20,
   },
@@ -163,11 +164,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   goalItem: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
   },
   goalRow: {
     flexDirection: 'row',
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginRight: 12,
   },
   removeButton: {
@@ -196,34 +197,29 @@ const styles = StyleSheet.create({
   },
   sliderTrack: {
     height: 6,
-    backgroundColor: '#e5e5e5',
-    borderRadius: 3,
+    backgroundColor: colors.outlineVariant,
+    borderRadius: 0,
     overflow: 'hidden',
   },
   sliderFill: {
     height: '100%',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 3,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 0,
   },
   sliderThumb: {
     position: 'absolute',
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#2d5a2d',
+    backgroundColor: colors.primaryContainer,
     marginLeft: -10,
     top: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
   },
   sliderValue: {
     width: 42,
     fontSize: 14,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     textAlign: 'right',
   },
   addGoalRow: {
@@ -233,25 +229,25 @@ const styles = StyleSheet.create({
   },
   addGoalInput: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
   },
   addButton: {
     width: 44,
     height: 44,
-    borderRadius: 10,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 0,
+    backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addButtonDisabled: {
-    backgroundColor: '#e5e5e5',
+    backgroundColor: colors.outlineVariant,
   },
   examplesSection: {
     marginTop: 4,
@@ -259,7 +255,7 @@ const styles = StyleSheet.create({
   examplesLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -275,11 +271,11 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 20,
+    backgroundColor: colors.selectedBg,
+    borderRadius: 0,
   },
   exampleChipText: {
     fontSize: 13,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 });

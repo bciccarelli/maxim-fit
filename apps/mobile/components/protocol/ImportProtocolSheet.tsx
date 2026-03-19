@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import { X, Upload, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '@/lib/theme';
 import { fetchApi } from '@/lib/api';
 
 type ImportState = 'idle' | 'loading' | 'success' | 'error';
@@ -99,7 +101,7 @@ export function ImportProtocolSheet({
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={handleClose} style={styles.closeButton}>
-            <X size={24} color="#666" />
+            <X size={24} color={colors.onSurfaceVariant} />
           </Pressable>
           <Text style={styles.title}>Import Protocol</Text>
           <View style={styles.placeholder} />
@@ -113,7 +115,7 @@ export function ImportProtocolSheet({
           {state === 'idle' && (
             <>
               <View style={styles.infoCard}>
-                <Sparkles size={20} color="#2d5a2d" />
+                <Sparkles size={20} color={colors.primaryContainer} />
                 <Text style={styles.infoText}>
                   AI will parse your text into a structured protocol with inferred goals
                 </Text>
@@ -124,7 +126,7 @@ export function ImportProtocolSheet({
                 value={pasteText}
                 onChangeText={setPasteText}
                 placeholder={PLACEHOLDER_TEXT}
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.onSurfaceVariant}
                 multiline
                 textAlignVertical="top"
               />
@@ -134,22 +136,32 @@ export function ImportProtocolSheet({
               </Text>
 
               <Pressable
-                style={[
-                  styles.submitButton,
-                  !pasteText.trim() && styles.submitButtonDisabled,
-                ]}
                 onPress={handleSubmit}
                 disabled={!pasteText.trim()}
               >
-                <Sparkles size={20} color="#fff" />
-                <Text style={styles.submitButtonText}>Parse with AI</Text>
+                {!pasteText.trim() ? (
+                  <View style={[styles.submitButton, styles.submitButtonDisabled]}>
+                    <Sparkles size={20} color={colors.onPrimary} />
+                    <Text style={styles.submitButtonText}>Parse with AI</Text>
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryContainer]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.submitButton}
+                  >
+                    <Sparkles size={20} color={colors.onPrimary} />
+                    <Text style={styles.submitButtonText}>Parse with AI</Text>
+                  </LinearGradient>
+                )}
               </Pressable>
             </>
           )}
 
           {state === 'loading' && (
             <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#2d5a2d" />
+              <ActivityIndicator size="large" color={colors.primaryContainer} />
               <Text style={styles.loadingTitle}>Parsing and verifying...</Text>
               <Text style={styles.loadingSubtitle}>
                 Extracting protocol structure, inferring goals, and verifying with current evidence
@@ -159,7 +171,7 @@ export function ImportProtocolSheet({
 
           {state === 'success' && (
             <View style={styles.centerContainer}>
-              <CheckCircle2 size={48} color="#2d5a2d" />
+              <CheckCircle2 size={48} color={colors.primaryContainer} />
               <Text style={styles.successTitle}>Protocol imported!</Text>
               <Text style={styles.successSubtitle}>
                 Redirecting to your protocol...
@@ -169,7 +181,7 @@ export function ImportProtocolSheet({
 
           {state === 'error' && (
             <View style={styles.errorContainer}>
-              <AlertCircle size={48} color="#c62828" />
+              <AlertCircle size={48} color={colors.destructive} />
               <Text style={styles.errorTitle}>Import failed</Text>
               <Text style={styles.errorText}>{error}</Text>
               <Pressable style={styles.retryButton} onPress={handleRetry}>
@@ -186,7 +198,7 @@ export function ImportProtocolSheet({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -194,9 +206,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   closeButton: {
     padding: 4,
@@ -204,7 +214,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   placeholder: {
     width: 32,
@@ -220,8 +230,8 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e8f5e9',
-    borderRadius: 12,
+    backgroundColor: colors.selectedBg,
+    borderRadius: 0,
     padding: 12,
     gap: 10,
     marginBottom: 16,
@@ -229,41 +239,40 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 13,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     lineHeight: 18,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     minHeight: 200,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
     marginBottom: 8,
   },
   hint: {
     fontSize: 12,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     marginBottom: 16,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 12,
+    borderRadius: 0,
     paddingVertical: 14,
     gap: 8,
   },
   submitButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.outlineVariant,
   },
   submitButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   centerContainer: {
     flex: 1,
@@ -274,12 +283,12 @@ const styles = StyleSheet.create({
   loadingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginTop: 16,
   },
   loadingSubtitle: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 32,
@@ -288,12 +297,12 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginTop: 16,
   },
   successSubtitle: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginTop: 4,
   },
   errorContainer: {
@@ -305,28 +314,28 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#c62828',
+    color: colors.destructive,
     marginTop: 16,
   },
   errorText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 32,
   },
   retryButton: {
     marginTop: 24,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
   },
   retryButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
 });

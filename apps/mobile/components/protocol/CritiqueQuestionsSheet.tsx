@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useState } from 'react';
 import { X, Sparkles } from 'lucide-react-native';
+import { colors } from '@/lib/theme';
 import type { Critique } from '@protocol/shared/schemas';
 
 interface CritiqueAnswer {
@@ -83,11 +84,11 @@ export function CritiqueQuestionsSheet({
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'major':
-        return '#c62828';
+        return colors.destructive;
       case 'moderate':
-        return '#f9a825';
+        return colors.warning;
       default:
-        return '#666';
+        return colors.onSurfaceVariant;
     }
   };
 
@@ -98,7 +99,7 @@ export function CritiqueQuestionsSheet({
       case 'moderate':
         return 'rgba(249, 168, 37, 0.15)';
       default:
-        return '#f5f5f0';
+        return colors.surface;
     }
   };
 
@@ -121,7 +122,7 @@ export function CritiqueQuestionsSheet({
             </Text>
           </View>
           <Pressable onPress={handleClose} style={styles.closeButton} disabled={submitting}>
-            <X size={24} color="#666" />
+            <X size={24} color={colors.onSurfaceVariant} />
           </Pressable>
         </View>
 
@@ -194,7 +195,7 @@ export function CritiqueQuestionsSheet({
                             value={currentAnswer}
                             onChangeText={(value) => handleAnswerChange(index, question.id, value)}
                             placeholder="Type your answer..."
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.onSurfaceVariant}
                             multiline
                           />
                         )}
@@ -218,10 +219,10 @@ export function CritiqueQuestionsSheet({
             disabled={submitting}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
               <>
-                <Sparkles size={16} color="#fff" />
+                <Sparkles size={16} color={colors.onPrimary} />
                 <Text style={styles.submitButtonText}>
                   Apply{totalQuestions > 0 ? ' with preferences' : ''}
                 </Text>
@@ -237,15 +238,14 @@ export function CritiqueQuestionsSheet({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLow,
   },
   headerContent: {
     flex: 1,
@@ -254,12 +254,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 4,
   },
   headerDescription: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   closeButton: {
     padding: 4,
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   severityBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   severityText: {
     fontSize: 11,
@@ -297,11 +297,11 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   criticismText: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   questionsContainer: {
@@ -314,19 +314,19 @@ const styles = StyleSheet.create({
   questionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   contextText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderColor: colors.outlineVariant,
+    borderRadius: 0,
     padding: 12,
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     minHeight: 44,
   },
   optionsContainer: {
@@ -335,41 +335,40 @@ const styles = StyleSheet.create({
   optionButton: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   optionButtonSelected: {
-    borderColor: '#2d5a2d',
+    borderColor: colors.primaryContainer,
     backgroundColor: 'rgba(45, 90, 45, 0.05)',
   },
   optionButtonText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   optionButtonTextSelected: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',
     padding: 16,
     gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLow,
   },
   cancelButton: {
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.outlineVariant,
   },
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   submitButton: {
     flex: 1,
@@ -378,8 +377,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 0,
+    backgroundColor: colors.primaryContainer,
     gap: 8,
   },
   submitButtonDisabled: {
@@ -388,6 +387,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#fff',
+    color: colors.onPrimary,
   },
 });

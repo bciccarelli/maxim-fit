@@ -10,6 +10,8 @@ import {
 import { useState } from 'react';
 import { X, Crown, Check, Zap } from 'lucide-react-native';
 import { PRICING } from '@/lib/subscription';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '@/lib/theme';
 
 const PRO_BENEFITS = [
   'AI Verification with Google Search',
@@ -99,14 +101,14 @@ export function UpgradeModal({
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.closeButton}>
-            <X size={24} color="#666" />
+            <X size={24} color={colors.onSurfaceVariant} />
           </Pressable>
         </View>
 
         {/* Icon and Title */}
         <View style={styles.titleSection}>
           <View style={styles.iconContainer}>
-            <Crown size={48} color="#2d5a2d" />
+            <Crown size={48} color={colors.primaryContainer} />
           </View>
           <Text style={styles.title}>Upgrade to Pro</Text>
           {feature && (
@@ -174,7 +176,7 @@ export function UpgradeModal({
           <Text style={styles.benefitsTitle}>Everything in Pro:</Text>
           {PRO_BENEFITS.map((benefit) => (
             <View key={benefit} style={styles.benefitRow}>
-              <Check size={18} color="#2d5a2d" />
+              <Check size={18} color={colors.primaryContainer} />
               <Text style={styles.benefitText}>{benefit}</Text>
             </View>
           ))}
@@ -182,14 +184,21 @@ export function UpgradeModal({
 
         {/* Upgrade Button */}
         <Pressable
-          style={[styles.upgradeButton, isLoading && styles.buttonDisabled]}
+          style={[isLoading && styles.buttonDisabled]}
           onPress={handleUpgrade}
           disabled={isLoading || isRestoring}
         >
-          <Zap size={20} color="#fff" />
-          <Text style={styles.upgradeButtonText}>
-            {isLoading ? 'Loading...' : 'Start free trial'}
-          </Text>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryContainer]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.upgradeButton}
+          >
+            <Zap size={20} color={colors.onPrimary} />
+            <Text style={styles.upgradeButtonText}>
+              {isLoading ? 'Loading...' : 'Start free trial'}
+            </Text>
+          </LinearGradient>
         </Pressable>
 
         {/* Restore Button */}
@@ -217,7 +226,7 @@ export function UpgradeModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   content: {
     padding: 24,
@@ -239,7 +248,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#e8f5e9',
+    backgroundColor: colors.selectedBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -247,18 +256,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
   },
   billingToggle: {
     flexDirection: 'row',
-    backgroundColor: '#f5f5f0',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: 4,
     marginBottom: 24,
   },
@@ -266,29 +275,24 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 0,
     alignItems: 'center',
   },
   billingOptionActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   billingOptionText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   billingOptionTextActive: {
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontWeight: '600',
   },
   savingsBadge: {
-    backgroundColor: '#e8f5e9',
-    borderRadius: 4,
+    backgroundColor: colors.selectedBg,
+    borderRadius: 0,
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginTop: 4,
@@ -296,7 +300,7 @@ const styles = StyleSheet.create({
   savingsText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   priceContainer: {
     flexDirection: 'row',
@@ -307,38 +311,38 @@ const styles = StyleSheet.create({
   priceSymbol: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginTop: 4,
   },
   price: {
     fontSize: 56,
     fontWeight: '700',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   priceInterval: {
     fontSize: 16,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginTop: 32,
     marginLeft: 2,
   },
   trialText: {
     fontSize: 14,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     textAlign: 'center',
     fontWeight: '500',
     marginBottom: 32,
   },
   benefitsContainer: {
-    backgroundColor: '#f5f5f0',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: 20,
     marginBottom: 24,
   },
   benefitsTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 16,
@@ -351,15 +355,14 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     fontSize: 15,
-    color: '#333',
+    color: colors.onSurface,
     flex: 1,
   },
   upgradeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 12,
+    borderRadius: 0,
     paddingVertical: 16,
     gap: 8,
     marginBottom: 12,
@@ -370,7 +373,7 @@ const styles = StyleSheet.create({
   upgradeButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onPrimary,
   },
   restoreButton: {
     alignItems: 'center',
@@ -379,12 +382,12 @@ const styles = StyleSheet.create({
   },
   restoreButtonText: {
     fontSize: 14,
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '500',
   },
   disclaimer: {
     fontSize: 12,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 18,
   },

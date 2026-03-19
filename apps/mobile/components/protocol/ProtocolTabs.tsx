@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Undo2 } from 'lucide-react-native';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 import type {
   DailyProtocol,
   DietPlan,
@@ -191,7 +192,7 @@ export function ProtocolTabs({
       {dirty && (
         <View style={[styles.saveButtonContainer, { bottom: insets.bottom + 63 }]}>
           <Pressable style={styles.undoButton} onPress={handleUndo} disabled={saving}>
-            <Undo2 size={20} color="#666" />
+            <Undo2 size={20} color={colors.onSurfaceVariant} />
           </Pressable>
           <View style={styles.saveButtonWrapper}>
             <SaveChangesButton onPress={handleSave} loading={saving} />
@@ -208,9 +209,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   tab: {
     flex: 1,
@@ -220,20 +219,20 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#2d5a2d',
+    borderBottomColor: colors.primaryContainer,
   },
   tabText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   tabTextActive: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '600',
   },
   content: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   contentContainer: {
     padding: 16,
@@ -255,12 +254,10 @@ const styles = StyleSheet.create({
   undoButton: {
     width: 48,
     height: 48,
-    borderRadius: 8,
-    backgroundColor: '#fff',
+    borderRadius: 0,
+    backgroundColor: colors.surfaceContainerLowest,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
   },
   saveButtonWrapper: {
     flex: 1,

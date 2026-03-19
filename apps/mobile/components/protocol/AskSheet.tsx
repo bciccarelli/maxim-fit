@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Send } from 'lucide-react-native';
+import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
 import { ChatCitationsDropdown } from './ChatCitationsDropdown';
@@ -155,7 +156,7 @@ export function AskSheet({
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={handleClose} style={styles.closeButton}>
-            <X size={24} color="#666" />
+            <X size={24} color={colors.onSurfaceVariant} />
           </Pressable>
           <Text style={styles.title}>Ask About Protocol</Text>
           {history.length > 0 && onExportToModify && (
@@ -173,7 +174,7 @@ export function AskSheet({
           contentContainerStyle={styles.messagesContent}
         >
           {isLoadingHistory ? (
-            <ActivityIndicator size="small" color="#2d5a2d" style={styles.loadingIndicator} />
+            <ActivityIndicator size="small" color={colors.primaryContainer} style={styles.loadingIndicator} />
           ) : history.length === 0 && !isStreaming ? (
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeTitle}>Ask a question</Text>
@@ -208,7 +209,7 @@ export function AskSheet({
                       <Text style={styles.answerText}>{streamedText}</Text>
                     ) : (
                       <View style={styles.thinkingContainer}>
-                        <ActivityIndicator size="small" color="#2d5a2d" />
+                        <ActivityIndicator size="small" color={colors.primaryContainer} />
                         <Text style={styles.thinkingText}>
                           {stage === 'researching' ? 'Researching...' : 'Thinking...'}
                         </Text>
@@ -234,7 +235,7 @@ export function AskSheet({
             value={question}
             onChangeText={setQuestion}
             placeholder="Ask a question..."
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.onSurfaceVariant}
             multiline
             maxLength={500}
             editable={!isStreaming}
@@ -245,9 +246,9 @@ export function AskSheet({
             disabled={!question.trim() || isStreaming}
           >
             {isStreaming ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
-              <Send size={20} color="#fff" />
+              <Send size={20} color={colors.onPrimary} />
             )}
           </Pressable>
         </View>
@@ -259,7 +260,7 @@ export function AskSheet({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -267,9 +268,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   closeButton: {
     padding: 4,
@@ -277,18 +276,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   exportButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 6,
+    backgroundColor: colors.selectedBg,
+    borderRadius: 0,
   },
   exportButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   placeholder: {
     width: 60,
@@ -304,8 +303,8 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   welcomeContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 24,
     alignItems: 'center',
     marginTop: 32,
@@ -313,12 +312,12 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginBottom: 8,
   },
   welcomeText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -327,9 +326,8 @@ const styles = StyleSheet.create({
   },
   questionBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: '#2d5a2d',
-    borderRadius: 16,
-    borderBottomRightRadius: 4,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 10,
     maxWidth: '80%',
@@ -337,23 +335,22 @@ const styles = StyleSheet.create({
   },
   questionText: {
     fontSize: 14,
-    color: '#fff',
+    color: colors.onPrimary,
     lineHeight: 20,
   },
   answerBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 10,
     maxWidth: '85%',
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   answerText: {
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   thinkingContainer: {
@@ -363,48 +360,46 @@ const styles = StyleSheet.create({
   },
   thinkingText: {
     fontSize: 14,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     fontStyle: 'italic',
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
+    backgroundColor: colors.errorContainer,
+    borderRadius: 0,
     padding: 12,
     marginTop: 8,
   },
   errorText: {
     fontSize: 14,
-    color: '#c62828',
+    color: colors.destructive,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    backgroundColor: colors.surfaceContainerLowest,
   },
   input: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
-    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     paddingHorizontal: 16,
     paddingVertical: 10,
     paddingRight: 12,
     fontSize: 14,
     maxHeight: 100,
-    color: '#333',
+    color: colors.onSurface,
   },
   sendButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2d5a2d',
+    borderRadius: 9999,
+    backgroundColor: colors.primaryContainer,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.outlineVariant,
   },
 });

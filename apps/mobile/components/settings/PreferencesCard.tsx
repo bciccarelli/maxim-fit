@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { Bookmark, Plus, Trash2 } from 'lucide-react-native';
 import { useUserNotes, type Note } from '@/hooks/useUserNotes';
+import { colors } from '@/lib/theme';
 
 function getSourceLabel(source: string | null): string {
   switch (source) {
@@ -51,10 +52,10 @@ export function PreferencesCard() {
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Bookmark size={20} color="#2d5a2d" />
+          <Bookmark size={20} color={colors.primaryContainer} />
           <Text style={styles.cardTitle}>Your Preferences</Text>
         </View>
-        <ActivityIndicator size="small" color="#2d5a2d" />
+        <ActivityIndicator size="small" color={colors.primaryContainer} />
       </View>
     );
   }
@@ -62,7 +63,7 @@ export function PreferencesCard() {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Bookmark size={20} color="#2d5a2d" />
+        <Bookmark size={20} color={colors.primaryContainer} />
         <Text style={styles.cardTitle}>Your Preferences</Text>
       </View>
 
@@ -77,7 +78,7 @@ export function PreferencesCard() {
           value={newNote}
           onChangeText={setNewNote}
           placeholder="Add a preference..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.onSurfaceVariant}
           returnKeyType="done"
           onSubmitEditing={handleAdd}
           editable={!isAdding}
@@ -91,9 +92,9 @@ export function PreferencesCard() {
           disabled={!newNote.trim() || isAdding}
         >
           {isAdding ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
-            <Plus size={18} color={newNote.trim() ? '#fff' : '#999'} />
+            <Plus size={18} color={newNote.trim() ? colors.onPrimary : colors.onSurfaceVariant} />
           )}
         </Pressable>
       </View>
@@ -124,9 +125,9 @@ export function PreferencesCard() {
                 disabled={deletingId === note.id}
               >
                 {deletingId === note.id ? (
-                  <ActivityIndicator size="small" color="#c62828" />
+                  <ActivityIndicator size="small" color={colors.destructive} />
                 ) : (
-                  <Trash2 size={16} color="#999" />
+                  <Trash2 size={16} color={colors.onSurfaceVariant} />
                 )}
               </Pressable>
             </View>
@@ -143,12 +144,12 @@ export function PreferencesCard() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#2d5a2d',
+    borderLeftColor: colors.primaryContainer,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -158,14 +159,14 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a2e1a',
+    color: colors.onSurface,
     marginLeft: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   helperText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 18,
     marginBottom: 12,
   },
@@ -176,23 +177,23 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   addButton: {
-    backgroundColor: '#2d5a2d',
-    borderRadius: 8,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 0,
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addButtonDisabled: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: colors.outlineVariant,
   },
   notesList: {
     marginTop: 4,
@@ -203,8 +204,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   noteItemBorder: {
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    marginTop: 4,
   },
   noteContent: {
     flex: 1,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     fontSize: 14,
-    color: '#1a2e1a',
+    color: colors.onSurface,
     lineHeight: 20,
   },
   noteMeta: {
@@ -222,23 +222,23 @@ const styles = StyleSheet.create({
   },
   noteSource: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   noteDot: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     marginHorizontal: 6,
   },
   noteDate: {
     fontSize: 11,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   deleteButton: {
     padding: 4,
   },
   emptyText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     paddingVertical: 16,
     lineHeight: 18,

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { PersonalInfoStepProps } from './types';
 import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
+import { colors } from '@/lib/theme';
 
 type Sex = 'male' | 'female' | 'other';
 type FitnessLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -80,7 +81,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             updateField('age', isNaN(num) ? undefined : num);
           }}
           placeholder="Enter age"
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.onSurfaceVariant}
           keyboardType="numeric"
           maxLength={3}
           returnKeyType="done"
@@ -140,7 +141,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               updateWeightMetric(isNaN(num) ? undefined : num);
             }}
             placeholder="Enter weight in kg"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.onSurfaceVariant}
             keyboardType="numeric"
             maxLength={3}
             returnKeyType="done"
@@ -155,7 +156,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               updateField('weight_lbs', isNaN(num) ? undefined : num);
             }}
             placeholder="Enter weight in lbs"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.onSurfaceVariant}
             keyboardType="numeric"
             maxLength={3}
             returnKeyType="done"
@@ -190,7 +191,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               updateHeightMetric(isNaN(num) ? undefined : num);
             }}
             placeholder="Enter height in cm"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.onSurfaceVariant}
             keyboardType="numeric"
             maxLength={3}
             returnKeyType="done"
@@ -207,7 +208,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
                   updateHeightImperial(isNaN(num) ? undefined : num, heightInches);
                 }}
                 placeholder="ft"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.onSurfaceVariant}
                 keyboardType="numeric"
                 maxLength={1}
                 returnKeyType="done"
@@ -224,7 +225,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
                   updateHeightImperial(heightFeet, isNaN(num) ? undefined : num);
                 }}
                 placeholder="in"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.onSurfaceVariant}
                 keyboardType="numeric"
                 maxLength={2}
                 returnKeyType="done"
@@ -270,9 +271,9 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
         <Text style={styles.collapsibleTitle}>Other Considerations</Text>
         <Text style={styles.collapsibleSubtitle}>(optional)</Text>
         {showOtherConsiderations ? (
-          <ChevronUp size={20} color="#666" />
+          <ChevronUp size={20} color={colors.onSurfaceVariant} />
         ) : (
-          <ChevronDown size={20} color="#666" />
+          <ChevronDown size={20} color={colors.onSurfaceVariant} />
         )}
       </Pressable>
 
@@ -288,7 +289,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
                 updateField('lifestyle_considerations', items);
               }}
               placeholder="e.g., office worker, frequent travel"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.onSurfaceVariant}
               multiline
               inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
             />
@@ -304,7 +305,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
                 updateField('dietary_restrictions', items);
               }}
               placeholder="e.g., vegetarian, gluten-free, nut allergy"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.onSurfaceVariant}
               multiline
               inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
             />
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
     marginBottom: 20,
   },
@@ -331,7 +332,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -348,26 +349,26 @@ const styles = StyleSheet.create({
   },
   unitText: {
     fontSize: 12,
-    color: '#999',
+    color: colors.onSurfaceVariant,
   },
   unitTextActive: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
     fontWeight: '600',
   },
   unitDivider: {
     fontSize: 12,
-    color: '#ccc',
+    color: colors.outlineVariant,
     marginHorizontal: 4,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
   },
   multilineInput: {
     minHeight: 60,
@@ -381,23 +382,23 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
     alignItems: 'center',
   },
   pillSelected: {
-    backgroundColor: '#e8f5e9',
-    borderColor: '#2d5a2d',
+    backgroundColor: colors.selectedBg,
+    borderColor: colors.primaryContainer,
   },
   pillText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.onSurfaceVariant,
     fontWeight: '500',
   },
   pillTextSelected: {
-    color: '#2d5a2d',
+    color: colors.primaryContainer,
   },
   heightRow: {
     flexDirection: 'row',
@@ -407,10 +408,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.outlineVariant,
     paddingRight: 12,
   },
   heightInput: {
@@ -418,28 +419,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#333',
+    color: colors.onSurface,
   },
   heightUnit: {
     fontSize: 12,
-    color: '#666',
+    color: colors.onSurfaceVariant,
   },
   collapsibleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
-    marginTop: 8,
+    marginTop: 16,
   },
   collapsibleTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1a2e1a',
+    color: colors.onSurface,
   },
   collapsibleSubtitle: {
     fontSize: 12,
-    color: '#999',
+    color: colors.onSurfaceVariant,
     marginLeft: 6,
     flex: 1,
   },

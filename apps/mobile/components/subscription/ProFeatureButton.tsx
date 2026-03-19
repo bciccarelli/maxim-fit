@@ -2,6 +2,7 @@ import { Pressable, View, StyleSheet, type ViewStyle } from 'react-native';
 import { Lock } from 'lucide-react-native';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 import { PRO_FEATURE_LABELS, type ProFeature } from '@/lib/subscription';
+import { colors } from '@/lib/theme';
 
 interface ProFeatureButtonProps {
   /** The Pro feature this button is gating */
@@ -63,7 +64,7 @@ export function ProFeatureButton({
     >
       {children}
       <View style={styles.lockBadge}>
-        <Lock size={10} color="#fff" />
+        <Lock size={10} color={colors.onPrimary} />
       </View>
     </Pressable>
   );
@@ -80,10 +81,10 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#666',
+    backgroundColor: colors.onSurfaceVariant,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: colors.surfaceContainerLowest,
   },
 });

@@ -1192,7 +1192,14 @@ const chatOperationGeminiSchema = {
     },
     fields: {
       type: 'object',
-      description: 'For modify: the fields to change (partial update, e.g. {"name": "New Name", "sets": 4}). For create: the complete element data. For delete: set to empty object {}. Use the same field names as the protocol JSON above.',
+      description: `For modify: only include fields that are changing (partial update, e.g. {"sets": 4}). For delete: set to empty object {}.
+For create, include ALL required fields for the element type:
+- supplement: {name, dosage_amount (string), dosage_unit (string), time (HH:MM), timing (string e.g. "with breakfast"), purpose (string)}
+- meal: {name, time (HH:MM), foods (string array), calories (integer), protein_g (number), carbs_g (number), fat_g (number)}
+- exercise: {name}. Optional: sets (integer), reps (string), duration_min (integer), rest_sec (integer), notes
+- workout: {name, day (string), time (HH:MM), duration_min (integer), exercises (array)}
+- other_event: {start_time (HH:MM), end_time (HH:MM), activity (string)}
+IMPORTANT: All times MUST be 24-hour HH:MM with leading zeros (e.g. "06:00", "14:30", NOT "6:00" or "2:30 PM"). All numeric values MUST be numbers not strings.`,
     },
     reason: {
       type: 'string',
@@ -1322,9 +1329,72 @@ export type AskAboutProtocolResult = {
   operations?: Array<Record<string, unknown>>;
 };
 
+/** Known numeric fields per element type for Gemini output coercion. */
+const GEMINI_NUMERIC_FIELDS: Record<string, string[]> = {
+  meal: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'target_calories', 'target_protein_g', 'target_carbs_g', 'target_fat_g'],
+  exercise: ['sets', 'duration_min', 'rest_sec'],
+  workout: ['duration_min'],
+};
+
+/** Known time fields per element type for Gemini output coercion. */
+const GEMINI_TIME_FIELDS: Record<string, string[]> = {
+  meal: ['time'],
+  supplement: ['time'],
+  workout: ['time'],
+  other_event: ['start_time', 'end_time'],
+  routine_event: ['start_time'],
+};
+
+/**
+ * Coerce common Gemini type issues in operation payloads:
+ * string numbers → numbers, malformed times → HH:MM.
+ */
+function coerceGeminiPayload(payload: Record<string, unknown>, elementType: string): Record<string, unknown> {
+  const result = { ...payload };
+
+  // Coerce string numbers
+  for (const key of GEMINI_NUMERIC_FIELDS[elementType] || []) {
+    if (key in result && typeof result[key] === 'string') {
+      const parsed = Number(result[key]);
+      if (!isNaN(parsed)) result[key] = parsed;
+    }
+  }
+
+  // Normalize time formats (e.g. "7:00" → "07:00", "2:30 PM" → "14:30")
+  for (const key of GEMINI_TIME_FIELDS[elementType] || []) {
+    if (key in result && typeof result[key] === 'string') {
+      const time = result[key] as string;
+      // Already valid
+      if (/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) continue;
+
+      // AM/PM
+      const amPm = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)/);
+      if (amPm) {
+        let h = parseInt(amPm[1], 10);
+        const period = amPm[3].toLowerCase();
+        if (period === 'pm' && h !== 12) h += 12;
+        if (period === 'am' && h === 12) h = 0;
+        result[key] = `${String(h).padStart(2, '0')}:${amPm[2]}`;
+        continue;
+      }
+
+      // Missing leading zero: "7:00" → "07:00"
+      const short = time.match(/^(\d{1,2}):(\d{2})$/);
+      if (short) {
+        const h = parseInt(short[1], 10);
+        if (h >= 0 && h <= 23) {
+          result[key] = `${String(h).padStart(2, '0')}:${short[2]}`;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 /**
  * Normalize raw Gemini operations to match our Zod schemas.
- * Strips sentinel values, maps fields→data for create ops, filters invalid ops.
+ * Strips sentinel values, maps fields→data for create ops, coerces types, filters invalid ops.
  */
 function normalizeGeminiOperations(
   rawOps: unknown[]
@@ -1342,6 +1412,18 @@ function normalizeGeminiOperations(
         return { ...rest, data: fields };
       }
       return clean;
+    })
+    .map((op: Record<string, unknown>) => {
+      // Coerce types in fields/data to fix common Gemini issues
+      const elementType = op.elementType as string | undefined;
+      if (!elementType) return op;
+
+      const dataKey = op.op === 'create' ? 'data' : 'fields';
+      const payload = op[dataKey] as Record<string, unknown> | undefined;
+      if (!payload || typeof payload !== 'object') return op;
+
+      const coerced = coerceGeminiPayload(payload, elementType);
+      return { ...op, [dataKey]: coerced };
     })
     .filter((op: Record<string, unknown>) => {
       if (op.op === 'modify' || op.op === 'delete') {
