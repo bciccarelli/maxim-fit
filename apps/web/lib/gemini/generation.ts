@@ -1196,7 +1196,7 @@ const chatOperationGeminiSchema = {
 For create, include ALL required fields for the element type:
 - supplement: {name, dosage_amount (string), dosage_unit (string), time (HH:MM), timing (string e.g. "with breakfast"), purpose (string)}
 - meal: {name, time (HH:MM), foods (string array), calories (integer), protein_g (number), carbs_g (number), fat_g (number)}
-- exercise: {name}. Optional: sets (integer), reps (string), duration_min (integer), rest_sec (integer), notes
+- exercise: {name, sets (integer), reps (string e.g. "8-10"), notes (string)}. Optional: duration_min (integer), rest_sec (integer). IMPORTANT: Always include name, sets, and reps for every exercise.
 - workout: {name, day (string), time (HH:MM), duration_min (integer), exercises (array)}
 - other_event: {start_time (HH:MM), end_time (HH:MM), activity (string)}
 IMPORTANT: All times MUST be 24-hour HH:MM with leading zeros (e.g. "06:00", "14:30", NOT "6:00" or "2:30 PM"). All numeric values MUST be numbers not strings.`,
@@ -1316,6 +1316,7 @@ ${question}
    - "Swap creatine for beta-alanine" → delete creatine by id + create new supplement
    - "Change bench press to 4 sets" → modify exercise by id, fields: {"sets": 4}
    - "Add a morning walk" → create other_event with walk data
+   - "Add pull-ups" → create exercise with parentId set to target workout's id, fields: {"name": "Pull-ups", "sets": 3, "reps": "8-10", "notes": "..."}
 
    Return an empty operations array only for pure information questions.
 
