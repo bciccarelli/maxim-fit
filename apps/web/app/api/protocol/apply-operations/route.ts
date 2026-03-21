@@ -59,6 +59,11 @@ export async function POST(request: NextRequest) {
     // Normalize to ensure all elements have IDs
     const protocolData = normalizeProtocol(current.protocol_data);
 
+    // Log workout state for debugging
+    console.log('[Apply-ops] Workouts before ops:', JSON.stringify(
+      protocolData.training.workouts.map(w => ({ id: w.id, name: w.name, day: w.day }))
+    ));
+
     // Validate operations reference existing elements
     const validOps = validateOperations(protocolData, operations);
     if (validOps.length === 0) {
@@ -67,6 +72,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Log operations for debugging
+    console.log('[Apply-ops] Operations:', JSON.stringify(validOps.map(op => ({
+      op: op.op,
+      elementType: op.elementType,
+      ...(op.op === 'create' ? { data: op.data } : {}),
+      ...(op.op === 'modify' ? { elementId: op.elementId, fields: op.fields } : {}),
+      ...(op.op === 'delete' ? { elementId: op.elementId } : {}),
+    }))));
 
     // Apply operations
     const modified = applyOperations(protocolData, validOps);

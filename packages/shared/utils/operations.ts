@@ -114,6 +114,10 @@ export function coerceElement(
         if (!('time' in result)) result.time = '08:00';
         break;
       case 'workout':
+        if (!('name' in result) || !result.name) result.name = 'New Workout';
+        if (!('day' in result) || !result.day) result.day = 'Day 1';
+        if (!('time' in result) || !result.time) result.time = '09:00';
+        if (!('duration_min' in result) || !result.duration_min) result.duration_min = 45;
         if (!('exercises' in result)) result.exercises = [];
         break;
       case 'exercise':
