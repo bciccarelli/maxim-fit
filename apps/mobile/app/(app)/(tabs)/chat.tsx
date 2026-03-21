@@ -586,7 +586,7 @@ export default function ChatScreen() {
       )}
 
       {/* Input Area - extra padding for tab bar when keyboard is hidden */}
-      <View style={[styles.inputContainer, { paddingBottom: keyboardVisible ? 8 : insets.bottom + 50 }]}>
+      <View style={[styles.inputContainer, { paddingBottom: keyboardVisible ? 0 : insets.bottom + 10 }]}>
         <Pressable
           style={[styles.photoButton, isStreaming && styles.photoButtonDisabled]}
           onPress={showImagePicker}

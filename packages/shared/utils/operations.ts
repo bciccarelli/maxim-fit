@@ -116,6 +116,9 @@ export function coerceElement(
       case 'workout':
         if (!('exercises' in result)) result.exercises = [];
         break;
+      case 'exercise':
+        if (!('name' in result) || !result.name) result.name = 'New Exercise';
+        break;
     }
   }
 
