@@ -1287,7 +1287,7 @@ function buildAskApplyPrompt(
     ? `\n## Previous Conversation\n${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n')}\n`
     : '';
 
-  return `You are a knowledgeable health coach. Answer the user's question and, if they're requesting changes, generate the specific operations to modify their protocol.
+  return `You are a knowledgeable health coach advising a user about their protocol. You cannot directly modify the user's protocol. When the user requests a change, you can suggest operations that the user will review and choose to accept or dismiss.
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
@@ -1303,16 +1303,15 @@ ${question}
 
 ## Instructions
 
-1. **Answer**: Be direct and conversational. Base your answer on the research findings above. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, give a fuller answer. Do NOT tell the user you are making changes — the operations will be shown separately as a suggestion they can accept or dismiss.
+1. **Operations**: Every element in the protocol has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "ex_x7k2p9qr" for an exercise).
 
-2. **Operations**: Every element in the protocol has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "ex_x7k2p9qr" for an exercise).
-
-   If the user is asking to change, add, remove, swap, or adjust anything, you MUST generate operations:
+   When the user requests a change, generate operations to suggest those changes. The user will see these as a proposal they can accept or dismiss. Without operations, no changes can happen — your answer text alone cannot modify the protocol.
    - **modify**: Change specific fields of an existing element. Set elementId to the element's id. Only include fields that change in "fields".
    - **delete**: Remove an element. Set elementId to the element's id.
    - **create**: Add a new element. Set elementType and provide complete data in "fields" (no id). For exercises, set parentId to the workout's id.
 
    Examples:
+   - "Change my breakfast to oatmeal and eggs" → modify the breakfast meal by id, fields: {"name": "Oatmeal & Eggs", "foods": ["Oatmeal", "Scrambled eggs"], "calories": 450, "protein_g": 35, "carbs_g": 50, "fat_g": 12}
    - "Swap creatine for beta-alanine" → delete creatine by id + create new supplement
    - "Change bench press to 4 sets" → modify exercise by id, fields: {"sets": 4}
    - "Add a morning walk" → create other_event with walk data
@@ -1320,7 +1319,9 @@ ${question}
 
    Return an empty operations array only for pure information questions.
 
-Generate the answer and operations now.`;
+2. **Answer**: Be direct and conversational. Base your answer on the research findings above. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, give a fuller answer.
+
+Generate the operations and answer now.`;
 }
 
 export type AskAboutProtocolResult = {
@@ -1518,6 +1519,10 @@ async function askApply(
     : undefined;
 
   console.log('[Ask Phase 2] After normalization:', operations ? operations.length + ' ops' : 'none');
+
+  if (parsed.suggestsModification && (!operations || operations.length === 0)) {
+    console.warn('[Ask Phase 2] WARNING: suggestsModification=true but no valid operations produced. The answer may falsely claim changes were made. Answer preview:', parsed.answer.slice(0, 200));
+  }
 
   return {
     answer: parsed.answer,

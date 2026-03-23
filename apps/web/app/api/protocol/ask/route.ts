@@ -16,7 +16,12 @@ function parseAndValidateOperations(
   rawOps: Array<Record<string, unknown>> | undefined,
   protocol: DailyProtocol
 ): ProtocolOperation[] | undefined {
-  if (!rawOps || rawOps.length === 0) return undefined;
+  if (!rawOps || rawOps.length === 0) {
+    console.log('[Ask] No raw operations to validate');
+    return undefined;
+  }
+
+  console.log('[Ask] Validating', rawOps.length, 'raw operations');
 
   const parsed: ProtocolOperation[] = [];
   for (const raw of rawOps) {
@@ -24,19 +29,25 @@ function parseAndValidateOperations(
     if (result.success) {
       parsed.push(result.data);
     } else {
-      console.error('[Ask] Operation failed Zod parse:', JSON.stringify(raw), result.error.flatten());
+      console.error('[Ask] Operation failed Zod parse:', JSON.stringify(raw));
+      console.error('[Ask] Zod errors:', JSON.stringify(result.error.flatten()));
     }
   }
 
   if (parsed.length === 0) {
-    console.error('[Ask] All operations failed Zod parsing. Raw count:', rawOps.length);
+    console.error('[Ask] All', rawOps.length, 'operations failed Zod parsing');
     return undefined;
   }
 
+  console.log('[Ask] Zod parsing:', parsed.length, '/', rawOps.length, 'passed');
+
   const valid = validateOperations(protocol, parsed);
   if (valid.length < parsed.length) {
-    console.warn('[Ask] Some operations failed ID validation:', parsed.length, '→', valid.length);
+    const dropped = parsed.filter(op => op.op !== 'create' && !valid.some(v => v.op !== 'create' && v.op === op.op && ('elementId' in v && 'elementId' in op && v.elementId === op.elementId)));
+    console.warn('[Ask] ID validation:', valid.length, '/', parsed.length, 'passed. Dropped ops:', JSON.stringify(dropped.map(op => ({ op: op.op, elementType: op.elementType, elementId: 'elementId' in op ? op.elementId : undefined }))));
   }
+
+  console.log('[Ask] Final valid operations:', valid.length);
   return valid.length > 0 ? valid : undefined;
 }
 
