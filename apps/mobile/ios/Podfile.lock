@@ -197,6 +197,8 @@ PODS:
     - ExpoModulesCore
   - ExpoAsset (55.0.5):
     - ExpoModulesCore
+  - ExpoClipboard (55.0.9):
+    - ExpoModulesCore
   - ExpoCrypto (55.0.6):
     - ExpoModulesCore
   - ExpoDomWebView (55.0.3):
@@ -2538,6 +2540,7 @@ DEPENDENCIES:
   - "ExpoAdapterGoogleSignIn (from `../../../node_modules/@react-native-google-signin/google-signin/expo/ios`)"
   - ExpoAppleAuthentication (from `../../../node_modules/expo-apple-authentication/ios`)
   - ExpoAsset (from `../../../node_modules/expo-asset/ios`)
+  - ExpoClipboard (from `../../../node_modules/expo-clipboard/ios`)
   - ExpoCrypto (from `../../../node_modules/expo-crypto/ios`)
   - "ExpoDomWebView (from `../../../node_modules/@expo/dom-webview/ios`)"
   - ExpoFileSystem (from `../../../node_modules/expo-file-system/ios`)
@@ -2688,6 +2691,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/expo-apple-authentication/ios"
   ExpoAsset:
     :path: "../../../node_modules/expo-asset/ios"
+  ExpoClipboard:
+    :path: "../../../node_modules/expo-clipboard/ios"
   ExpoCrypto:
     :path: "../../../node_modules/expo-crypto/ios"
   ExpoDomWebView:
@@ -2915,6 +2920,7 @@ SPEC CHECKSUMS:
   ExpoAdapterGoogleSignIn: 21ff1daeef3d21cb0b45772d8029102cc728d6b1
   ExpoAppleAuthentication: 10a520d56dce75f460846552508be3d6634d9d1b
   ExpoAsset: 45028cd834f336730b785ab18c7501b2af8ba590
+  ExpoClipboard: fba6501fed478667b1cc888e999f82fb2838c685
   ExpoCrypto: 624299b9ebf3b8db13c2e75fb72aecbc29efb29a
   ExpoDomWebView: f101fb3db4b6eec4163fca51f7507189b7e48661
   ExpoFileSystem: 9e48188eecc989b67f052dd9d03a070e7abf847c

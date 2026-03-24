@@ -18,6 +18,7 @@
     "@supabase/supabase-js": "^2.47.12",
     "expo": "~55.0.0-preview.11",
     "expo-apple-authentication": "~55.0.6",
+    "expo-clipboard": "~55.0.9",
     "expo-constants": "~55.0.2",
     "expo-crypto": "~55.0.6",
     "expo-dev-client": "~55.0.6",

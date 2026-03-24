@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, Image, ActionSheetIOS, Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Send, ChevronDown, Plus, Wand2, Lock, MessageSquare, ImageIcon, X } from 'lucide-react-native';
@@ -281,6 +282,25 @@ export default function ChatScreen() {
     setShowDropdown(false);
   }, []);
 
+  const handleMessageLongPress = useCallback((text: string) => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Copy'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) Clipboard.setStringAsync(text);
+        }
+      );
+    } else {
+      Alert.alert('Message', undefined, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Copy', onPress: () => Clipboard.setStringAsync(text) },
+      ]);
+    }
+  }, []);
+
   const handleModifyFromChat = useCallback((answerText: string) => {
     setModifyContext(`Based on this conversation about my protocol:\n\n"${answerText}"\n\nPlease make appropriate modifications.`);
     setShowModifySheet(true);
@@ -493,7 +513,7 @@ export default function ChatScreen() {
           <>
             {history.map((qa) => (
               <View key={qa.id} style={styles.qaContainer}>
-                <View style={styles.questionBubble}>
+                <Pressable style={styles.questionBubble} onLongPress={() => handleMessageLongPress(qa.question)}>
                   {qa.image_url && (
                     <Image
                       source={{ uri: qa.image_url }}
@@ -502,14 +522,14 @@ export default function ChatScreen() {
                     />
                   )}
                   <Text style={styles.questionText}>{qa.question}</Text>
-                </View>
+                </Pressable>
                 <View style={styles.answerWrapper}>
-                  <View style={styles.answerBubble}>
+                  <Pressable style={styles.answerBubble} onLongPress={() => handleMessageLongPress(qa.answer)}>
                     <Text style={styles.answerText}>{qa.answer}</Text>
                     {qa.citations && qa.citations.length > 0 && (
                       <ChatCitationsDropdown citations={qa.citations} />
                     )}
-                  </View>
+                  </Pressable>
                   {qa.operations && qa.operations.length > 0 && selectedVersion && parsedProtocol ? (
                     <ChatOperationsCard
                       operations={qa.operations}

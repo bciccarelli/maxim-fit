@@ -1213,11 +1213,11 @@ IMPORTANT: All times MUST be 24-hour HH:MM with leading zeros (e.g. "06:00", "14
 const askResultSchema = {
   type: 'object',
   properties: {
-    answer: { type: 'string', description: 'Direct, conversational answer to the user question about their protocol. Prefer brevity but expand when the question warrants a fuller explanation. Base your answer on the research findings provided.' },
+    answer: { type: 'string', description: 'Direct, conversational answer. When proposing changes, describe what you are suggesting and why — never describe changes as already applied. Prefer brevity but expand when the question warrants it. Base your answer on the research findings provided.' },
     suggestsModification: { type: 'boolean', description: 'True if the user is asking to change, add, remove, swap, or modify their protocol. False for pure information questions.' },
     operations: {
       type: 'array',
-      description: 'Array of specific operations to modify the protocol. MUST be populated whenever the user asks to change, add, remove, swap, replace, update, or adjust anything. Return an empty array for pure information questions.',
+      description: 'Array of proposed changes to the protocol. Each operation is a suggestion the user will review and accept or dismiss. MUST be populated whenever the user asks to change, add, remove, swap, replace, update, or adjust anything. Return an empty array for pure information questions. For modify/delete operations, the elementId MUST be copied exactly from the protocol data — do not fabricate IDs.',
       items: chatOperationGeminiSchema,
     },
   },
@@ -1287,10 +1287,45 @@ function buildAskApplyPrompt(
     ? `\n## Previous Conversation\n${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n')}\n`
     : '';
 
-  return `You are a knowledgeable health coach advising a user about their protocol. You cannot directly modify the user's protocol. When the user requests a change, you can suggest operations that the user will review and choose to accept or dismiss.
+  // Build element ID reference table for easy lookup
+  const mealRefs = protocol.diet.meals
+    .map(m => `- "${m.name}" → id: "${m.id}"`)
+    .join('\n');
+  const supplementRefs = protocol.supplementation.supplements
+    .map(s => `- "${s.name}" → id: "${s.id}"`)
+    .join('\n');
+  const workoutRefs = protocol.training.workouts
+    .map(w => {
+      const exercises = w.exercises
+        .map(e => `  - "${e.name}" → id: "${e.id}"`)
+        .join('\n');
+      return `- "${w.name}" → id: "${w.id}"\n${exercises}`;
+    })
+    .join('\n');
+  const eventRefs = protocol.schedules.flatMap(s => [
+    ...s.other_events.map(e => `- "${e.activity}" → id: "${e.id}"`),
+    ...(s.routine_events ?? []).map(r => `- "${r.name}" → id: "${r.id}"`),
+  ]).join('\n');
+
+  return `You are a protocol advisor for Maxim. You draft suggested changes to a user's health protocol. You do not have the ability to make changes directly — every operation you produce is a proposal that the user will see, review, and either accept or dismiss. Your answer text should reflect this: describe what you are proposing, not what you have done.
 
 ## User Configuration
 ${JSON.stringify(config, null, 2)}
+
+## Element ID Reference
+Use this table to find the correct elementId for modify and delete operations.
+
+### Meals
+${mealRefs || '(none)'}
+
+### Supplements
+${supplementRefs || '(none)'}
+
+### Workouts & Exercises
+${workoutRefs || '(none)'}
+
+### Schedule Events
+${eventRefs || '(none)'}
 
 ## Current Protocol
 ${JSON.stringify(protocol, null, 2)}
@@ -1303,23 +1338,24 @@ ${question}
 
 ## Instructions
 
-1. **Operations**: Every element in the protocol has an "id" field (e.g., "ml_a1b2c3d4" for a meal, "ex_x7k2p9qr" for an exercise).
+1. **Operations**: Your operations are proposals — the user sees each one as a card they can accept or dismiss. Without operations, no changes can happen. Your answer text alone has no effect on the protocol.
 
-   When the user requests a change, generate operations to suggest those changes. The user will see these as a proposal they can accept or dismiss. Without operations, no changes can happen — your answer text alone cannot modify the protocol.
-   - **modify**: Change specific fields of an existing element. Set elementId to the element's id. Only include fields that change in "fields".
-   - **delete**: Remove an element. Set elementId to the element's id.
-   - **create**: Add a new element. Set elementType and provide complete data in "fields" (no id). For exercises, set parentId to the workout's id.
+   **Finding element IDs**: Use the Element ID Reference table above. For modify and delete operations, you MUST copy the exact id string from the reference table (e.g., "ml_a1b2c3d4"). Do not invent or guess IDs.
+
+   - **modify**: Propose changes to specific fields of an existing element. Copy the elementId from the reference table. Only include fields that are changing in "fields".
+   - **delete**: Propose removing an element. Copy the elementId from the reference table.
+   - **create**: Propose adding a new element. Set elementType and provide complete data in "fields" (no id needed). For exercises, set parentId to the target workout's id from the reference table.
 
    Examples:
-   - "Change my breakfast to oatmeal and eggs" → modify the breakfast meal by id, fields: {"name": "Oatmeal & Eggs", "foods": ["Oatmeal", "Scrambled eggs"], "calories": 450, "protein_g": 35, "carbs_g": 50, "fat_g": 12}
-   - "Swap creatine for beta-alanine" → delete creatine by id + create new supplement
-   - "Change bench press to 4 sets" → modify exercise by id, fields: {"sets": 4}
+   - "Change my breakfast to oatmeal and eggs" → modify the breakfast meal. Look up the breakfast meal's id from the reference table, then set fields: {"name": "Oatmeal & Eggs", "foods": ["Oatmeal", "Scrambled eggs"], "calories": 450, "protein_g": 35, "carbs_g": 50, "fat_g": 12}
+   - "Swap creatine for beta-alanine" → delete the creatine supplement (look up its id) + create a new supplement with beta-alanine data
+   - "Change bench press to 4 sets" → modify the bench press exercise (look up its id), fields: {"sets": 4}
    - "Add a morning walk" → create other_event with walk data
-   - "Add pull-ups" → create exercise with parentId set to target workout's id, fields: {"name": "Pull-ups", "sets": 3, "reps": "8-10", "notes": "..."}
+   - "Add pull-ups to my workout" → create exercise. Set parentId to the target workout's id from the reference table. fields: {"name": "Pull-ups", "sets": 3, "reps": "8-10", "notes": "..."}
 
    Return an empty operations array only for pure information questions.
 
-2. **Answer**: Be direct and conversational. Base your answer on the research findings above. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, give a fuller answer.
+2. **Answer**: Be direct and conversational. When you are proposing changes, describe what you are suggesting and why — do not describe changes as already made. Base your answer on the research findings above. Prefer brevity: a few sentences is often enough. But if the question asks "why" or involves trade-offs, give a fuller answer.
 
 Generate the operations and answer now.`;
 }
