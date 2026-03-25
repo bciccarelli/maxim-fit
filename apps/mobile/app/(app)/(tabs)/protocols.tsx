@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput, AppState } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, Plus, Pencil, Trash2, Upload, History } from 'lucide-react-native';
@@ -63,33 +63,57 @@ export default function ProtocolsScreen() {
   const [confirmDeleteChainId, setConfirmDeleteChainId] = useState<string | null>(null);
   const [deletingChainId, setDeletingChainId] = useState<string | null>(null);
 
-  // Schedule notifications when protocol is loaded
-  const lastScheduledProtocolId = useRef<string | null>(null);
-  useEffect(() => {
-    async function scheduleNotifications() {
-      if (!parsedData || !selectedVersion) return;
+  // Schedule notifications when protocol is loaded or app returns to foreground
+  const lastScheduledRef = useRef<{ protocolId: string; timestamp: number } | null>(null);
+  const RESCHEDULE_INTERVAL_MS = 6 * 60 * 60 * 1000; // Re-schedule every 6 hours
 
-      // Only schedule once per protocol version
-      if (lastScheduledProtocolId.current === selectedVersion.id) return;
+  const scheduleNotifications = useCallback(async () => {
+    if (!parsedData || !selectedVersion) return;
 
-      try {
-        const preferences = await getNotificationPreferences();
-        if (preferences.enabled) {
-          const count = await scheduleProtocolNotifications(
-            parsedData,
-            preferences,
-            selectedVersion.id
-          );
-          console.log(`Scheduled ${count} notifications for protocol`);
-          lastScheduledProtocolId.current = selectedVersion.id;
-        }
-      } catch (error) {
-        console.error('Error scheduling notifications:', error);
-      }
+    // Skip if same protocol version was scheduled recently (within 6 hours)
+    const now = Date.now();
+    if (
+      lastScheduledRef.current &&
+      lastScheduledRef.current.protocolId === selectedVersion.id &&
+      now - lastScheduledRef.current.timestamp < RESCHEDULE_INTERVAL_MS
+    ) {
+      return;
     }
 
-    scheduleNotifications();
+    try {
+      const preferences = await getNotificationPreferences();
+      if (preferences.enabled) {
+        const result = await scheduleProtocolNotifications(
+          parsedData,
+          preferences,
+          selectedVersion.id
+        );
+        if (result.permissionDenied) {
+          console.warn('Notification permissions not granted — skipping scheduling');
+        } else {
+          console.log(`Scheduled ${result.scheduled}/${result.total} notifications for protocol`);
+          lastScheduledRef.current = { protocolId: selectedVersion.id, timestamp: now };
+        }
+      }
+    } catch (error) {
+      console.error('Error scheduling notifications:', error);
+    }
   }, [parsedData, selectedVersion]);
+
+  // Schedule on protocol load
+  useEffect(() => {
+    scheduleNotifications();
+  }, [scheduleNotifications]);
+
+  // Re-schedule when app returns to foreground (keeps the rolling 3-day window filled)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        scheduleNotifications();
+      }
+    });
+    return () => subscription.remove();
+  }, [scheduleNotifications]);
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);

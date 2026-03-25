@@ -1,5 +1,4 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
 import type { DailyProtocol, DayOfWeek } from '@protocol/shared/schemas';
 import type { NotificationPreferences } from '@/lib/types/notifications';
 
@@ -12,15 +11,38 @@ export interface NotificationData {
   scheduledTime?: string; // HH:MM
 }
 
-// Map day names to Date day indices (0 = Sunday)
-const DAY_INDEX: Record<DayOfWeek, number> = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
+export interface ScheduleResult {
+  scheduled: number;
+  total: number;
+  permissionDenied?: boolean;
+}
+
+// iOS caps pending local notifications at 64. Reserve buffer for snooze-created notifications.
+const MAX_NOTIFICATIONS = 58;
+
+// Priority weights by category (higher = more important)
+const CATEGORY_PRIORITY: Record<NotificationData['type'], number> = {
+  meal: 50,
+  supplement: 40,
+  workout: 35,
+  schedule_block: 20,
+  hydration: 10,
+};
+
+// Priority weights by day proximity (higher = more important)
+function getDayPriority(dayOffset: number): number {
+  if (dayOffset === 0) return 100;
+  if (dayOffset === 1) return 80;
+  if (dayOffset === 2) return 60;
+  return Math.max(20, 40 - (dayOffset - 3) * 10);
+}
+
+type NotificationCandidate = {
+  title: string;
+  body: string;
+  triggerDate: Date;
+  data: NotificationData;
+  priority: number;
 };
 
 function getDayOfWeek(date: Date): DayOfWeek {
@@ -46,8 +68,6 @@ function formatDate(date: Date): string {
 }
 
 function parseSupplementTiming(timing: string): string | null {
-  // Try to extract time from timing string
-  // Common patterns: "Morning", "With breakfast", "8:00 AM", "08:00"
   const timeMatch = timing.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
   if (timeMatch) {
     let hours = parseInt(timeMatch[1], 10);
@@ -60,7 +80,6 @@ function parseSupplementTiming(timing: string): string | null {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   }
 
-  // Map common timing words to approximate times
   const timingLower = timing.toLowerCase();
   if (timingLower.includes('morning') || timingLower.includes('breakfast') || timingLower.includes('wake')) {
     return '07:00';
@@ -82,65 +101,73 @@ function parseSupplementTiming(timing: string): string | null {
 }
 
 /**
- * Schedule notifications for a protocol based on user preferences
+ * Schedule notifications for a protocol based on user preferences.
+ * Collects all candidate notifications, prioritizes them, and schedules
+ * up to MAX_NOTIFICATIONS (58) to stay within the iOS 64-notification limit.
  */
 export async function scheduleProtocolNotifications(
   protocol: DailyProtocol,
   preferences: NotificationPreferences,
   protocolId: string,
-  daysAhead: number = 7
-): Promise<number> {
+  daysAhead: number = 3
+): Promise<ScheduleResult> {
+  // Verify OS-level permission first
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') {
+    return { scheduled: 0, total: 0, permissionDenied: true };
+  }
+
   // Cancel all existing scheduled notifications
   await Notifications.cancelAllScheduledNotificationsAsync();
 
   if (!preferences.enabled) {
-    return 0;
+    return { scheduled: 0, total: 0 };
   }
 
-  let scheduledCount = 0;
+  const candidates: NotificationCandidate[] = [];
   const now = new Date();
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const date = addDays(now, dayOffset);
     const dateStr = formatDate(date);
     const dayOfWeek = getDayOfWeek(date);
+    const dayPriority = getDayPriority(dayOffset);
 
-    // Find applicable schedule variant for this day
+    // Find applicable schedule variant for this day (only needed for schedule-block notifications)
     const scheduleVariant = protocol.schedules.find(s => s.days.includes(dayOfWeek));
-    if (!scheduleVariant) continue;
 
-    // Schedule wake time notification
-    if (preferences.categories.schedule.enabled && preferences.categories.schedule.wakeTime) {
+    // Collect wake time notification (requires schedule variant)
+    if (scheduleVariant && preferences.categories.schedule.enabled && preferences.categories.schedule.wakeTime) {
       const wakeTime = combineDateAndTime(date, scheduleVariant.wake_time);
       if (wakeTime > now) {
-        await scheduleNotification({
+        candidates.push({
           title: 'Good morning!',
-          body: `Time to start your day`,
-          trigger: wakeTime,
+          body: 'Time to start your day',
+          triggerDate: wakeTime,
           data: {
             type: 'schedule_block',
-            activityIndex: -1, // Special index for wake time
+            activityIndex: -1,
             activityName: 'Wake up',
             protocolId,
             scheduledDate: dateStr,
             scheduledTime: scheduleVariant.wake_time,
           },
+          priority: dayPriority + CATEGORY_PRIORITY.schedule_block,
         });
-        scheduledCount++;
       }
     }
 
-    // Schedule activity block notifications (other_events)
-    if (preferences.categories.schedule.enabled && preferences.categories.schedule.activityBlocks) {
+    // Collect activity block notifications (requires schedule variant)
+    if (scheduleVariant && preferences.categories.schedule.enabled && preferences.categories.schedule.activityBlocks) {
       for (let i = 0; i < (scheduleVariant.other_events || []).length; i++) {
         const event = scheduleVariant.other_events[i];
         const eventTime = combineDateAndTime(date, event.start_time);
 
         if (eventTime > now) {
-          await scheduleNotification({
+          candidates.push({
             title: event.activity,
             body: `${event.start_time} – ${event.end_time}`,
-            trigger: eventTime,
+            triggerDate: eventTime,
             data: {
               type: 'schedule_block',
               activityIndex: i,
@@ -149,44 +176,44 @@ export async function scheduleProtocolNotifications(
               scheduledDate: dateStr,
               scheduledTime: event.start_time,
             },
+            priority: dayPriority + CATEGORY_PRIORITY.schedule_block,
           });
-          scheduledCount++;
         }
       }
     }
 
-    // Schedule sleep time notification
-    if (preferences.categories.schedule.enabled && preferences.categories.schedule.sleepTime) {
+    // Collect sleep time notification (requires schedule variant)
+    if (scheduleVariant && preferences.categories.schedule.enabled && preferences.categories.schedule.sleepTime) {
       const sleepTime = combineDateAndTime(date, scheduleVariant.sleep_time);
       if (sleepTime > now) {
-        await scheduleNotification({
+        candidates.push({
           title: 'Time to wind down',
           body: `Prepare for sleep at ${scheduleVariant.sleep_time}`,
-          trigger: sleepTime,
+          triggerDate: sleepTime,
           data: {
             type: 'schedule_block',
-            activityIndex: -2, // Special index for sleep time
+            activityIndex: -2,
             activityName: 'Sleep',
             protocolId,
             scheduledDate: dateStr,
             scheduledTime: scheduleVariant.sleep_time,
           },
+          priority: dayPriority + CATEGORY_PRIORITY.schedule_block,
         });
-        scheduledCount++;
       }
     }
 
-    // Schedule meal notifications
+    // Collect meal notifications
     if (preferences.categories.meals.enabled) {
       for (let i = 0; i < protocol.diet.meals.length; i++) {
         const meal = protocol.diet.meals[i];
         const mealTime = combineDateAndTime(date, meal.time);
 
         if (mealTime > now) {
-          await scheduleNotification({
+          candidates.push({
             title: meal.name,
             body: `${meal.calories} cal · P ${meal.protein_g}g C ${meal.carbs_g}g F ${meal.fat_g}g`,
-            trigger: mealTime,
+            triggerDate: mealTime,
             data: {
               type: 'meal',
               activityIndex: i,
@@ -195,26 +222,26 @@ export async function scheduleProtocolNotifications(
               scheduledDate: dateStr,
               scheduledTime: meal.time,
             },
+            priority: dayPriority + CATEGORY_PRIORITY.meal,
           });
-          scheduledCount++;
         }
       }
     }
 
-    // Schedule supplement notifications
+    // Collect supplement notifications — use schema `time` field, fall back to fuzzy parsing
     if (preferences.categories.supplements.enabled) {
       for (let i = 0; i < protocol.supplementation.supplements.length; i++) {
         const supp = protocol.supplementation.supplements[i];
-        const suppTime = parseSupplementTiming(supp.timing);
+        const suppTime = supp.time || parseSupplementTiming(supp.timing);
 
         if (suppTime) {
           const suppDateTime = combineDateAndTime(date, suppTime);
 
           if (suppDateTime > now) {
-            await scheduleNotification({
+            candidates.push({
               title: supp.name,
               body: `${supp.dosage_amount} ${supp.dosage_unit} - ${supp.timing}`,
-              trigger: suppDateTime,
+              triggerDate: suppDateTime,
               data: {
                 type: 'supplement',
                 activityIndex: i,
@@ -223,14 +250,14 @@ export async function scheduleProtocolNotifications(
                 scheduledDate: dateStr,
                 scheduledTime: suppTime,
               },
+              priority: dayPriority + CATEGORY_PRIORITY.supplement,
             });
-            scheduledCount++;
           }
         }
       }
     }
 
-    // Schedule workout notifications
+    // Collect workout notifications — use schema `time` field instead of hardcoded 09:00
     if (preferences.categories.workouts.enabled) {
       const todayWorkout = protocol.training.workouts.find(w => {
         const workoutDay = w.day.toLowerCase();
@@ -239,46 +266,46 @@ export async function scheduleProtocolNotifications(
       });
 
       if (todayWorkout) {
-        // Schedule workout reminder for 9 AM by default
-        const workoutTime = combineDateAndTime(date, '09:00');
+        const workoutTimeStr = todayWorkout.time || '09:00';
+        const workoutTime = combineDateAndTime(date, workoutTimeStr);
 
         if (workoutTime > now) {
-          await scheduleNotification({
+          candidates.push({
             title: `Workout: ${todayWorkout.name}`,
             body: `${todayWorkout.duration_min} min · ${todayWorkout.exercises.length} exercises`,
-            trigger: workoutTime,
+            triggerDate: workoutTime,
             data: {
               type: 'workout',
               activityIndex: 0,
               activityName: todayWorkout.name,
               protocolId,
               scheduledDate: dateStr,
-              scheduledTime: '09:00',
+              scheduledTime: workoutTimeStr,
             },
+            priority: dayPriority + CATEGORY_PRIORITY.workout,
           });
-          scheduledCount++;
         }
       }
     }
 
-    // Schedule hydration reminders
+    // Collect hydration reminders
     if (preferences.categories.hydration.enabled) {
       const intervalMinutes = preferences.categories.hydration.intervalMinutes;
-      const startHour = 8; // Start reminders at 8 AM
-      const endHour = 21; // End reminders at 9 PM
+      const startHour = 8;
+      const endHour = 21;
 
       for (let hour = startHour; hour <= endHour; hour++) {
         for (let minute = 0; minute < 60; minute += intervalMinutes) {
-          if (hour === startHour && minute === 0) continue; // Skip first one
+          if (hour === startHour && minute === 0) continue;
 
           const hydrationTime = new Date(date);
           hydrationTime.setHours(hour, minute, 0, 0);
 
           if (hydrationTime > now) {
-            await scheduleNotification({
+            candidates.push({
               title: 'Hydration reminder',
-              body: `Don't forget to drink water`,
-              trigger: hydrationTime,
+              body: "Don't forget to drink water",
+              triggerDate: hydrationTime,
               data: {
                 type: 'hydration',
                 activityIndex: 0,
@@ -287,38 +314,40 @@ export async function scheduleProtocolNotifications(
                 scheduledDate: dateStr,
                 scheduledTime: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
               },
+              priority: dayPriority + CATEGORY_PRIORITY.hydration,
             });
-            scheduledCount++;
           }
         }
       }
     }
   }
 
-  return scheduledCount;
-}
-
-interface ScheduleNotificationParams {
-  title: string;
-  body: string;
-  trigger: Date;
-  data: NotificationData;
-}
-
-async function scheduleNotification({ title, body, trigger, data }: ScheduleNotificationParams): Promise<void> {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      data,
-      sound: true,
-      categoryIdentifier: 'protocol_activity',
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: trigger,
-    },
+  // Sort by priority descending, then by trigger date ascending as tiebreaker
+  candidates.sort((a, b) => {
+    if (b.priority !== a.priority) return b.priority - a.priority;
+    return a.triggerDate.getTime() - b.triggerDate.getTime();
   });
+
+  // Budget enforcement: schedule only the top MAX_NOTIFICATIONS candidates
+  const toSchedule = candidates.slice(0, MAX_NOTIFICATIONS);
+
+  for (const candidate of toSchedule) {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: candidate.title,
+        body: candidate.body,
+        data: candidate.data as unknown as Record<string, unknown>,
+        sound: true,
+        categoryIdentifier: 'protocol_activity',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: candidate.triggerDate,
+      },
+    });
+  }
+
+  return { scheduled: toSchedule.length, total: candidates.length };
 }
 
 /**
