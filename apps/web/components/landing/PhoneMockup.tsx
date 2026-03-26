@@ -18,14 +18,14 @@ export function PhoneMockup({
   return (
     <div className="relative flex justify-center">
       {imageError ? (
-        <div className="w-56 h-[460px] md:w-64 md:h-[520px] flex flex-col items-center justify-center bg-muted/50 rounded-[2.5rem]">
+        <div className="w-72 h-[500px] md:w-96 md:h-[640px] flex flex-col items-center justify-center bg-muted/50 rounded-[2.5rem]">
           <Smartphone className="h-12 w-12 text-muted-foreground mb-3" />
           <p className="text-xs text-muted-foreground text-center px-4">
             App preview
           </p>
         </div>
       ) : (
-        <div className="relative w-56 h-[460px] md:w-64 md:h-[520px]">
+        <div className="relative w-72 h-[500px] md:w-96 md:h-[640px]">
           <Image
             src={imageSrc}
             alt={imageAlt}

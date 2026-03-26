@@ -195,9 +195,6 @@ export default function HomePage() {
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Schedule. Diet. Supplements. Training.{' '}
-                <span className="text-foreground font-medium">
-                  Scored, verifiable, challengeable.
-                </span>
               </p>
             </section>
 
