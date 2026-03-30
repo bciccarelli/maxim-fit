@@ -11,6 +11,7 @@ import { VersionHistory } from '@/components/protocol/VersionHistory';
 import { EditableProtocolName } from '@/components/protocol/EditableProtocolName';
 import { EvaluationSummary } from '@/components/protocol/EvaluationSummary';
 import { CritiquesSection } from '@/components/protocol/CritiquesSection';
+import { ExportPdfButton } from '@/components/protocol/ExportPdfButton';
 import { History } from 'lucide-react';
 import type { DailyProtocol, AdherenceScore, GoalScore, Critique } from '@/lib/schemas/protocol';
 import type { Tier } from '@/lib/stripe/config';
@@ -162,7 +163,7 @@ export function DashboardProtocolView({
         throw new Error(data.error || 'Failed to delete');
       }
 
-      router.push('/dashboard');
+      router.push('/dashboard/protocols');
       router.refresh();
     } catch (error) {
       console.error('Delete error:', error);
@@ -264,6 +265,15 @@ export function DashboardProtocolView({
             onVerify={handleVerify}
             onModificationAccepted={handleModificationAccepted}
             tier={tier}
+          />
+          <ExportPdfButton
+            protocol={selectedProtocol.protocol_data}
+            metadata={{
+              name: selectedProtocol.name,
+              weighted_goal_score: selectedProtocol.weighted_goal_score,
+              viability_score: selectedProtocol.viability_score ?? null,
+              verified: isVerified,
+            }}
           />
           <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
             <History className="h-4 w-4 mr-2" />

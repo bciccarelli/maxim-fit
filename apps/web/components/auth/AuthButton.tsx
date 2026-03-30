@@ -42,13 +42,9 @@ export function AuthButton() {
   if (user) {
     return (
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard')}>
+        <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/protocols')}>
           <LayoutDashboard className="h-4 w-4 mr-2" />
           Dashboard
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => router.push('/settings')}>
-          <User className="h-4 w-4 mr-2" />
-          Settings
         </Button>
         <Button variant="outline" size="sm" onClick={handleSignOut}>
           <LogOut className="h-4 w-4 mr-2" />

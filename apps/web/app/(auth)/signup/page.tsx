@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { AppleSignInButton } from '@/components/auth/AppleSignInButton';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -159,6 +160,7 @@ export default function SignupPage() {
               </div>
             </div>
             <GoogleSignInButton />
+            <AppleSignInButton />
             <p className="text-sm text-muted-foreground text-center">
               Already have an account?{' '}
               <Link href="/login" className="text-primary hover:underline">
