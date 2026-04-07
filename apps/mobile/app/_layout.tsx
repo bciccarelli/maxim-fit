@@ -5,8 +5,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ProtocolProvider } from '@/contexts/ProtocolContext';
+import { ScheduleProvider } from '@/contexts/ScheduleContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { RatingPromptProvider, useRatingPromptContext } from '@/contexts/RatingPromptContext';
+import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
 import { GlobalUpgradeModal } from '@/components/subscription/GlobalUpgradeModal';
 import {
   registerNotificationCategories,
@@ -19,6 +21,7 @@ import type { EventSubscription } from 'expo-notifications';
 
 function RootLayoutNav() {
   const { session, isLoading } = useAuth();
+  const { hasCompletedOnboarding } = useOnboarding();
   const segments = useSegments();
   const router = useRouter();
   const { trackAppOpen } = useRatingPromptContext();
@@ -53,20 +56,30 @@ function RootLayoutNav() {
     }
   }, [session?.user?.id]);
 
+  // 3-way redirect: auth → onboarding → app
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || hasCompletedOnboarding === null) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inAppGroup = segments[0] === '(app)';
+    const inOnboardingGroup = segments[0] === '(onboarding)';
 
-    if (!session && inAppGroup) {
-      // Redirect to login if not authenticated
+    if (!session && (inAppGroup || inOnboardingGroup)) {
+      // Not authenticated — redirect to login
       router.replace('/login');
     } else if (session && inAuthGroup) {
-      // Redirect to app if authenticated
+      if (hasCompletedOnboarding) {
+        // Authenticated + onboarded — go to app
+        router.replace('/(app)/(tabs)/protocols');
+      } else {
+        // Authenticated + not onboarded — go to onboarding
+        router.replace('/(onboarding)/goals');
+      }
+    } else if (session && inOnboardingGroup && hasCompletedOnboarding) {
+      // Already onboarded but somehow in onboarding — redirect to app
       router.replace('/(app)/(tabs)/protocols');
     }
-  }, [session, isLoading, segments]);
+  }, [session, isLoading, segments, hasCompletedOnboarding]);
 
   return (
     <>
@@ -81,16 +94,20 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <ProtocolProvider>
-            <SubscriptionProvider>
-              <RatingPromptProvider>
-                <KeyboardAccessoryProvider>
-                  <RootLayoutNav />
-                  <GlobalUpgradeModal />
-                </KeyboardAccessoryProvider>
-              </RatingPromptProvider>
-            </SubscriptionProvider>
-          </ProtocolProvider>
+          <OnboardingProvider>
+            <ProtocolProvider>
+              <ScheduleProvider>
+                <SubscriptionProvider>
+                  <RatingPromptProvider>
+                    <KeyboardAccessoryProvider>
+                      <RootLayoutNav />
+                      <GlobalUpgradeModal />
+                    </KeyboardAccessoryProvider>
+                  </RatingPromptProvider>
+                </SubscriptionProvider>
+              </ScheduleProvider>
+            </ProtocolProvider>
+          </OnboardingProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

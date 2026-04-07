@@ -1,12 +1,14 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, Check, Flame, Clock, Utensils, Pill, Dumbbell, Droplets, ChevronRight } from 'lucide-react-native';
+import { ChevronDown, Check, Flame, Clock, Utensils, Pill, Dumbbell, Droplets, ChevronRight, Calendar, AlertCircle } from 'lucide-react-native';
 import { useProtocol, type ProtocolChain } from '@/contexts/ProtocolContext';
+import { useSchedule } from '@/contexts/ScheduleContext';
 import { useRatingPromptContext } from '@/contexts/RatingPromptContext';
 import type { DailyProtocol, DayOfWeek } from '@protocol/shared/schemas';
 import { useComplianceTracking, ActivityType } from '@/hooks/useComplianceTracking';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
+import { useRouter } from 'expo-router';
 import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
 
 interface TodayActivity {
@@ -74,8 +76,15 @@ function getTodayActivities(protocol: DailyProtocol): {
   };
 }
 
+function formatDateShort(dateStr: string): string {
+  const [, m, d] = dateStr.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[parseInt(m) - 1]} ${parseInt(d)}`;
+}
+
 export default function ProgressScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { recordCoreAction, maybeShowRatingPrompt } = useRatingPromptContext();
 
   // Use shared protocol context
@@ -88,6 +97,9 @@ export default function ProgressScreen() {
     isLoadingChains: isLoading,
     refreshChains,
   } = useProtocol();
+
+  // Schedule context for active protocol resolution
+  const { activeSchedule, isScheduleActive, daysUntilEnd, nextSchedule } = useSchedule();
 
   // Local UI state
   const [showDropdown, setShowDropdown] = useState(false);
@@ -289,6 +301,36 @@ export default function ProgressScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Schedule Banner */}
+        {isScheduleActive && activeSchedule && (
+          <Pressable
+            style={styles.scheduleBanner}
+            onPress={() => router.push('/(app)/calendar' as any)}
+          >
+            <View style={styles.scheduleBannerLeft} />
+            <Calendar size={14} color={colors.info} />
+            <Text style={styles.scheduleBannerText} numberOfLines={1}>
+              Following: {activeSchedule.label || activeSchedule.protocol_name || 'Scheduled Protocol'}
+              {activeSchedule.end_date && (
+                <Text style={styles.scheduleBannerDate}>
+                  {' '}(ends {formatDateShort(activeSchedule.end_date)})
+                </Text>
+              )}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* Transition Warning */}
+        {isScheduleActive && daysUntilEnd !== null && daysUntilEnd <= 3 && !nextSchedule && (
+          <View style={styles.transitionWarning}>
+            <View style={styles.transitionWarningLeft} />
+            <AlertCircle size={14} color={colors.warning} />
+            <Text style={styles.transitionWarningText}>
+              Current protocol ends in {daysUntilEnd} {daysUntilEnd === 1 ? 'day' : 'days'}
+            </Text>
+          </View>
+        )}
+
         {/* Hero Progress Card */}
         <View style={styles.heroCard}>
           <View style={styles.progressCircle}>
@@ -884,5 +926,54 @@ const styles = StyleSheet.create({
   barLabelToday: {
     color: colors.primaryContainer,
     fontWeight: '600',
+  },
+  scheduleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainerLowest,
+    gap: spacing.sm,
+    padding: spacing.md,
+    overflow: 'hidden',
+  },
+  scheduleBannerLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: colors.info,
+  },
+  scheduleBannerText: {
+    fontSize: fontSize.xs,
+    color: colors.onSurface,
+    flex: 1,
+    paddingLeft: spacing.xs,
+  },
+  scheduleBannerDate: {
+    color: colors.onSurfaceVariant,
+    fontVariant: ['tabular-nums'],
+  },
+  transitionWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainerLowest,
+    gap: spacing.sm,
+    padding: spacing.md,
+    overflow: 'hidden',
+  },
+  transitionWarningLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: colors.warning,
+  },
+  transitionWarningText: {
+    fontSize: fontSize.xs,
+    color: colors.onSurface,
+    flex: 1,
+    paddingLeft: spacing.xs,
+    fontVariant: ['tabular-nums'],
   },
 });

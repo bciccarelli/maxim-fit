@@ -10,6 +10,7 @@ import {
   Pill,
   BarChart3,
   MessageSquare,
+  ArrowRight,
   type LucideIcon
 } from 'lucide-react';
 import { AuthButton } from '@/components/auth/AuthButton';
@@ -24,8 +25,10 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { setPendingProtocol } from '@/lib/hooks/useClaimPendingProtocol';
 import {
   CredibilityStrip,
+  HeroDataPreview,
   MobileAppSection,
-  HowItWorks
+  HowItWorks,
+  CtaSection
 } from '@/components/landing';
 import type { DailyProtocol } from '@/lib/schemas/protocol';
 import type { PersonalInfo, Goal } from '@/lib/schemas/user-config';
@@ -60,7 +63,7 @@ const FEATURES: Feature[] = [
   {
     icon: BarChart3,
     title: 'Evaluation',
-    description: 'Goal scores and requirement adherence.'
+    description: 'AI-scored goal adherence and requirement checks.'
   },
   {
     icon: MessageSquare,
@@ -156,7 +159,7 @@ export default function HomePage() {
       )}
 
       {/* Header */}
-      <header className="border-b">
+      <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image src="/logo.png" alt="Maxim" width={32} height={32} />
@@ -186,29 +189,87 @@ export default function HomePage() {
         {!protocol ? (
           <>
             {/* Hero */}
-            <section className="container mx-auto px-4 pt-12 pb-8 text-center">
-              <p className="text-xs font-medium uppercase tracking-widest text-primary mb-4">
+            <section className="container mx-auto px-4 pt-20 pb-16 text-center">
+              <p className="text-xs font-medium uppercase tracking-widest text-primary mb-6">
                 Evidence-based health optimization
               </p>
-              <h1 className="text-3xl font-bold tracking-tight mb-3">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 max-w-3xl mx-auto leading-tight">
                 Your daily protocol, precisely engineered
               </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Schedule. Diet. Supplements. Training.{' '}
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+                Schedule. Diet. Supplements. Training.
               </p>
+
+              {/* CTA buttons */}
+              <div className="flex items-center justify-center gap-3 mb-12">
+                <Button size="lg" onClick={scrollToWizard}>
+                  Get started
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={scrollToFeatures}
+                >
+                  Learn more
+                </Button>
+              </div>
+
+              {/* Data preview strip */}
+              <HeroDataPreview />
             </section>
 
             {/* Credibility Strip */}
-            {/* <CredibilityStrip /> */}
+            <CredibilityStrip />
 
-            {/* Wizard + Mobile App Side by Side */}
-            <section ref={wizardRef} className="container mx-auto px-4 py-12">
-              <div
-                ref={appRef}
-                className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-32 items-start"
-              >
-                {/* Wizard - hidden on mobile */}
-                <div className="hidden md:block">
+            {/* Features */}
+            <section
+              ref={featuresRef}
+              className="container mx-auto px-4 py-16"
+            >
+              <div className="max-w-4xl mx-auto">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+                  What you get
+                </p>
+                <h2 className="text-lg font-semibold tracking-tight mb-10">
+                  A complete daily system
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {FEATURES.map((feature) => (
+                    <div
+                      key={feature.title}
+                      className="border-l-2 border-l-primary pl-4 py-4 pr-4 rounded-r-lg bg-card/50 border border-l-0 border-border/50"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <feature.icon className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-semibold">
+                          {feature.title}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {feature.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* How It Works */}
+            <HowItWorks />
+
+            {/* Wizard Section */}
+            <section ref={wizardRef} className="border-t">
+              <div className="container mx-auto px-4 py-16">
+                <div className="max-w-xl mx-auto">
+                  <p className="text-xs font-medium uppercase tracking-widest text-primary mb-2 text-center">
+                    Try it now
+                  </p>
+                  <h2 className="text-lg font-semibold tracking-tight mb-8 text-center">
+                    Generate your protocol
+                  </h2>
+
                   {error && !generationStage && (
                     <div className="border-l-2 border-l-destructive pl-4 py-2 mb-6">
                       <p className="text-sm text-destructive">{error}</p>
@@ -224,48 +285,16 @@ export default function HomePage() {
                     Sign in to save protocols and unlock modifications.
                   </p>
                 </div>
-
-                {/* Mobile App */}
-                <MobileAppSection inline />
               </div>
             </section>
 
-            {/* Features */}
-            <section
-              ref={featuresRef}
-              className="container mx-auto px-4 py-12"
-            >
-              <div className="max-w-4xl mx-auto">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
-                  What you get
-                </p>
-                <h2 className="text-lg font-semibold tracking-tight mb-8">
-                  A complete daily system
-                </h2>
+            {/* Mobile App Section */}
+            <div ref={appRef}>
+              <MobileAppSection />
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {FEATURES.map((feature) => (
-                    <div
-                      key={feature.title}
-                      className="border-l-2 border-l-primary pl-4 py-3"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <feature.icon className="h-4 w-4 text-primary" />
-                        <h3 className="text-sm font-semibold">
-                          {feature.title}
-                        </h3>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {feature.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            {/* How It Works */}
-            <HowItWorks />
+            {/* CTA Section */}
+            <CtaSection />
           </>
         ) : (
           <div className="container mx-auto px-4 py-8 max-w-4xl">

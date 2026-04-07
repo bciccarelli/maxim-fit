@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Stack, Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { SocialSignInButtons } from '@/components/auth/SocialSignInButtons';
 import { Divider } from '@/components/auth/Divider';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +26,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
+  const { markOnboardingComplete } = useOnboarding();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -38,6 +40,9 @@ export default function LoginScreen() {
 
     if (error) {
       Alert.alert('Error', error.message);
+    } else {
+      // Returning users skip onboarding
+      await markOnboardingComplete();
     }
   };
 

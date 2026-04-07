@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput, AppState } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, Plus, Pencil, Trash2, Upload, History } from 'lucide-react-native';
+import { ChevronDown, Plus, Pencil, Trash2, Upload, History, Calendar } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -80,6 +80,9 @@ export default function ProtocolsScreen() {
       return;
     }
 
+    // Set ref IMMEDIATELY (synchronously) to block concurrent calls from racing renders
+    lastScheduledRef.current = { protocolId: selectedVersion.id, timestamp: now };
+
     try {
       const preferences = await getNotificationPreferences();
       if (preferences.enabled) {
@@ -90,23 +93,21 @@ export default function ProtocolsScreen() {
         );
         if (result.permissionDenied) {
           console.warn('Notification permissions not granted — skipping scheduling');
+          lastScheduledRef.current = null; // Reset so next attempt can retry
         } else {
           console.log(`Scheduled ${result.scheduled}/${result.total} notifications for protocol`);
-          lastScheduledRef.current = { protocolId: selectedVersion.id, timestamp: now };
         }
       }
     } catch (error) {
       console.error('Error scheduling notifications:', error);
+      lastScheduledRef.current = null; // Reset on error so retry works
     }
   }, [parsedData, selectedVersion]);
 
-  // Schedule on protocol load
+  // Schedule on protocol load and when app returns to foreground
   useEffect(() => {
     scheduleNotifications();
-  }, [scheduleNotifications]);
 
-  // Re-schedule when app returns to foreground (keeps the rolling 3-day window filled)
-  useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         scheduleNotifications();
@@ -336,6 +337,12 @@ export default function ProtocolsScreen() {
             <Text style={styles.scoreChipLabel}>goal</Text>
           </View>
         )}
+        <Pressable
+          style={styles.iconButton}
+          onPress={() => router.push('/(app)/calendar' as any)}
+        >
+          <Calendar size={18} color={colors.onSurfaceVariant} />
+        </Pressable>
         <Pressable
           style={styles.iconButton}
           onPress={() => setShowVersionHistory(true)}

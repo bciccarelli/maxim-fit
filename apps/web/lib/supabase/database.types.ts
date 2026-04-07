@@ -138,6 +138,39 @@ export type Database = {
         }
         Relationships: []
       }
+      protocol_schedules: {
+        Row: {
+          id: string
+          user_id: string
+          version_chain_id: string
+          start_date: string
+          end_date: string | null
+          label: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          version_chain_id: string
+          start_date: string
+          end_date?: string | null
+          label?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          version_chain_id?: string
+          start_date?: string
+          end_date?: string | null
+          label?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       protocol_modifications: {
         Row: {
           created_at: string | null

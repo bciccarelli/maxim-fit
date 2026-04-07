@@ -20,7 +20,7 @@ const FITNESS_OPTIONS: { value: FitnessLevel; label: string }[] = [
   { value: 'advanced', label: 'Advanced' },
 ];
 
-export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepProps) {
+export function PersonalInfoStep({ personalInfo, onChange, showValidation }: PersonalInfoStepProps) {
   const [useMetric, setUseMetric] = useState(false);
   const [showOtherConsiderations, setShowOtherConsiderations] = useState(false);
 
@@ -74,7 +74,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
       <View style={styles.field}>
         <Text style={styles.label}>Age</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, showValidation && !personalInfo.age && styles.inputError]}
           value={personalInfo.age?.toString() || ''}
           onChangeText={(text) => {
             const num = parseInt(text, 10);
@@ -87,6 +87,9 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
           returnKeyType="done"
           inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
         />
+        {showValidation && !personalInfo.age && (
+          <Text style={styles.errorText}>Required</Text>
+        )}
       </View>
 
       {/* Sex */}
@@ -99,6 +102,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               style={[
                 styles.pill,
                 personalInfo.sex === option.value && styles.pillSelected,
+                showValidation && !personalInfo.sex && styles.pillError,
               ]}
               onPress={() => updateField('sex', option.value)}
             >
@@ -113,6 +117,9 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             </Pressable>
           ))}
         </View>
+        {showValidation && !personalInfo.sex && (
+          <Text style={styles.errorText}>Required</Text>
+        )}
       </View>
 
       {/* Weight */}
@@ -134,7 +141,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
         </View>
         {useMetric ? (
           <TextInput
-            style={styles.input}
+            style={[styles.input, showValidation && !personalInfo.weight_lbs && styles.inputError]}
             value={weightKg?.toString() || ''}
             onChangeText={(text) => {
               const num = parseInt(text, 10);
@@ -149,7 +156,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
           />
         ) : (
           <TextInput
-            style={styles.input}
+            style={[styles.input, showValidation && !personalInfo.weight_lbs && styles.inputError]}
             value={personalInfo.weight_lbs?.toString() || ''}
             onChangeText={(text) => {
               const num = parseInt(text, 10);
@@ -162,6 +169,9 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             returnKeyType="done"
             inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
           />
+        )}
+        {showValidation && !personalInfo.weight_lbs && (
+          <Text style={styles.errorText}>Required</Text>
         )}
       </View>
 
@@ -184,7 +194,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
         </View>
         {useMetric ? (
           <TextInput
-            style={styles.input}
+            style={[styles.input, showValidation && !personalInfo.height_in && styles.inputError]}
             value={heightCm?.toString() || ''}
             onChangeText={(text) => {
               const num = parseInt(text, 10);
@@ -199,7 +209,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
           />
         ) : (
           <View style={styles.heightRow}>
-            <View style={styles.heightInputWrapper}>
+            <View style={[styles.heightInputWrapper, showValidation && !personalInfo.height_in && styles.inputError]}>
               <TextInput
                 style={styles.heightInput}
                 value={heightFeet?.toString() || ''}
@@ -216,7 +226,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               />
               <Text style={styles.heightUnit}>ft</Text>
             </View>
-            <View style={styles.heightInputWrapper}>
+            <View style={[styles.heightInputWrapper, showValidation && !personalInfo.height_in && styles.inputError]}>
               <TextInput
                 style={styles.heightInput}
                 value={heightInches?.toString() || ''}
@@ -235,6 +245,9 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             </View>
           </View>
         )}
+        {showValidation && !personalInfo.height_in && (
+          <Text style={styles.errorText}>Required</Text>
+        )}
       </View>
 
       {/* Fitness Level */}
@@ -247,6 +260,7 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
               style={[
                 styles.pill,
                 personalInfo.fitness_level === option.value && styles.pillSelected,
+                showValidation && !personalInfo.fitness_level && styles.pillError,
               ]}
               onPress={() => updateField('fitness_level', option.value)}
             >
@@ -261,6 +275,9 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             </Pressable>
           ))}
         </View>
+        {showValidation && !personalInfo.fitness_level && (
+          <Text style={styles.errorText}>Required</Text>
+        )}
       </View>
 
       {/* Other Considerations (collapsible) */}
@@ -444,5 +461,16 @@ const styles = StyleSheet.create({
   },
   collapsibleContent: {
     paddingTop: 8,
+  },
+  inputError: {
+    borderColor: colors.warning,
+  },
+  pillError: {
+    borderColor: colors.warning,
+  },
+  errorText: {
+    fontSize: 12,
+    color: colors.warning,
+    marginTop: 4,
   },
 });

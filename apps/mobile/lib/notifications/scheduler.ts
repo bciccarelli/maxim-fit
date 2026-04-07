@@ -100,6 +100,9 @@ function parseSupplementTiming(timing: string): string | null {
   return null;
 }
 
+// Module-level mutex to prevent concurrent scheduling from racing renders
+let schedulingInProgress = false;
+
 /**
  * Schedule notifications for a protocol based on user preferences.
  * Collects all candidate notifications, prioritizes them, and schedules
@@ -110,6 +113,24 @@ export async function scheduleProtocolNotifications(
   preferences: NotificationPreferences,
   protocolId: string,
   daysAhead: number = 3
+): Promise<ScheduleResult> {
+  // Prevent concurrent execution — if already scheduling, skip silently
+  if (schedulingInProgress) {
+    return { scheduled: 0, total: 0 };
+  }
+  schedulingInProgress = true;
+  try {
+    return await scheduleProtocolNotificationsImpl(protocol, preferences, protocolId, daysAhead);
+  } finally {
+    schedulingInProgress = false;
+  }
+}
+
+async function scheduleProtocolNotificationsImpl(
+  protocol: DailyProtocol,
+  preferences: NotificationPreferences,
+  protocolId: string,
+  daysAhead: number
 ): Promise<ScheduleResult> {
   // Verify OS-level permission first
   const { status } = await Notifications.getPermissionsAsync();

@@ -33,6 +33,13 @@ export async function POST(request: NextRequest) {
 
     const chainId = protocol?.version_chain_id ?? id;
 
+    // Delete any schedules referencing this chain
+    await supabase
+      .from('protocol_schedules')
+      .delete()
+      .eq('version_chain_id', chainId)
+      .eq('user_id', user.id);
+
     // Delete entire version chain
     const { error } = await supabase
       .from('protocols')

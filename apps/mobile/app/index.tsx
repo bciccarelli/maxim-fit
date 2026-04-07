@@ -1,12 +1,14 @@
 import { Redirect } from 'expo-router';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { colors } from '@/lib/theme';
 
 export default function Index() {
   const { session, isLoading } = useAuth();
+  const { hasCompletedOnboarding } = useOnboarding();
 
-  if (isLoading) {
+  if (isLoading || hasCompletedOnboarding === null) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={colors.primaryContainer} />
@@ -14,11 +16,15 @@ export default function Index() {
     );
   }
 
-  if (session) {
-    return <Redirect href="/(app)/(tabs)/protocols" />;
+  if (!session) {
+    return <Redirect href="/(auth)/login" />;
   }
 
-  return <Redirect href="/(auth)/login" />;
+  if (!hasCompletedOnboarding) {
+    return <Redirect href="/(onboarding)/goals" />;
+  }
+
+  return <Redirect href="/(app)/(tabs)/protocols" />;
 }
 
 const styles = StyleSheet.create({

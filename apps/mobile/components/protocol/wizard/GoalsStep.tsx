@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, TextInput, Pressable, LayoutChangeEvent, Platform } from 'react-native';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { Plus, Trash2 } from 'lucide-react-native';
 import type { GoalsStepProps } from './types';
 import { EXAMPLE_GOALS } from './types';
@@ -14,6 +15,11 @@ interface WeightSliderProps {
 function WeightSlider({ value, onChange }: WeightSliderProps) {
   const percent = Math.round(value * 100);
   const sliderWidth = useRef(0);
+  const scale = useSharedValue(1);
+
+  const animatedTextStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   const handleLayout = (e: LayoutChangeEvent) => {
     sliderWidth.current = e.nativeEvent.layout.width;
@@ -27,6 +33,11 @@ function WeightSlider({ value, onChange }: WeightSliderProps) {
     const snappedPercent = Math.round(rawPercent / 5) * 5;
     const clampedPercent = Math.max(0, Math.min(100, snappedPercent));
     onChange(clampedPercent / 100);
+    // Pulse the percentage text
+    scale.value = withSequence(
+      withTiming(1.15, { duration: 80 }),
+      withTiming(1, { duration: 80 })
+    );
   };
 
   return (
@@ -41,12 +52,12 @@ function WeightSlider({ value, onChange }: WeightSliderProps) {
         </View>
         <View style={[styles.sliderThumb, { left: `${percent}%` }]} />
       </Pressable>
-      <Text style={styles.sliderValue}>{percent}%</Text>
+      <Animated.Text style={[styles.sliderValue, animatedTextStyle]}>{percent}%</Animated.Text>
     </View>
   );
 }
 
-export function GoalsStep({ goals, onChange }: GoalsStepProps) {
+export function GoalsStep({ goals, onChange, showValidation }: GoalsStepProps) {
   const [newGoalText, setNewGoalText] = useState('');
 
   const addGoal = (name: string) => {
@@ -126,6 +137,11 @@ export function GoalsStep({ goals, onChange }: GoalsStepProps) {
           <Plus size={20} color={newGoalText.trim() ? colors.onPrimary : colors.onSurfaceVariant} />
         </Pressable>
       </View>
+
+      {/* Validation hint */}
+      {showValidation && goals.length === 0 && (
+        <Text style={styles.validationHint}>Add at least one goal to continue</Text>
+      )}
 
       {/* Example Goals */}
       {availableExamples.length > 0 && (
@@ -268,14 +284,19 @@ const styles = StyleSheet.create({
   exampleChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: colors.selectedBg,
     borderRadius: 0,
   },
   exampleChipText: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.primaryContainer,
+  },
+  validationHint: {
+    fontSize: 12,
+    color: colors.warning,
+    marginBottom: 16,
   },
 });
