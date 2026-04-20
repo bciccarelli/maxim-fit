@@ -15,14 +15,36 @@ export type ImageData = {
  * Catches impossibly large sets values that indicate data corruption.
  */
 function validateExerciseData(parsed: Record<string, unknown>): void {
-  const training = parsed.training as { workouts?: Array<{ exercises?: Array<{ name?: string; sets?: number }> }> } | undefined;
+  const WEEKDAYS = new Set(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+  const PLACEHOLDER = /^(day\s*\d+|new\s*(exercise|workout)|exercise|workout|untitled)$/i;
+
+  const training = parsed.training as
+    | { workouts?: Array<{ name?: string; day?: string; exercises?: Array<{ name?: string; sets?: number }> }> }
+    | undefined;
+
   for (const workout of training?.workouts ?? []) {
+    if (workout.day && !WEEKDAYS.has(workout.day.toLowerCase())) {
+      throw new Error(
+        `[validateExerciseData] Invalid workout.day "${workout.day}" — must be a lowercase weekday name (monday–sunday).`,
+      );
+    }
+    if (workout.day) workout.day = workout.day.toLowerCase();
+
+    if (workout.name && PLACEHOLDER.test(workout.name.trim())) {
+      throw new Error(
+        `[validateExerciseData] Workout has placeholder name "${workout.name}". Re-prompt required.`,
+      );
+    }
+
     for (const exercise of workout.exercises ?? []) {
+      if (exercise.name && PLACEHOLDER.test(exercise.name.trim())) {
+        throw new Error(
+          `[validateExerciseData] Exercise has placeholder name "${exercise.name}". Re-prompt required.`,
+        );
+      }
       if (exercise.sets !== null && exercise.sets !== undefined) {
-        // Catch impossibly large sets values (likely corruption from Gemini)
         if (typeof exercise.sets === 'number' && exercise.sets > 100) {
-          console.error(`[validateExerciseData] Detected corrupted sets value: ${exercise.sets} for exercise: ${exercise.name}`);
-          // Recover with a reasonable default
+          console.error(`[validateExerciseData] Corrupted sets value: ${exercise.sets} for exercise: ${exercise.name}`);
           exercise.sets = 3;
         }
       }
@@ -163,8 +185,15 @@ export const dailyProtocolGeminiSchema = {
           items: {
             type: 'object',
             properties: {
-              name: { type: 'string' },
-              day: { type: 'string' },
+              name: {
+                type: 'string',
+                description: 'Descriptive workout name referencing the training focus (e.g. "Upper Body Strength", "Push Day", "Zone 2 Cardio"). MUST NOT be a placeholder like "Workout", "New Workout", or "Day 1".',
+              },
+              day: {
+                type: 'string',
+                enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                description: 'Day of the week this workout is scheduled on. MUST be a lowercase weekday name (monday, tuesday, wednesday, thursday, friday, saturday, sunday). Placeholders like "Day 1" are NOT allowed.',
+              },
               time: { type: 'string', description: 'Workout start time in HH:MM 24-hour format, e.g. "06:00", "17:30"' },
               duration_min: { type: 'integer', minimum: 1 },
               exercises: {
@@ -173,7 +202,10 @@ export const dailyProtocolGeminiSchema = {
                 items: {
                   type: 'object',
                   properties: {
-                    name: { type: 'string' },
+                    name: {
+                      type: 'string',
+                      description: 'Specific exercise name (e.g. "Barbell Back Squat", "Pull-ups", "Dynamic stretching"). MUST NOT be a placeholder like "Exercise", "New Exercise", or a numeric label.',
+                    },
                     sets: { type: 'integer', minimum: 1 },
                     reps: { type: 'string' },
                     duration_min: { type: 'integer', minimum: 1 },

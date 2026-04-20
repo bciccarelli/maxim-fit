@@ -5,6 +5,8 @@ import {
   getHasCompletedOnboarding,
   setHasCompletedOnboarding as persistOnboardingComplete,
 } from '@/lib/storage/onboardingStorage';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface OnboardingContextType {
   // Wizard state shared across onboarding screens
@@ -25,6 +27,7 @@ const OnboardingContext = createContext<OnboardingContextType | null>(null);
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { session } = useAuth();
 
   // Wizard form state
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -43,6 +46,29 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       setHasCompletedOnboarding(completed);
     });
   }, []);
+
+  // Fresh install bypass: if a returning user signs in but their local
+  // onboarding flag is missing (AsyncStorage wiped), infer completion from
+  // server state. Any existing protocol means they've onboarded before.
+  useEffect(() => {
+    if (!session?.user || hasCompletedOnboarding !== false) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('protocols')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .limit(1);
+      if (cancelled || error) return;
+      if (data && data.length > 0) {
+        await persistOnboardingComplete(true);
+        setHasCompletedOnboarding(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, hasCompletedOnboarding]);
 
   // Complete onboarding and navigate to main app
   const completeOnboarding = useCallback(async () => {

@@ -66,31 +66,39 @@ export const IAP_AVAILABLE = Platform.OS === 'ios';
 
 // Track connection state
 let isConnected = false;
+let pendingInit: Promise<boolean> | null = null;
 
 /**
  * Initialize the IAP connection.
  * Must be called before any other IAP operations.
+ *
+ * Concurrent callers share the same in-flight promise so we never invoke
+ * initConnection() twice in parallel (which races the native state and
+ * produces "Connection not initialized" errors on downstream calls).
  */
 export async function initializeIAP(): Promise<boolean> {
   if (!IAP_AVAILABLE) {
-    console.log('[IAP] Not available on this platform');
     return false;
   }
 
-  if (isConnected) {
-    console.log('[IAP] Already connected');
-    return true;
-  }
+  if (isConnected) return true;
+  if (pendingInit) return pendingInit;
 
-  try {
-    await initConnection();
-    isConnected = true;
-    console.log('[IAP] Connection initialized');
-    return true;
-  } catch (error) {
-    console.error('[IAP] Failed to initialize:', error);
-    return false;
-  }
+  pendingInit = (async () => {
+    try {
+      await initConnection();
+      isConnected = true;
+      console.log('[IAP] Connection initialized');
+      return true;
+    } catch (error) {
+      console.error('[IAP] Failed to initialize:', error);
+      return false;
+    } finally {
+      pendingInit = null;
+    }
+  })();
+
+  return pendingInit;
 }
 
 /**

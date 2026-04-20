@@ -114,14 +114,14 @@ export function coerceElement(
         if (!('time' in result)) result.time = '08:00';
         break;
       case 'workout':
-        if (!('name' in result) || !result.name) result.name = 'New Workout';
-        if (!('day' in result) || !result.day) result.day = 'Day 1';
+        // name and day are required — do not fabricate defaults.
+        // applyCreate will skip the op if they're missing.
         if (!('time' in result) || !result.time) result.time = '09:00';
         if (!('duration_min' in result) || !result.duration_min) result.duration_min = 45;
         if (!('exercises' in result)) result.exercises = [];
         break;
       case 'exercise':
-        if (!('name' in result) || !result.name) result.name = 'New Exercise';
+        // name is required — do not fabricate a default.
         break;
     }
   }
@@ -291,8 +291,12 @@ function applyCreate(
       return { ...protocol, supplementation: { ...protocol.supplementation, supplements } };
     }
     case 'exercise': {
-      data.id = generateElementId(ELEMENT_PREFIXES.exercise);
       if (!op.parentId) return protocol;
+      if (typeof data.name !== 'string' || !data.name.trim()) {
+        console.warn('[operations] Skipping create exercise op: missing name', op);
+        return protocol;
+      }
+      data.id = generateElementId(ELEMENT_PREFIXES.exercise);
       const workouts = protocol.training.workouts.map(w => {
         if (w.id !== op.parentId) return w;
         return { ...w, exercises: [...w.exercises, data as unknown as Exercise] };
@@ -300,6 +304,11 @@ function applyCreate(
       return { ...protocol, training: { ...protocol.training, workouts } };
     }
     case 'workout': {
+      if (typeof data.name !== 'string' || !data.name.trim() ||
+          typeof data.day !== 'string' || !data.day.trim()) {
+        console.warn('[operations] Skipping create workout op: missing name or day', op);
+        return protocol;
+      }
       data.id = generateElementId(ELEMENT_PREFIXES.workout);
       const workouts = [...protocol.training.workouts, data as unknown as Workout];
       return { ...protocol, training: { ...protocol.training, workouts } };

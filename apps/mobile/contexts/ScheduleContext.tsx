@@ -79,7 +79,9 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       const result = await fetchApi<{ schedules: ProtocolSchedule[] }>('/api/protocol/schedule');
       setSchedules(result.schedules);
     } catch (error) {
-      console.error('Error fetching schedules:', error);
+      // Non-fatal: schedules are optional. Log warn so it doesn't surface as a red console error on fresh installs that have none.
+      console.warn('[schedules] fetch failed, continuing without schedules:', error);
+      setSchedules([]);
     } finally {
       setIsLoading(false);
     }
