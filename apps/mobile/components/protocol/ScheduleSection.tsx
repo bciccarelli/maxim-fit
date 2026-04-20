@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Keyboard, Keyboar
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Trash2, X, Utensils, Pill, Dumbbell, Clock, Layers } from 'lucide-react-native';
 import type { DailyProtocol, ScheduleVariant, OtherEvent, RoutineEvent, RoutineSubEvent, DayOfWeek } from '@protocol/shared/schemas';
-import { colors } from '@/lib/theme';
+import { colors, mf } from '@/lib/theme';
 import {
   computeScheduleEvents,
   getVariantIndexForDay,
@@ -130,15 +130,15 @@ function computeBlockLayout(
 function getEventBlockStyle(source: ScheduleEventSource) {
   switch (source) {
     case 'meal':
-      return { backgroundColor: 'rgba(45, 90, 45, 0.15)', borderLeftColor: colors.primaryContainer };
+      return { backgroundColor: mf.surface, borderLeftColor: mf.eventMeal };
     case 'supplement':
-      return { backgroundColor: 'rgba(2, 132, 199, 0.1)', borderLeftColor: colors.info };
+      return { backgroundColor: mf.surface, borderLeftColor: mf.eventSupp };
     case 'workout':
-      return { backgroundColor: 'rgba(217, 119, 6, 0.1)', borderLeftColor: colors.warning };
+      return { backgroundColor: mf.surface, borderLeftColor: mf.eventWorkout };
     case 'routine':
-      return { backgroundColor: 'rgba(45, 90, 45, 0.12)', borderLeftColor: colors.primaryContainer };
+      return { backgroundColor: mf.surface, borderLeftColor: mf.eventSleep };
     case 'other':
-      return { backgroundColor: 'rgba(66, 73, 63, 0.1)', borderLeftColor: colors.onSurfaceVariant };
+      return { backgroundColor: mf.surface, borderLeftColor: mf.eventOther };
   }
 }
 
@@ -146,15 +146,15 @@ function SourceIcon({ source }: { source: ScheduleEventSource }) {
   const iconProps = { size: 14 };
   switch (source) {
     case 'meal':
-      return <Utensils {...iconProps} color={colors.primaryContainer} />;
+      return <Utensils {...iconProps} color={mf.eventMeal} />;
     case 'supplement':
-      return <Pill {...iconProps} color={colors.info} />;
+      return <Pill {...iconProps} color={mf.eventSupp} />;
     case 'workout':
-      return <Dumbbell {...iconProps} color={colors.warning} />;
+      return <Dumbbell {...iconProps} color={mf.eventWorkout} />;
     case 'routine':
-      return <Layers {...iconProps} color={colors.primaryContainer} />;
+      return <Layers {...iconProps} color={mf.eventSleep} />;
     case 'other':
-      return <Clock {...iconProps} color={colors.onSurfaceVariant} />;
+      return <Clock {...iconProps} color={mf.eventOther} />;
   }
 }
 
@@ -162,11 +162,11 @@ function SubEventIcon({ type }: { type: ComputedSubEvent['type'] }) {
   const iconProps = { size: 12 };
   switch (type) {
     case 'meal':
-      return <Utensils {...iconProps} color={colors.primaryContainer} />;
+      return <Utensils {...iconProps} color={mf.eventMeal} />;
     case 'supplement':
-      return <Pill {...iconProps} color={colors.info} />;
+      return <Pill {...iconProps} color={mf.eventSupp} />;
     case 'activity':
-      return <Clock {...iconProps} color={colors.onSurfaceVariant} />;
+      return <Clock {...iconProps} color={mf.eventOther} />;
   }
 }
 

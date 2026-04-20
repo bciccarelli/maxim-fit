@@ -104,7 +104,7 @@ Evaluation critiques are displayed in a standalone `CritiquesSection` component 
 
 ### Ask + Export to Modify
 
-The Ask modal uses streaming (`useSSEStream`) for progressive answer display. The AI prompt is conversational (2-4 sentences, no bullet points unless asked). Responses include a `suggestsModification` boolean.
+The Ask modal uses streaming (`useSSEStream`) for progressive answer display. The AI prompt is conversational (2-4 sentences, no bullet points unless asked). When the user asks for a change, the response includes an `operations` array — the presence of operations (not a separate boolean flag) is the single source of truth for whether a modification is proposed.
 
 An "Export to Modify" button appears when there's Q&A history. It builds a context string from the last 3 Q&A pairs and passes it to the Modify modal via `ProtocolActions`, which manages the flow: closes Ask modal → sets prefilled message → opens Modify modal.
 

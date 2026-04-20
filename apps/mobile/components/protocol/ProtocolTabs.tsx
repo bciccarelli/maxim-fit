@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Undo2 } from 'lucide-react-native';
-import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
+import { colors, mf, fonts } from '@/lib/theme';
 import type {
   DailyProtocol,
   DietPlan,
@@ -27,10 +27,10 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: 'schedule', label: 'Schedule' },
-  { id: 'diet', label: 'Diet' },
-  { id: 'supplements', label: 'Supps' },
-  { id: 'training', label: 'Training' },
+  { id: 'schedule', label: 'SCHEDULE' },
+  { id: 'diet', label: 'DIET' },
+  { id: 'supplements', label: 'SUPP.' },
+  { id: 'training', label: 'TRAINING' },
 ];
 
 interface ProtocolTabsProps {
@@ -206,10 +206,13 @@ export function ProtocolTabs({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: mf.bg,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceContainerLowest,
+    backgroundColor: mf.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: mf.line,
   },
   tab: {
     flex: 1,
@@ -219,23 +222,23 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: colors.primaryContainer,
+    borderBottomColor: mf.accent,
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    color: mf.fg3,
   },
   tabTextActive: {
-    color: colors.primaryContainer,
-    fontWeight: '600',
+    color: mf.fg,
   },
   content: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: mf.bg,
   },
   contentContainer: {
-    padding: 16,
+    paddingTop: 16,
     paddingBottom: 100,
   },
   contentContainerWithButton: {
@@ -252,10 +255,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   undoButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 0,
-    backgroundColor: colors.surfaceContainerLowest,
+    width: 44,
+    height: 44,
+    backgroundColor: mf.surface,
+    borderWidth: 1,
+    borderColor: mf.line2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -263,9 +267,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   critiquesContainerTop: {
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingHorizontal: 20,
   },
   citationsContainer: {
     marginTop: 16,
+    paddingHorizontal: 20,
   },
 });

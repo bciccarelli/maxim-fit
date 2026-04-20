@@ -41,7 +41,6 @@ export function AskModal({ open, onOpenChange, protocolId, versionChainId, onExp
 
   const { streamedText, result, isStreaming, stage, startStream, reset } = useSSEStream<{
     answer: string;
-    suggestsModification: boolean;
     citations?: Citation[];
   }>();
 

@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
     if (conversationId) {
       const { data: questions, error } = await supabase
         .from('protocol_questions')
-        .select('id, question, answer, created_at, citations, conversation_id, image_url')
+        .select('id, question, answer, created_at, citations, conversation_id, image_url, operations')
         .eq('version_chain_id', chainId)
         .eq('conversation_id', conversationId)
         .eq('user_id', user.id)
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
     // Otherwise, return all Q&A grouped by conversation
     const { data: questions, error } = await supabase
       .from('protocol_questions')
-      .select('id, question, answer, created_at, citations, conversation_id, image_url')
+      .select('id, question, answer, created_at, citations, conversation_id, image_url, operations')
       .eq('version_chain_id', chainId)
       .eq('user_id', user.id)
       .order('created_at', { ascending: true });
@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
               }
             } while (!genResult.done);
 
-            const { answer, suggestsModification, citations: newCitations, operations: rawOperations } = genResult.value;
+            const { answer, citations: newCitations, operations: rawOperations } = genResult.value;
 
             // Parse and validate operations against the current protocol
             const operations = parseAndValidateOperations(rawOperations, protocolData);
@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
               imageUrl = await uploadImageToStorage(supabase, imageData.base64, imageData.mimeType, user.id);
             }
 
-            // Save Q&A with conversation ID, citations, and image URL
+            // Save Q&A with conversation ID, citations, image URL, and operations
             await supabase
               .from('protocol_questions')
               .insert({
@@ -338,6 +338,7 @@ export async function POST(request: NextRequest) {
                 answer,
                 citations: newCitations.length > 0 ? newCitations : null,
                 image_url: imageUrl,
+                operations: operations && operations.length > 0 ? operations : null,
               });
 
             // Merge new citations with existing ones on the protocol
@@ -358,7 +359,6 @@ export async function POST(request: NextRequest) {
                 done: true,
                 result: {
                   answer,
-                  suggestsModification,
                   citations: newCitations,
                   conversationId: activeConversationId,
                   imageUrl,
@@ -382,7 +382,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming path - now captures citations and operations
-    const { answer, suggestsModification, citations: newCitations, operations: rawOps } = await askAboutProtocol(protocolData, askConfig, question, history, imageData);
+    const { answer, citations: newCitations, operations: rawOps } = await askAboutProtocol(protocolData, askConfig, question, history, imageData);
 
     // Parse and validate operations against the current protocol
     const validOps = parseAndValidateOperations(rawOps, protocolData);
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest) {
       imageUrl = await uploadImageToStorage(supabase, imageData.base64, imageData.mimeType, user.id);
     }
 
-    // Save Q&A with conversation ID, citations, and image URL
+    // Save Q&A with conversation ID, citations, image URL, and operations
     const { error: saveError } = await supabase
       .from('protocol_questions')
       .insert({
@@ -409,6 +409,7 @@ export async function POST(request: NextRequest) {
         answer,
         citations: newCitations.length > 0 ? newCitations : null,
         image_url: imageUrl,
+        operations: validOps && validOps.length > 0 ? validOps : null,
       });
 
     if (saveError) {
@@ -426,7 +427,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       answer,
-      suggestsModification,
       citations: mergedCitations,
       conversationId: activeConversationId,
       imageUrl,

@@ -37,7 +37,6 @@ type Conversation = {
 
 type AskResult = {
   answer: string;
-  suggestsModification: boolean;
   citations?: Citation[];
   conversationId?: string;
   imageUrl?: string;

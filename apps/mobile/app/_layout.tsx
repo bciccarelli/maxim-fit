@@ -1,8 +1,20 @@
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+  useFonts as useInter,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+} from '@expo-google-fonts/jetbrains-mono';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ProtocolProvider } from '@/contexts/ProtocolContext';
 import { ScheduleProvider } from '@/contexts/ScheduleContext';
@@ -10,6 +22,7 @@ import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { RatingPromptProvider, useRatingPromptContext } from '@/contexts/RatingPromptContext';
 import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
 import { GlobalUpgradeModal } from '@/components/subscription/GlobalUpgradeModal';
+import { mf } from '@/lib/theme';
 import {
   registerNotificationCategories,
   setupNotificationResponseListener,
@@ -83,15 +96,28 @@ function RootLayoutNav() {
 
   return (
     <>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
       <Slot />
     </>
   );
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useInter({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+  });
+
+  if (!fontsLoaded) {
+    return <View style={{ flex: 1, backgroundColor: mf.bg }} />;
+  }
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: mf.bg }}>
       <SafeAreaProvider>
         <AuthProvider>
           <OnboardingProvider>

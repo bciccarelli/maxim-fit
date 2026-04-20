@@ -51,7 +51,8 @@
           "photosPermission": "Allow Maxim to access your photos to share images for health protocol questions.",
           "cameraPermission": "Allow Maxim to use your camera to take photos for health protocol questions."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

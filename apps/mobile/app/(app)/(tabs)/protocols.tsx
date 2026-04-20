@@ -1,15 +1,23 @@
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, TextInput, AppState } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Alert,
+  TextInput,
+  AppState,
+} from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, Plus, Pencil, Trash2, Upload, History, Calendar } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { ChevronDown, Plus, Pencil, Trash2, Upload, History } from 'lucide-react-native';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProtocol, type ProtocolChain } from '@/contexts/ProtocolContext';
 import type { DailyProtocol } from '@protocol/shared/schemas';
 import { ProtocolTabs } from '@/components/protocol/ProtocolTabs';
-import { CritiquesSection } from '@/components/protocol/CritiquesSection';
-import { ModifySheet } from '@/components/protocol/ModifySheet';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
 import { ImportProtocolSheet } from '@/components/protocol/ImportProtocolSheet';
 import { VersionHistorySheet } from '@/components/protocol/VersionHistorySheet';
@@ -17,16 +25,15 @@ import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
 import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
 import { useUserConfig } from '@/hooks/useUserConfig';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, borderRadius, fontSize } from '@/lib/theme';
+import { mf, fonts } from '@/lib/theme';
+import { trackedSm } from '@/lib/mfStyles';
+import { MFHeader, ScoreTile, MFButton } from '@/components/mf';
 
 export default function ProtocolsScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { config: userConfig } = useUserConfig();
 
-  // Use shared protocol context
   const {
     chains,
     setChains,
@@ -41,36 +48,25 @@ export default function ProtocolsScreen() {
     refreshVersions,
   } = useProtocol();
 
-  // Local UI state
   const [showChainDropdown, setShowChainDropdown] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Name editing
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
-
-  // Modals
-  const [showModifySheet, setShowModifySheet] = useState(false);
-  const [modifyContext, setModifyContext] = useState<string | undefined>(undefined);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showImportSheet, setShowImportSheet] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
 
-  // Subscription context for Pro feature gating
   const { canAccess, showUpgradeModal } = useSubscriptionContext();
 
-  // Delete state
   const [confirmDeleteChainId, setConfirmDeleteChainId] = useState<string | null>(null);
   const [deletingChainId, setDeletingChainId] = useState<string | null>(null);
 
-  // Schedule notifications when protocol is loaded or app returns to foreground
+  // Schedule notifications when protocol loads / app returns to foreground
   const lastScheduledRef = useRef<{ protocolId: string; timestamp: number } | null>(null);
-  const RESCHEDULE_INTERVAL_MS = 6 * 60 * 60 * 1000; // Re-schedule every 6 hours
+  const RESCHEDULE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
   const scheduleNotifications = useCallback(async () => {
     if (!parsedData || !selectedVersion) return;
-
-    // Skip if same protocol version was scheduled recently (within 6 hours)
     const now = Date.now();
     if (
       lastScheduledRef.current &&
@@ -79,49 +75,32 @@ export default function ProtocolsScreen() {
     ) {
       return;
     }
-
-    // Set ref IMMEDIATELY (synchronously) to block concurrent calls from racing renders
     lastScheduledRef.current = { protocolId: selectedVersion.id, timestamp: now };
-
     try {
       const preferences = await getNotificationPreferences();
       if (preferences.enabled) {
-        const result = await scheduleProtocolNotifications(
-          parsedData,
-          preferences,
-          selectedVersion.id
-        );
+        const result = await scheduleProtocolNotifications(parsedData, preferences, selectedVersion.id);
         if (result.permissionDenied) {
-          console.warn('Notification permissions not granted — skipping scheduling');
-          lastScheduledRef.current = null; // Reset so next attempt can retry
-        } else {
-          console.log(`Scheduled ${result.scheduled}/${result.total} notifications for protocol`);
+          lastScheduledRef.current = null;
         }
       }
-    } catch (error) {
-      console.error('Error scheduling notifications:', error);
-      lastScheduledRef.current = null; // Reset on error so retry works
+    } catch {
+      lastScheduledRef.current = null;
     }
   }, [parsedData, selectedVersion]);
 
-  // Schedule on protocol load and when app returns to foreground
   useEffect(() => {
     scheduleNotifications();
-
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') {
-        scheduleNotifications();
-      }
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') scheduleNotifications();
     });
-    return () => subscription.remove();
+    return () => sub.remove();
   }, [scheduleNotifications]);
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await refreshChains();
-    if (selectedChain) {
-      await refreshVersions();
-    }
+    if (selectedChain) await refreshVersions();
     setIsRefreshing(false);
   }, [refreshChains, refreshVersions, selectedChain]);
 
@@ -130,29 +109,26 @@ export default function ProtocolsScreen() {
     setShowChainDropdown(false);
   };
 
-  const handleModifyAccepted = useCallback(async (newProtocolId: string) => {
-    // Refresh to get the new version
-    await refreshVersions();
-  }, [refreshVersions]);
-
-  const handleProtocolChange = useCallback(async (updatedProtocol: DailyProtocol) => {
-    if (!selectedVersion) return;
-    try {
-      await fetchApi<{ id: string }>('/api/protocol/edit', {
-        method: 'POST',
-        body: JSON.stringify({
-          protocolId: selectedVersion.id,
-          protocolData: updatedProtocol,
-          changeNote: 'Direct edit (mobile)',
-        }),
-      });
-      // Refresh versions to get the new version
-      await refreshVersions();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save changes. Please try again.');
-      throw error;
-    }
-  }, [selectedVersion, refreshVersions]);
+  const handleProtocolChange = useCallback(
+    async (updatedProtocol: DailyProtocol) => {
+      if (!selectedVersion) return;
+      try {
+        await fetchApi<{ id: string }>('/api/protocol/edit', {
+          method: 'POST',
+          body: JSON.stringify({
+            protocolId: selectedVersion.id,
+            protocolData: updatedProtocol,
+            changeNote: 'Direct edit (mobile)',
+          }),
+        });
+        await refreshVersions();
+      } catch (error) {
+        Alert.alert('Error', 'Failed to save changes. Please try again.');
+        throw error;
+      }
+    },
+    [selectedVersion, refreshVersions],
+  );
 
   const handleStartEditName = () => {
     setEditedName(selectedChain?.name || '');
@@ -164,71 +140,53 @@ export default function ProtocolsScreen() {
       setIsEditingName(false);
       return;
     }
-
     try {
       await fetchApi('/api/protocol/name', {
         method: 'POST',
-        body: JSON.stringify({
-          protocolId: selectedVersion.id,
-          name: editedName.trim(),
-        }),
+        body: JSON.stringify({ protocolId: selectedVersion.id, name: editedName.trim() }),
       });
-      // Update local state via context
       if (selectedChain) {
         updateSelectedChain({ name: editedName.trim() });
-        setChains(prev => prev.map(c =>
-          c.version_chain_id === selectedChain.version_chain_id
-            ? { ...c, name: editedName.trim() }
-            : c
-        ));
+        setChains((prev) =>
+          prev.map((c) =>
+            c.version_chain_id === selectedChain.version_chain_id ? { ...c, name: editedName.trim() } : c,
+          ),
+        );
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to update name.');
     }
     setIsEditingName(false);
   };
 
-  const handleNewProtocol = () => {
-    setShowGenerateModal(true);
-  };
-
   const handleDeleteChain = async (chainId: string) => {
-    // Find any protocol in this chain to get its ID for deletion
     const chainProtocol = chains.find((c) => c.version_chain_id === chainId);
     if (!chainProtocol) return;
-
     if (confirmDeleteChainId !== chainId) {
       setConfirmDeleteChainId(chainId);
       return;
     }
-
     setDeletingChainId(chainId);
     try {
       await fetchApi('/api/protocol/delete', {
         method: 'POST',
         body: JSON.stringify({ id: chainProtocol.id }),
       });
-
-      // Close dropdown and reset state
       setShowChainDropdown(false);
       setConfirmDeleteChainId(null);
-
-      // Refresh chains - context will handle selection if current was deleted
       await refreshChains();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to delete protocol. Please try again.');
+    } catch {
+      Alert.alert('Error', 'Failed to delete protocol.');
     } finally {
       setDeletingChainId(null);
     }
   };
 
-  const handleGenerateComplete = useCallback(async (protocolId: string) => {
-    // Refresh protocols to show the new one
+  const handleGenerateComplete = useCallback(async () => {
     await refreshChains();
   }, [refreshChains]);
 
-  const handleImportComplete = useCallback(async (protocolId: string) => {
-    // Refresh protocols to show the new one
+  const handleImportComplete = useCallback(async () => {
     await refreshChains();
   }, [refreshChains]);
 
@@ -241,21 +199,15 @@ export default function ProtocolsScreen() {
     setShowImportSheet(true);
   }, [canAccess, showUpgradeModal]);
 
-  const handleVersionRevert = useCallback(async (newProtocolId: string) => {
-    // Refresh both chains (to update current version ID) and versions
+  const handleVersionRevert = useCallback(async () => {
     await refreshChains();
     await refreshVersions();
   }, [refreshChains, refreshVersions]);
 
-  const openModifyWithContext = (context?: string) => {
-    setModifyContext(context);
-    setShowModifySheet(true);
-  };
-
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primaryContainer} />
+        <ActivityIndicator size="large" color={mf.accent} />
       </View>
     );
   }
@@ -265,188 +217,178 @@ export default function ProtocolsScreen() {
       <ScrollView
         style={[styles.container, { paddingTop: insets.top }]}
         contentContainerStyle={styles.emptyContent}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />
-        }
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={mf.accent} />}
       >
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No protocols yet</Text>
+          <Text style={[trackedSm(mf.fg3), { marginBottom: 8 }]}>MAXIM · FIT</Text>
+          <Text style={styles.emptyTitle}>No protocol yet</Text>
           <Text style={styles.emptyText}>
-            Create your personalized health protocol to get started.
+            Create your personalized, evidence-based daily protocol to get started.
           </Text>
-          <Pressable
-            onPress={() => setShowGenerateModal(true)}
-          >
-            <LinearGradient
-              colors={[colors.primary, colors.primaryContainer]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.generateButton}
-            >
-              <Text style={styles.generateButtonText}>Generate Protocol</Text>
-            </LinearGradient>
-          </Pressable>
+          <MFButton label="Generate Protocol" onPress={() => setShowGenerateModal(true)} />
         </View>
         <GenerateProtocolModal
           visible={showGenerateModal}
           onClose={() => setShowGenerateModal(false)}
           onComplete={handleGenerateComplete}
-          initialConfig={userConfig ? {
-            personal_info: userConfig.personal_info,
-            goals: userConfig.goals,
-            requirements: userConfig.requirements,
-          } : undefined}
+          initialConfig={
+            userConfig
+              ? {
+                  personal_info: userConfig.personal_info,
+                  goals: userConfig.goals,
+                  requirements: userConfig.requirements,
+                }
+              : undefined
+          }
         />
       </ScrollView>
     );
   }
 
+  const goalScore = selectedVersion?.weighted_goal_score ?? null;
+  const version = selectedVersion?.version ?? 1;
+  const createdAt = selectedVersion?.created_at
+    ? new Date(selectedVersion.created_at)
+        .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        .toUpperCase()
+    : '';
+  const subLine = [`V${version}`, createdAt].filter(Boolean).join(' · ');
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header with Name and Dropdown */}
-      <View style={styles.headerContainer}>
-        {/* Editable Name */}
-        <View style={styles.nameContainer}>
-          {isEditingName ? (
-            <TextInput
-              style={styles.nameInput}
-              value={editedName}
-              onChangeText={setEditedName}
-              onBlur={handleSaveName}
-              onSubmitEditing={handleSaveName}
-              autoFocus
-              selectTextOnFocus
-              maxLength={100}
-            />
-          ) : (
-            <Pressable style={styles.nameRow} onPress={handleStartEditName}>
-              <Text style={styles.protocolName} numberOfLines={1}>
-                {selectedChain?.name || 'Untitled Protocol'}
-              </Text>
-              <Pencil size={14} color={colors.onSurfaceVariant} />
+      <MFHeader
+        title={selectedChain?.name || 'Untitled Protocol'}
+        titleRight={
+          isEditingName ? null : (
+            <Pressable hitSlop={6} onPress={handleStartEditName}>
+              <Pencil size={12} color={mf.fg3} />
             </Pressable>
-          )}
-        </View>
-
-        {/* Score + History */}
-        {selectedVersion?.weighted_goal_score != null && (
-          <View style={styles.scoreChip}>
-            <Text style={styles.scoreChipValue}>
-              {selectedVersion.weighted_goal_score.toFixed(1)}
-            </Text>
-            <Text style={styles.scoreChipLabel}>goal</Text>
-          </View>
-        )}
-        <Pressable
-          style={styles.iconButton}
-          onPress={() => router.push('/(app)/calendar' as any)}
-        >
-          <Calendar size={18} color={colors.onSurfaceVariant} />
-        </Pressable>
-        <Pressable
-          style={styles.iconButton}
-          onPress={() => setShowVersionHistory(true)}
-        >
-          <History size={18} color={colors.onSurfaceVariant} />
-        </Pressable>
-
-        {/* Protocol Dropdown Button */}
-        <View style={[styles.dropdownButtonWrapper, { zIndex: 20 }]}>
-          <Pressable
-            style={styles.dropdownButton}
-            onPress={() => setShowChainDropdown(!showChainDropdown)}
-          >
-            <ChevronDown size={20} color={colors.onSurfaceVariant} />
-          </Pressable>
-
-          {showChainDropdown && (
-            <View style={styles.dropdownMenu}>
+          )
+        }
+        sub={subLine}
+        right={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {goalScore != null && (
+              <ScoreTile
+                value={goalScore.toFixed(1)}
+                label="GOAL"
+                size="sm"
+                tone="good"
+                style={{ paddingVertical: 4, paddingHorizontal: 8 }}
+              />
+            )}
+            <View style={{ position: 'relative' }}>
               <Pressable
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setShowChainDropdown(false);
-                  handleNewProtocol();
-                }}
+                onPress={() => setShowChainDropdown((v) => !v)}
+                style={styles.dropdownButton}
               >
-                <Plus size={16} color={colors.primaryContainer} />
-                <Text style={[styles.dropdownItemText, styles.newProtocolText]}>
-                  New Protocol
-                </Text>
+                <ChevronDown size={16} color={mf.fg2} />
               </Pressable>
-              <Pressable
-                style={styles.dropdownItem}
-                onPress={handleImportPress}
-              >
-                <Upload size={16} color={colors.primaryContainer} />
-                <Text style={[styles.dropdownItemText, styles.newProtocolText]}>
-                  Import Protocol
-                </Text>
-              </Pressable>
-              <View style={styles.dropdownDivider} />
-              {chains.map((chain) => {
-                const isDeleting = deletingChainId === chain.version_chain_id;
-                const isConfirming = confirmDeleteChainId === chain.version_chain_id;
-
-                return (
-                  <View
-                    key={chain.id}
-                    style={[
-                      styles.dropdownItem,
-                      chain.id === selectedChain?.id && styles.dropdownItemSelected,
-                    ]}
+              {showChainDropdown && (
+                <View style={styles.dropdownMenu}>
+                  <Pressable
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setShowChainDropdown(false);
+                      setShowGenerateModal(true);
+                    }}
                   >
-                    <Pressable
-                      style={styles.dropdownItemContent}
-                      onPress={() => handleChainSelect(chain)}
-                    >
-                      <Text
+                    <Plus size={14} color={mf.accent} />
+                    <Text style={styles.dropdownActionText}>GENERATE NEW</Text>
+                  </Pressable>
+                  <Pressable style={styles.dropdownItem} onPress={handleImportPress}>
+                    <Upload size={14} color={mf.accent} />
+                    <Text style={styles.dropdownActionText}>IMPORT</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setShowChainDropdown(false);
+                      setShowVersionHistory(true);
+                    }}
+                  >
+                    <History size={14} color={mf.accent} />
+                    <Text style={styles.dropdownActionText}>VERSION HISTORY</Text>
+                  </Pressable>
+                  <View style={styles.dropdownDivider} />
+                  <Text style={[trackedSm(mf.fg3), { paddingHorizontal: 12, paddingVertical: 6 }]}>
+                    ALL · {chains.length}
+                  </Text>
+                  {chains.map((chain) => {
+                    const isDeleting = deletingChainId === chain.version_chain_id;
+                    const isConfirming = confirmDeleteChainId === chain.version_chain_id;
+                    const selected = chain.id === selectedChain?.id;
+                    return (
+                      <View
+                        key={chain.id}
                         style={[
-                          styles.dropdownItemText,
-                          chain.id === selectedChain?.id && styles.dropdownItemTextSelected,
+                          styles.chainRow,
+                          selected && { backgroundColor: mf.surface2 },
                         ]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
                       >
-                        {chain.name || 'Untitled Protocol'}
-                      </Text>
-                    </Pressable>
-
-                    {isConfirming && !isDeleting ? (
-                      <View style={styles.deleteConfirmRow}>
                         <Pressable
-                          style={styles.deleteConfirmButton}
-                          onPress={() => handleDeleteChain(chain.version_chain_id)}
+                          style={{ flex: 1 }}
+                          onPress={() => handleChainSelect(chain)}
                         >
-                          <Trash2 size={14} color={colors.destructive} />
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.chainName,
+                              selected && { color: mf.accent },
+                            ]}
+                          >
+                            {chain.name || 'Untitled Protocol'}
+                          </Text>
                         </Pressable>
-                        <Pressable
-                          onPress={() => setConfirmDeleteChainId(null)}
-                        >
-                          <Text style={styles.deleteCancelText}>Cancel</Text>
-                        </Pressable>
-                      </View>
-                    ) : (
-                      <Pressable
-                        style={styles.deleteButton}
-                        onPress={() => handleDeleteChain(chain.version_chain_id)}
-                        disabled={isDeleting}
-                      >
-                        {isDeleting ? (
-                          <ActivityIndicator size="small" color={colors.onSurfaceVariant} />
+                        {isConfirming && !isDeleting ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Pressable onPress={() => handleDeleteChain(chain.version_chain_id)}>
+                              <Trash2 size={13} color={mf.bad} />
+                            </Pressable>
+                            <Pressable onPress={() => setConfirmDeleteChainId(null)}>
+                              <Text style={{ fontFamily: fonts.mono, fontSize: 10, color: mf.fg3 }}>
+                                CANCEL
+                              </Text>
+                            </Pressable>
+                          </View>
                         ) : (
-                          <Trash2 size={14} color={colors.onSurfaceVariant} />
+                          <Pressable
+                            onPress={() => handleDeleteChain(chain.version_chain_id)}
+                            disabled={isDeleting}
+                            style={{ padding: 4 }}
+                          >
+                            {isDeleting ? (
+                              <ActivityIndicator size="small" color={mf.fg3} />
+                            ) : (
+                              <Trash2 size={13} color={mf.fg3} />
+                            )}
+                          </Pressable>
                         )}
-                      </Pressable>
-                    )}
-                  </View>
-                );
-              })}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
-          )}
-        </View>
-      </View>
+          </View>
+        }
+      />
 
-      {/* Protocol Content */}
+      {isEditingName && (
+        <View style={styles.editNameRow}>
+          <TextInput
+            style={styles.nameInput}
+            value={editedName}
+            onChangeText={setEditedName}
+            onBlur={handleSaveName}
+            onSubmitEditing={handleSaveName}
+            autoFocus
+            selectTextOnFocus
+            maxLength={100}
+          />
+        </View>
+      )}
+
       {parsedData && selectedVersion ? (
         <ProtocolTabs
           protocol={parsedData}
@@ -455,44 +397,28 @@ export default function ProtocolsScreen() {
           protocolId={selectedVersion.id}
           critiques={selectedVersion.critiques}
           verified={selectedVersion.verified}
-          onCritiquesUpdated={(critiques) => {
-            updateSelectedVersion({ critiques });
-          }}
+          onCritiquesUpdated={(critiques) => updateSelectedVersion({ critiques })}
           onProtocolUpdated={refreshVersions}
         />
       ) : (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primaryContainer} />
+          <ActivityIndicator size="large" color={mf.accent} />
         </View>
       )}
 
-      {/* Modals */}
-      {selectedVersion && (
-        <ModifySheet
-          visible={showModifySheet}
-          onClose={() => {
-            setShowModifySheet(false);
-            setModifyContext(undefined);
-          }}
-          protocolId={selectedVersion.id}
-          currentScores={{
-            weighted_goal_score: selectedVersion.weighted_goal_score,
-            viability_score: selectedVersion.viability_score,
-          }}
-          onAccepted={handleModifyAccepted}
-          initialMessage={modifyContext}
-          currentProtocol={parsedData ?? undefined}
-        />
-      )}
       <GenerateProtocolModal
         visible={showGenerateModal}
         onClose={() => setShowGenerateModal(false)}
         onComplete={handleGenerateComplete}
-        initialConfig={userConfig ? {
-          personal_info: userConfig.personal_info,
-          goals: userConfig.goals,
-          requirements: userConfig.requirements,
-        } : undefined}
+        initialConfig={
+          userConfig
+            ? {
+                personal_info: userConfig.personal_info,
+                goals: userConfig.goals,
+                requirements: userConfig.requirements,
+              }
+            : undefined
+        }
       />
       <ImportProtocolSheet
         visible={showImportSheet}
@@ -515,170 +441,107 @@ export default function ProtocolsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surfaceContainerLowest,
+    backgroundColor: mf.bg,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.surfaceContainerLowest,
+    backgroundColor: mf.bg,
   },
   emptyContent: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.md,
+    padding: 24,
   },
   emptyState: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xl,
-    alignItems: 'center',
+    padding: 24,
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: mf.line,
+    borderLeftWidth: 2,
+    borderLeftColor: mf.accent,
+    backgroundColor: mf.surface,
   },
   emptyTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginBottom: spacing.sm,
+    fontFamily: fonts.sansMedium,
+    fontSize: 20,
+    color: mf.fg,
+    marginBottom: 8,
+    letterSpacing: -0.3,
   },
   emptyText: {
-    fontSize: fontSize.sm,
-    color: colors.onSurfaceVariant,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  generateButton: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md / 2 + spacing.sm / 2,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-  },
-  generateButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.surfaceContainerLowest,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md / 2 + spacing.sm / 2,
-    backgroundColor: colors.surface,
-    gap: spacing.sm,
-  },
-  nameContainer: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  protocolName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.onSurface,
-    flexShrink: 1,
-  },
-  nameInput: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.onSurface,
-    padding: 0,
-    margin: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.primaryContainer,
-  },
-  dropdownButtonWrapper: {
-    position: 'relative',
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: mf.fg2,
+    marginBottom: 20,
+    lineHeight: 19,
   },
   dropdownButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surface,
+    width: 32,
+    height: 32,
+    borderWidth: 1,
+    borderColor: mf.line2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dropdownMenu: {
     position: 'absolute',
-    top: '100%',
+    top: 36,
     right: 0,
-    minWidth: 220,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.xs,
-    overflow: 'hidden',
-  },
-  dropdownDivider: {
-    height: spacing.sm,
-    backgroundColor: colors.surfaceContainerLow,
+    minWidth: 240,
+    backgroundColor: mf.surface,
+    borderWidth: 1,
+    borderColor: mf.line2,
+    zIndex: 10,
+    paddingVertical: 4,
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md / 2 + spacing.sm / 2,
-    paddingVertical: spacing.md / 2 + spacing.sm / 2,
-    gap: spacing.sm,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  dropdownItemSelected: {
-    backgroundColor: colors.selectedBg,
-  },
-  dropdownItemText: {
-    fontSize: fontSize.sm,
-    color: colors.onSurface,
+  dropdownActionText: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    letterSpacing: 1.0,
+    textTransform: 'uppercase',
+    color: mf.fg,
     flex: 1,
   },
-  dropdownItemTextSelected: {
-    color: colors.primaryContainer,
-    fontWeight: '500',
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: mf.line,
+    marginVertical: 4,
   },
-  newProtocolText: {
-    color: colors.primaryContainer,
-    fontWeight: '500',
-  },
-  dropdownItemContent: {
-    flex: 1,
-  },
-  deleteButton: {
-    padding: spacing.xs,
-  },
-  deleteConfirmRow: {
+  chainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 8,
   },
-  deleteConfirmButton: {
-    padding: spacing.xs,
-  },
-  deleteCancelText: {
-    fontSize: fontSize.xs,
-    color: colors.onSurfaceVariant,
-  },
-  scoreChip: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    backgroundColor: colors.surface,
-    paddingHorizontal: 6,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    gap: 2,
-  },
-  scoreChipValue: {
+  chainName: {
+    fontFamily: fonts.sans,
     fontSize: 13,
-    fontWeight: '600',
-    color: colors.onSurface,
-    fontVariant: ['tabular-nums'],
+    color: mf.fg2,
   },
-  scoreChipLabel: {
-    fontSize: 9,
-    color: colors.onSurfaceVariant,
+  editNameRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: mf.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: mf.line,
   },
-  iconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+  nameInput: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 18,
+    color: mf.fg,
+    borderWidth: 1,
+    borderColor: mf.line2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
 });

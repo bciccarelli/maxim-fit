@@ -17,7 +17,6 @@ type QuestionAnswer = {
 
 type AskResult = {
   answer: string;
-  suggestsModification: boolean;
   citations?: Citation[];
 };
 

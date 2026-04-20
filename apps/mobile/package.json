@@ -12,6 +12,8 @@
     "build:ios": "eas build --platform ios"
   },
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@protocol/shared": "*",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-google-signin/google-signin": "^16.1.1",
@@ -22,6 +24,7 @@
     "expo-constants": "~55.0.2",
     "expo-crypto": "~55.0.6",
     "expo-dev-client": "~55.0.6",
+    "expo-font": "~55.0.6",
     "expo-glass-effect": "~55.0.6",
     "expo-image-picker": "~55.0.10",
     "expo-linear-gradient": "~55.0.9",

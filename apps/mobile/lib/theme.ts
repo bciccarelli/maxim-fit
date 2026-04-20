@@ -1,56 +1,93 @@
-// Clinical Dossier design system for Maxim Fit
-// Based on Stitch project "Maxim Fit" (ID: 12512777690207007321)
+// Maxim Fit — Dark Forest Clinical design system
 //
-// Color mapping from old → new:
-// '#fff'/'#ffffff'      → colors.surfaceContainerLowest
-// '#f5f5f0'             → colors.surface
-// '#f9f9f7'/'#f0f0f0'   → colors.surfaceContainerLow
-// '#2d5a2d'             → colors.primaryContainer
-// '#1a2e1a'/'#1a1c19'   → colors.onSurface
-// '#666'/'#666666'      → colors.onSurfaceVariant
-// '#999'/'#999999'      → colors.onSurfaceVariant
-// '#e5e5e5'/'#e0e0e0'   → colors.outlineVariant (or remove)
-// '#c62828'             → colors.destructive
+// Primary palette ported from mf-styles.css. Tokens are additive:
+// new consumers should use `mf.*` tokens; legacy `colors.*` names remain
+// to avoid breaking un-migrated screens while we retheme piece by piece.
 
+export const mf = {
+  // Surfaces
+  bg: '#0F1F17',
+  bg2: '#0A1711',
+  surface: '#13271C',
+  surface2: '#18301F',
+
+  // Lines / borders
+  line: '#1F3D2B',
+  line2: '#2A5A3E',
+
+  // Foreground
+  fg: '#E8EEE6',
+  fg2: '#B8C5B2',
+  fg3: '#6B7D68',
+  fg4: '#4A5A48',
+
+  // Accent + semantic
+  accent: '#4AA373',
+  accent2: '#6BC491',
+  warn: '#D4A84A',
+  bad: '#C06A52',
+  verified: '#6BC491',
+
+  // Event-type accents for the schedule timeline
+  eventSleep: '#6B7D68',
+  eventMeal: '#5C8AA8',
+  eventWorkout: '#C08A4A',
+  eventSupp: '#8A7DB0',
+  eventWork: '#4A5A48',
+  eventOther: '#2A5A3E',
+} as const;
+
+export const fonts = {
+  sans: 'Inter_400Regular',
+  sansMedium: 'Inter_500Medium',
+  sansSemibold: 'Inter_600SemiBold',
+  mono: 'JetBrainsMono_400Regular',
+  monoMedium: 'JetBrainsMono_500Medium',
+  monoSemibold: 'JetBrainsMono_600SemiBold',
+} as const;
+
+// Legacy color aliases — map old names onto the new dark palette so
+// un-migrated components still render with reasonable dark colors.
+// Prefer `mf.*` in new code.
 export const colors = {
-  // Surfaces (hierarchy — depth via background shifts, not borders)
-  surface: '#fafaf5',
-  surfaceContainerLowest: '#ffffff',
-  surfaceContainerLow: '#f4f4ef',
-  surfaceContainer: '#eeeee9',
-  surfaceContainerHigh: '#e8e8e3',
-  surfaceContainerHighest: '#e3e3de',
+  // Surfaces
+  surface: mf.bg,
+  surfaceContainerLowest: mf.bg2,
+  surfaceContainerLow: mf.surface,
+  surfaceContainer: mf.surface,
+  surfaceContainerHigh: mf.surface2,
+  surfaceContainerHighest: mf.surface2,
 
-  // Text (green-tinted grays — never pure gray)
-  onSurface: '#1a1c19',
-  onSurfaceVariant: '#42493f',
+  // Text
+  onSurface: mf.fg,
+  onSurfaceVariant: mf.fg2,
 
-  // Outline (borders — use sparingly, prefer background shifts)
-  outline: '#72796e',
-  outlineVariant: '#c1c9bc',
+  // Outline
+  outline: mf.line2,
+  outlineVariant: mf.line,
 
-  // Primary — deep forest green
-  primary: '#154218',
-  primaryContainer: '#2d5a2d',
-  onPrimary: '#ffffff',
-  onPrimaryContainer: '#9dd097',
-  primaryFixed: '#bcf0b5',
-  primaryFixedDim: '#a1d39a',
+  // Primary — accent green
+  primary: mf.accent,
+  primaryContainer: mf.accent,
+  onPrimary: mf.bg2,
+  onPrimaryContainer: mf.bg2,
+  primaryFixed: mf.accent2,
+  primaryFixedDim: mf.accent,
 
   // Secondary
-  secondary: '#50634d',
-  secondaryContainer: '#d3e9cc',
+  secondary: mf.fg2,
+  secondaryContainer: mf.surface2,
 
   // Status
-  success: '#22c55e',
-  warning: '#f59e0b',
-  error: '#ba1a1a',
-  errorContainer: '#ffdad6',
-  destructive: '#c62828',
+  success: mf.verified,
+  warning: mf.warn,
+  error: mf.bad,
+  errorContainer: mf.surface,
+  destructive: mf.bad,
 
   // Semantic
-  selectedBg: '#e8f5e9',
-  info: '#0284c7',
+  selectedBg: mf.surface2,
+  info: '#5C8AA8',
 
   // Social buttons
   google: '#ffffff',
@@ -58,16 +95,16 @@ export const colors = {
   apple: '#000000',
   appleText: '#ffffff',
 
-  // Legacy aliases (for gradual migration — prefer new names)
-  background: '#fafaf5',
-  card: '#ffffff',
-  text: '#1a1c19',
-  textSecondary: '#42493f',
-  textMuted: '#42493f',
-  border: '#c1c9bc',
-  borderLight: '#c1c9bc',
-  primaryDark: '#154218',
-  primaryLight: '#3d7a3d',
+  // Legacy aliases
+  background: mf.bg,
+  card: mf.surface,
+  text: mf.fg,
+  textSecondary: mf.fg2,
+  textMuted: mf.fg3,
+  border: mf.line,
+  borderLight: mf.line,
+  primaryDark: mf.accent,
+  primaryLight: mf.accent2,
 } as const;
 
 export const spacing = {

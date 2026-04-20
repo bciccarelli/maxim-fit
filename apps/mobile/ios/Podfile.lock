@@ -205,7 +205,7 @@ PODS:
     - ExpoModulesCore
   - ExpoFileSystem (55.0.6):
     - ExpoModulesCore
-  - ExpoFont (55.0.4):
+  - ExpoFont (55.0.6):
     - ExpoModulesCore
   - ExpoGlassEffect (55.0.6):
     - ExpoModulesCore
@@ -2924,7 +2924,7 @@ SPEC CHECKSUMS:
   ExpoCrypto: 624299b9ebf3b8db13c2e75fb72aecbc29efb29a
   ExpoDomWebView: f101fb3db4b6eec4163fca51f7507189b7e48661
   ExpoFileSystem: 9e48188eecc989b67f052dd9d03a070e7abf847c
-  ExpoFont: 1aa465cf9f8ac6b670405becba8b15473581b2dd
+  ExpoFont: cdd7a1d574a376fa003c713eff49e0a4df8672c7
   ExpoGlassEffect: 90d88314e283c2c9a4814fb773ef9aae56ca9a62
   ExpoImage: 8f835720453ed5be7764d9650aa1efde8109abc7
   ExpoImagePicker: 550f22a1db18bf74a6fe81e87c934001d67b5074

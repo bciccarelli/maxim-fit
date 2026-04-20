@@ -1214,14 +1214,13 @@ const askResultSchema = {
   type: 'object',
   properties: {
     answer: { type: 'string', description: 'Direct, conversational answer. When proposing changes, describe what you are suggesting and why — never describe changes as already applied. Prefer brevity but expand when the question warrants it. Base your answer on the research findings provided.' },
-    suggestsModification: { type: 'boolean', description: 'True if the user is asking to change, add, remove, swap, or modify their protocol. False for pure information questions.' },
     operations: {
       type: 'array',
       description: 'Array of proposed changes to the protocol. Each operation is a suggestion the user will review and accept or dismiss. MUST be populated whenever the user asks to change, add, remove, swap, replace, update, or adjust anything. Return an empty array for pure information questions. For modify/delete operations, the elementId MUST be copied exactly from the protocol data — do not fabricate IDs.',
       items: chatOperationGeminiSchema,
     },
   },
-  required: ['answer', 'suggestsModification', 'operations'],
+  required: ['answer', 'operations'],
 } as const;
 
 export type QAHistoryItem = { question: string; answer: string };
@@ -1362,7 +1361,6 @@ Generate the operations and answer now.`;
 
 export type AskAboutProtocolResult = {
   answer: string;
-  suggestsModification: boolean;
   citations: Citation[];
   operations?: Array<Record<string, unknown>>;
 };
@@ -1524,7 +1522,7 @@ async function askApply(
   question: string,
   history: QAHistoryItem[],
   researchText: string
-): Promise<{ answer: string; suggestsModification: boolean; operations?: Array<Record<string, unknown>> }> {
+): Promise<{ answer: string; operations?: Array<Record<string, unknown>> }> {
   const client = getGeminiClient();
   const prompt = buildAskApplyPrompt(protocol, config, question, history, researchText);
 
@@ -1544,8 +1542,8 @@ async function askApply(
 
   const parsed = JSON.parse(text);
 
-  console.log('[Ask Phase 2] suggestsModification:', parsed.suggestsModification,
-    'operations count:', Array.isArray(parsed.operations) ? parsed.operations.length : 'not array');
+  console.log('[Ask Phase 2] operations count:',
+    Array.isArray(parsed.operations) ? parsed.operations.length : 'not array');
   if (Array.isArray(parsed.operations) && parsed.operations.length > 0) {
     console.log('[Ask Phase 2] First operation:', JSON.stringify(parsed.operations[0]));
   }
@@ -1556,13 +1554,8 @@ async function askApply(
 
   console.log('[Ask Phase 2] After normalization:', operations ? operations.length + ' ops' : 'none');
 
-  if (parsed.suggestsModification && (!operations || operations.length === 0)) {
-    console.warn('[Ask Phase 2] WARNING: suggestsModification=true but no valid operations produced. The answer may falsely claim changes were made. Answer preview:', parsed.answer.slice(0, 200));
-  }
-
   return {
     answer: parsed.answer,
-    suggestsModification: parsed.suggestsModification,
     operations,
   };
 }
