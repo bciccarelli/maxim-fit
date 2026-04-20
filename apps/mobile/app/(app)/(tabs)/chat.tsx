@@ -620,7 +620,6 @@ export default function ChatScreen() {
           placeholder={selectedImage ? 'Ask about this image...' : 'Ask a question...'}
           placeholderTextColor={colors.onSurfaceVariant}
           multiline
-          maxLength={500}
           editable={!isStreaming}
         />
         <Pressable
