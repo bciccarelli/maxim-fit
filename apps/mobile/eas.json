@@ -10,7 +10,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.maxim.fit",
         "EXPO_PUBLIC_BYPASS_SUBSCRIPTION": "true",
-        "EXPO_NO_CAPABILITY_SYNC": "1"
+        "EXPO_NO_CAPABILITY_SYNC": "1",
+        "EAS_BUILD_DISABLE_EXPO_DOCTOR_STEP": "1"
       }
     },
     "preview": {
@@ -18,7 +19,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.maxim.fit",
         "EXPO_PUBLIC_BYPASS_SUBSCRIPTION": "true",
-        "EXPO_NO_CAPABILITY_SYNC": "1"
+        "EXPO_NO_CAPABILITY_SYNC": "1",
+        "EAS_BUILD_DISABLE_EXPO_DOCTOR_STEP": "1"
       }
     },
     "production": {
@@ -26,7 +28,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.maxim.fit",
         "EXPO_PUBLIC_BYPASS_SUBSCRIPTION": "true",
-        "EXPO_NO_CAPABILITY_SYNC": "1"
+        "EXPO_NO_CAPABILITY_SYNC": "1",
+        "EAS_BUILD_DISABLE_EXPO_DOCTOR_STEP": "1"
       }
     }
   },
