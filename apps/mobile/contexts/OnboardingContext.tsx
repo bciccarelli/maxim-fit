@@ -5,6 +5,7 @@ import {
   getHasCompletedOnboarding,
   setHasCompletedOnboarding as persistOnboardingComplete,
 } from '@/lib/storage/onboardingStorage';
+import { armProtocolEditingTip } from '@/lib/storage/onboardingTipsStorage';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -70,9 +71,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     };
   }, [session?.user?.id, hasCompletedOnboarding]);
 
-  // Complete onboarding and navigate to main app
+  // Complete onboarding and navigate to main app. Arms the one-shot editing
+  // tip so the protocols screen shows it on first render.
   const completeOnboarding = useCallback(async () => {
     await persistOnboardingComplete(true);
+    await armProtocolEditingTip();
     setHasCompletedOnboarding(true);
     router.replace('/(app)/(tabs)/protocols');
   }, [router]);

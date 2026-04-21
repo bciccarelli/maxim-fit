@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, Plus, Pencil, Trash2, Upload, History } from 'lucide-react-native';
+import { ChevronDown, Plus, Pencil, Trash2, Upload, History, X } from 'lucide-react-native';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProtocol, type ProtocolChain } from '@/contexts/ProtocolContext';
@@ -23,6 +23,7 @@ import { ImportProtocolSheet } from '@/components/protocol/ImportProtocolSheet';
 import { VersionHistorySheet } from '@/components/protocol/VersionHistorySheet';
 import { scheduleProtocolNotifications } from '@/lib/notifications/scheduler';
 import { getNotificationPreferences } from '@/lib/storage/notificationPreferences';
+import { consumeProtocolEditingTip } from '@/lib/storage/onboardingTipsStorage';
 import { useUserConfig } from '@/hooks/useUserConfig';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 import { mf, fonts } from '@/lib/theme';
@@ -55,6 +56,23 @@ export default function ProtocolsScreen() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showImportSheet, setShowImportSheet] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showEditingTip, setShowEditingTip] = useState(false);
+
+  // Show the "you can edit directly or ask in chat" hint exactly once, and
+  // only for users who just completed onboarding (the flag is armed there).
+  useEffect(() => {
+    let cancelled = false;
+    consumeProtocolEditingTip().then((shouldShow) => {
+      if (!cancelled && shouldShow) setShowEditingTip(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dismissEditingTip = useCallback(() => {
+    setShowEditingTip(false);
+  }, []);
 
   const { canAccess, showUpgradeModal } = useSubscriptionContext();
 
@@ -434,6 +452,22 @@ export default function ProtocolsScreen() {
           onRevert={handleVersionRevert}
         />
       )}
+
+      {showEditingTip && (
+        <View style={[styles.tipContainer, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+          <View style={styles.tipCard}>
+            <View style={styles.tipTextWrap}>
+              <Text style={styles.tipHeading}>Your protocol is ready</Text>
+              <Text style={styles.tipBody}>
+                Tap any item to edit it directly, or ask for modifications in the chat — I'll propose changes you can accept.
+              </Text>
+            </View>
+            <Pressable onPress={dismissEditingTip} hitSlop={10} style={styles.tipClose}>
+              <X size={14} color={mf.fg2} />
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -442,6 +476,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: mf.bg,
+  },
+  tipContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+  },
+  tipCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: mf.surface,
+    borderWidth: 1,
+    borderColor: mf.line,
+    borderLeftWidth: 2,
+    borderLeftColor: mf.accent,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  tipTextWrap: {
+    flex: 1,
+  },
+  tipHeading: {
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: mf.fg3,
+    marginBottom: 4,
+  },
+  tipBody: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    color: mf.fg,
+  },
+  tipClose: {
+    padding: 4,
   },
   loadingContainer: {
     flex: 1,
