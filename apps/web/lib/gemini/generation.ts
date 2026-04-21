@@ -1355,23 +1355,97 @@ Output clear, organized prose. Do NOT output JSON.`;
  * Extract a JSON object from text that may be wrapped in a ```json code fence,
  * preceded by prose, or returned raw. Returns null if nothing parses.
  */
+/**
+ * Attempt to parse a JSON string, with two forgiving retries for common LLM
+ * mistakes: trailing commas, and unescaped newlines inside string values.
+ */
+function tryParseJsonLenient(s: string): unknown | undefined {
+  if (!s) return undefined;
+  const trimmed = s.trim();
+  try { return JSON.parse(trimmed); } catch { /* fall through */ }
+
+  // Strip trailing commas before } or ]
+  const noTrailingCommas = trimmed.replace(/,\s*(\}|\])/g, '$1');
+  if (noTrailingCommas !== trimmed) {
+    try { return JSON.parse(noTrailingCommas); } catch { /* fall through */ }
+  }
+
+  return undefined;
+}
+
+/**
+ * Find balanced top-level JSON object substrings in text, respecting string
+ * literals and their escapes. Returns each candidate in source order.
+ */
+function findJsonObjectCandidates(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === '\\') { escape = true; continue; }
+      if (ch === '"') { inString = false; }
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        out.push(text.slice(start, i + 1));
+        start = -1;
+      } else if (depth < 0) {
+        depth = 0;
+      }
+    }
+  }
+  return out;
+}
+
+function looksLikeAskResponse(obj: unknown): obj is { answer?: unknown; operations?: unknown } {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return 'answer' in o || 'operations' in o;
+}
+
 export function extractJsonObject(text: string): unknown {
   if (!text) return null;
-  // Direct parse first (schema mode, or pure JSON responses).
-  try { return JSON.parse(text); } catch { /* fall through */ }
 
-  // Fenced code block.
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced) {
-    try { return JSON.parse(fenced[1].trim()); } catch { /* fall through */ }
-  }
+  // 1. Direct parse (schema mode or pure-JSON responses).
+  const direct = tryParseJsonLenient(text);
+  if (direct !== undefined) return direct;
 
-  // Last-resort: find the outermost JSON object.
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    try { return JSON.parse(text.slice(firstBrace, lastBrace + 1)); } catch { /* fall through */ }
+  // 2. Walk ALL fenced code blocks and pick one that looks like the Ask shape.
+  //    Fall back to the first fenced block that parses at all.
+  const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  const fencedParses: unknown[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = fenceRegex.exec(text)) !== null) {
+    const parsed = tryParseJsonLenient(m[1]);
+    if (parsed !== undefined) fencedParses.push(parsed);
   }
+  const preferredFence = fencedParses.find(looksLikeAskResponse);
+  if (preferredFence !== undefined) return preferredFence;
+  if (fencedParses.length > 0) return fencedParses[0];
+
+  // 3. Scan for all balanced top-level JSON objects in the raw text (handles
+  //    prose-before / prose-after JSON). Prefer one that has the Ask shape.
+  const candidates = findJsonObjectCandidates(text);
+  const parsed: unknown[] = [];
+  for (const c of candidates) {
+    const p = tryParseJsonLenient(c);
+    if (p !== undefined) parsed.push(p);
+  }
+  const preferred = parsed.find(looksLikeAskResponse);
+  if (preferred !== undefined) return preferred;
+  if (parsed.length > 0) return parsed[0];
+
   return null;
 }
 
@@ -1894,26 +1968,48 @@ export async function askAboutProtocol(
     throw new Error('No response from Gemini during single-phase ask');
   }
 
-  const parsed = extractJsonObject(text) as { answer?: unknown; operations?: unknown } | null;
-  if (!parsed || typeof parsed !== 'object') {
-    console.error('[Ask single-phase] Could not extract JSON from response. First 400 chars:', text.slice(0, 400));
-    throw new Error('Ask response did not contain parseable JSON');
+  const groundingMetadata = getGroundingMetadata(response);
+  const citations = extractCitations(groundingMetadata, 'ask');
+
+  const extracted = extractJsonObject(text);
+  const parsed = extracted && typeof extracted === 'object' && !Array.isArray(extracted)
+    ? (extracted as { answer?: unknown; operations?: unknown })
+    : null;
+  if (!parsed) {
+    // The model produced no parseable JSON. This happens occasionally on pure
+    // information questions where the model answers in prose and forgets the
+    // wrapping object. Return the text as the answer with no ops rather than
+    // throwing — the user gets their answer, just without proposed changes.
+    console.warn('[Ask single-phase] No parseable JSON in response. Returning raw text as answer. First 400 chars:', text.slice(0, 400));
+    return {
+      answer: stripFencesAndArtifacts(text),
+      operations: undefined,
+      citations,
+    };
   }
 
-  const answer = typeof parsed.answer === 'string' ? parsed.answer : '';
+  const answer = typeof parsed.answer === 'string' ? parsed.answer : stripFencesAndArtifacts(text);
   const rawOps = Array.isArray(parsed.operations) ? parsed.operations : [];
   const operations = rawOps.length > 0 ? normalizeGeminiOperations(rawOps) : undefined;
 
   console.log('[Ask single-phase] ops:', rawOps.length, 'raw →', operations?.length ?? 0, 'normalized');
-
-  const groundingMetadata = getGroundingMetadata(response);
-  const citations = extractCitations(groundingMetadata, 'ask');
 
   return {
     answer,
     operations,
     citations,
   };
+}
+
+/**
+ * Strip common response artifacts (code fences, leading/trailing whitespace)
+ * when we fall back to returning raw text as the answer.
+ */
+function stripFencesAndArtifacts(text: string): string {
+  return text
+    .replace(/```(?:json)?\s*[\s\S]*?```/g, '') // remove fenced JSON blocks
+    .replace(/^\s+|\s+$/g, '')
+    || text.trim(); // if stripping emptied everything, return the original trimmed
 }
 
 // Combined schema for parsing protocol text with inferred goals
