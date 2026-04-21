@@ -1,7 +1,6 @@
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { OnboardingHeader } from '@/components/onboarding/OnboardingHeader';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
@@ -11,21 +10,8 @@ import { colors } from '@/lib/theme';
 export default function PersonalInfoScreen() {
   const router = useRouter();
   const { personalInfo, setPersonalInfo } = useOnboarding();
-  const [showValidation, setShowValidation] = useState(false);
-
-  const isValid = !!(
-    personalInfo.age &&
-    personalInfo.weight_lbs &&
-    personalInfo.height_in &&
-    personalInfo.sex &&
-    personalInfo.fitness_level
-  );
 
   const handleNext = () => {
-    if (!isValid) {
-      setShowValidation(true);
-      return;
-    }
     router.push('/(onboarding)/generating');
   };
 
@@ -42,8 +28,8 @@ export default function PersonalInfoScreen() {
         <OnboardingHeader
           currentStep={2}
           totalSteps={3}
-          title="About you"
-          description="We use this to calibrate nutrition targets, training load, and recovery recommendations."
+          title="About you (optional)"
+          description="All fields are optional. Anything you share helps us calibrate nutrition targets, training load, and recovery — but you can skip and generate a protocol right away."
         />
         <ScrollView
           style={styles.flex}
@@ -54,7 +40,6 @@ export default function PersonalInfoScreen() {
           <PersonalInfoStep
             personalInfo={personalInfo}
             onChange={setPersonalInfo}
-            showValidation={showValidation}
           />
         </ScrollView>
         <OnboardingFooter
@@ -62,7 +47,6 @@ export default function PersonalInfoScreen() {
           onBack={handleBack}
           nextLabel="Generate protocol"
           showGenerateIcon
-          nextDisabled={showValidation && !isValid}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -22,7 +22,6 @@ export interface RequirementsStepProps {
 export interface PersonalInfoStepProps {
   personalInfo: Partial<PersonalInfo>;
   onChange: (info: Partial<PersonalInfo>) => void;
-  showValidation?: boolean;
 }
 
 export interface GeneratingStepProps {
