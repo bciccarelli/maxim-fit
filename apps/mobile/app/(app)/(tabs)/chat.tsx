@@ -2,14 +2,13 @@ import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndic
 import * as Clipboard from 'expo-clipboard';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Send, ChevronDown, Plus, Wand2, Lock, MessageSquare, ImageIcon, X } from 'lucide-react-native';
+import { Send, ChevronDown, Plus, Lock, MessageSquare, ImageIcon, X } from 'lucide-react-native';
 import { colors } from '@/lib/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { useProtocol } from '@/contexts/ProtocolContext';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 import { useSSEStream } from '@/lib/useSSEStream';
 import { apiUrl, getAuthHeaders } from '@/lib/api';
-import { ModifySheet } from '@/components/protocol/ModifySheet';
 import { GenerateProtocolModal } from '@/components/protocol/GenerateProtocolModal';
 import { ChatCitationsDropdown } from '@/components/protocol/ChatCitationsDropdown';
 import { ChatOperationsCard } from '@/components/protocol/ChatOperationsCard';
@@ -89,9 +88,6 @@ export default function ChatScreen() {
   // Check if user has access to the ask feature
   const hasAskAccess = canAccess('ask');
 
-  // Modify sheet state
-  const [showModifySheet, setShowModifySheet] = useState(false);
-  const [modifyContext, setModifyContext] = useState<string | undefined>(undefined);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   // Keyboard visibility for input padding
@@ -300,16 +296,7 @@ export default function ChatScreen() {
     }
   }, []);
 
-  const handleModifyFromChat = useCallback((answerText: string) => {
-    setModifyContext(`Based on this conversation about my protocol:\n\n"${answerText}"\n\nPlease make appropriate modifications.`);
-    setShowModifySheet(true);
-  }, []);
-
-  const handleModifyAccepted = useCallback(() => {
-    // Could refresh protocol data here if needed
-  }, []);
-
-  const handleGenerateComplete = useCallback(async (protocolId: string) => {
+  const handleGenerateComplete = useCallback(async () => {
     await refreshChains();
   }, [refreshChains]);
 
@@ -529,21 +516,13 @@ export default function ChatScreen() {
                       <ChatCitationsDropdown citations={qa.citations} />
                     )}
                   </Pressable>
-                  {qa.operations && qa.operations.length > 0 && selectedVersion && parsedProtocol ? (
+                  {qa.operations && qa.operations.length > 0 && selectedVersion && parsedProtocol && (
                     <ChatOperationsCard
                       operations={qa.operations}
                       protocolId={selectedVersion.id}
                       protocol={parsedProtocol}
                       onApplied={() => {}}
                     />
-                  ) : (
-                    <Pressable
-                      style={styles.sparkleButton}
-                      onPress={() => handleModifyFromChat(qa.answer)}
-                    >
-                      <Wand2 size={14} color={colors.primaryContainer} />
-                      <Text style={styles.sparkleButtonText}>Modify</Text>
-                    </Pressable>
                   )}
                 </View>
               </View>
@@ -641,24 +620,6 @@ export default function ChatScreen() {
         </Pressable>
       </View>
 
-      {/* Modify Sheet */}
-      {selectedVersion && (
-        <ModifySheet
-          visible={showModifySheet}
-          onClose={() => {
-            setShowModifySheet(false);
-            setModifyContext(undefined);
-          }}
-          protocolId={selectedVersion.id}
-          currentScores={{
-            weighted_goal_score: selectedVersion.weighted_goal_score,
-            viability_score: selectedVersion.viability_score,
-          }}
-          onAccepted={handleModifyAccepted}
-          initialMessage={modifyContext}
-          currentProtocol={parsedProtocol ?? undefined}
-        />
-      )}
     </KeyboardAvoidingView>
   );
 }

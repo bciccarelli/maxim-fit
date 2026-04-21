@@ -46,11 +46,6 @@ function formatDay(day: string): string {
   return parsed.map((d) => WEEKDAY_SHORT[d]).join(' / ');
 }
 
-function pickNextAvailableDay(usedDays: string[]): Weekday {
-  const used = new Set(usedDays.flatMap((d) => parseDays(d)));
-  return WEEKDAYS.find((d) => !used.has(d)) ?? 'monday';
-}
-
 const EMPTY_EXERCISE: Exercise = {
   name: '',
   sets: 3,
@@ -60,13 +55,6 @@ const EMPTY_EXERCISE: Exercise = {
   notes: null,
 };
 
-const createEmptyWorkout = (day: Weekday): Workout => ({
-  name: '',
-  day,
-  time: '06:00',
-  duration_min: 45,
-  exercises: [],
-});
 
 // Format exercise data as "3 x 10 · 60s" or "45 min"
 const formatExerciseData = (exercise: Exercise): string => {
@@ -146,14 +134,6 @@ export function TrainingSection({
     },
     [training, onChange]
   );
-
-  const addWorkout = useCallback(() => {
-    const nextDay = pickNextAvailableDay(training.workouts.map((w) => w.day));
-    const newWorkouts = [...training.workouts, createEmptyWorkout(nextDay)];
-    onChange?.({ ...training, workouts: newWorkouts });
-    setSelectedWorkoutIndex(newWorkouts.length - 1);
-    setEditingWorkoutIndex(newWorkouts.length - 1);
-  }, [training, onChange]);
 
   const removeWorkout = useCallback(
     (workoutIndex: number) => {
@@ -369,50 +349,40 @@ export function TrainingSection({
       <View style={styles.card}>
         {renderProgramHeader()}
 
-        {/* Workout selector chips */}
-        {training.workouts.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.workoutSelector}
-            contentContainerStyle={styles.workoutSelectorContent}
-          >
-            {training.workouts.map((workout, index) => (
-              <Pressable
-                key={index}
-                style={[
-                  styles.workoutChip,
-                  selectedWorkoutIndex === index && styles.workoutChipActive,
-                ]}
-                onPress={() => setSelectedWorkoutIndex(index)}
-              >
-                <Text
+        {/* Week-day chips (Mon–Sun in order). Rest days are disabled. */}
+        <View style={styles.workoutSelector}>
+          <View style={styles.workoutSelectorRow}>
+            {WEEKDAYS.map((d) => {
+              const workoutIndex = training.workouts.findIndex((w) => parseDays(w.day).includes(d));
+              const isRest = workoutIndex === -1;
+              const isSelected = !isRest && workoutIndex === selectedWorkoutIndex;
+              return (
+                <Pressable
+                  key={d}
                   style={[
-                    styles.workoutChipText,
-                    selectedWorkoutIndex === index && styles.workoutChipTextActive,
+                    styles.dayChipRow,
+                    isSelected && styles.dayChipRowSelected,
+                    isRest && styles.dayChipRowRest,
                   ]}
+                  onPress={isRest ? undefined : () => setSelectedWorkoutIndex(workoutIndex)}
+                  disabled={isRest}
                 >
-                  {formatDay(workout.day)}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
+                  <Text
+                    style={[
+                      styles.dayChipRowText,
+                      isSelected && styles.dayChipRowTextSelected,
+                      isRest && styles.dayChipRowTextRest,
+                    ]}
+                  >
+                    {WEEKDAY_SHORT[d]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         {renderSelectedWorkout()}
-
-        {editable && (
-          <Pressable
-            style={[styles.addButton, training.workouts.length >= 7 && styles.addButtonDisabled]}
-            onPress={training.workouts.length >= 7 ? undefined : addWorkout}
-            disabled={training.workouts.length >= 7}
-          >
-            <Plus size={16} color={colors.primaryContainer} />
-            <Text style={styles.addButtonText}>
-              {training.workouts.length >= 7 ? 'All 7 days assigned' : 'Add training day'}
-            </Text>
-          </Pressable>
-        )}
 
       </View>
 
@@ -706,31 +676,42 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // Workout selector chips
+  // Week-day chip row (Mon–Sun)
   workoutSelector: {
     marginBottom: 12,
-    marginHorizontal: -4,
   },
-  workoutSelectorContent: {
-    paddingHorizontal: 4,
-    gap: 8,
+  workoutSelectorRow: {
+    flexDirection: 'row',
+    gap: 6,
   },
-  workoutChip: {
-    paddingHorizontal: 14,
+  dayChipRow: {
+    flex: 1,
     paddingVertical: 8,
-    borderRadius: 0,
+    alignItems: 'center',
     backgroundColor: colors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
-  workoutChipActive: {
+  dayChipRowSelected: {
     backgroundColor: colors.primaryContainer,
+    borderColor: colors.primaryContainer,
   },
-  workoutChipText: {
+  dayChipRowRest: {
+    backgroundColor: 'transparent',
+    borderColor: colors.outlineVariant,
+    opacity: 0.4,
+  },
+  dayChipRowText: {
     fontSize: 12,
     fontWeight: '500',
     color: colors.onSurfaceVariant,
   },
-  workoutChipTextActive: {
+  dayChipRowTextSelected: {
     color: colors.surfaceContainerLowest,
+    fontWeight: '600',
+  },
+  dayChipRowTextRest: {
+    color: colors.onSurfaceVariant,
   },
 
   // Selected workout content
