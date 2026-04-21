@@ -11,18 +11,27 @@ Generate a personalized, evidence-based daily health protocol. The protocol must
 
 ## Gemini API
 
-**Model Configuration:**
-- `MODEL_FAST` (`gemini-2.5-flash-lite`): Initial protocol generation, no grounding needed
-- `MODEL_GROUNDED` (`gemini-3-flash-preview`): Verification, Ask, and other grounded + structured output tasks
-- `MODEL_RESEARCH` (`gemini-3-flash-preview`): Phase 1 of Modify - research with grounding, no structured output
-- `MODEL_STRUCTURED` (`gemini-3-pro-preview`): Phase 2 of Modify - structured output with Pro model, no grounding
+**Model Configuration** (see [`lib/gemini/client.ts`](apps/web/lib/gemini/client.ts)):
+- `MODEL_FAST` (`gemini-2.5-flash-lite`): Initial protocol generation, no grounding needed.
+- `MODEL_GROUNDED` (`gemini-3.1-flash-lite-preview`): Verification and other grounded + structured output tasks.
+- `MODEL_RESEARCH` (`gemini-3.1-flash-lite-preview`): Phase 1 of Modify — research with grounding, no structured output.
+- `MODEL_STRUCTURED` (`gemini-3.1-pro-preview`): Ask + Phase 2 of Modify — Pro reasoning with Google Search grounding and JSON-in-prose output.
 
-**Two-Phase Modify Architecture:**
-The Modify feature uses a two-phase approach for better research quality and structured output:
+**Ask Architecture (single-phase, grounded, no responseSchema):**
+`askAboutProtocol` makes **one** Gemini call against `MODEL_STRUCTURED` with Google Search enabled and no `responseSchema`. The answer + operations come back as JSON-in-prose (often wrapped in a ```json fence), which `extractJsonObject` parses. Citations are pulled from the response's `groundingMetadata`.
+
+Design notes (validated against live probes, see [`apps/web/scripts/probe-*.ts`](apps/web/scripts/)):
+- Gemini 3.1 supports grounding + generation in one call, so the old research → apply split is no longer architecturally necessary.
+- We intentionally do **not** pass `responseSchema`. With the typed per-element-type payload schema (`exerciseFields`, `supplementFields`, etc.), Gemini inflates output to 30–65k tokens filling placeholder scaffolding for every op. Grounding-only + JSON-in-prose keeps output under ~1.5k tokens.
+- The prompt ([`buildAskSinglePhasePrompt`](apps/web/lib/gemini/generation.ts)) casts the model as a *"deterministic protocol editor"* with an explicit literal-count rule. Under the old "protocol advisor" framing, Pro self-limited bulk ops (e.g. emitting 1 op instead of the 9 requested). The deterministic-editor framing + "surface concerns in answer only" override consistently produces full op counts across `3-flash` / `3.1-flash-lite` / `3.1-pro`.
+- The prompt also includes a *"research first"* directive because Pro otherwise skips invoking Google Search entirely when it thinks it knows the answer, yielding 0 citations. With the directive, Pro searches 2–3 times per call with good retrieval.
+
+**Two-Phase Modify Architecture (unchanged):**
+Modify still uses the two-phase approach:
 1. **Phase 1 (Research)**: Uses `MODEL_RESEARCH` with Google Search grounding to research the user's request. Returns free-form prose with citations.
-2. **Phase 2 (Apply)**: Uses `MODEL_STRUCTURED` (Pro model) with structured output to apply the research findings and generate the modified protocol JSON.
+2. **Phase 2 (Apply)**: Uses `MODEL_STRUCTURED` (Pro) with structured output to apply the research findings and generate the modified protocol JSON.
 
-This separation allows Phase 1 to focus on evidence gathering without JSON formatting constraints, while Phase 2 uses Pro's superior reasoning for complex structured output.
+This separation is retained because Modify produces a whole-protocol replacement (strict schema parse via `dailyProtocolSchema`), not an operations array, so the responseSchema is both necessary and small enough not to balloon output.
 
 ## Project Structure
 

@@ -421,20 +421,28 @@ export function ScheduleSection({
     [protocol, variantIndex, updateProtocol]
   );
 
-  const handleAddOtherEvent = useCallback(() => {
-    const newSchedules = [...protocol.schedules];
-    const variant = newSchedules[variantIndex];
-    if (variant) {
-      const newOtherEventIndex = variant.other_events.length; // Index of new event in other_events array
+  const handleAddOtherEvent = useCallback(
+    (startTime?: string) => {
+      const newSchedules = [...protocol.schedules];
+      const variant = newSchedules[variantIndex];
+      if (!variant) return;
+      const newEvent: OtherEvent = { ...EMPTY_OTHER_EVENT };
+      if (startTime) {
+        newEvent.start_time = startTime;
+        const [h, m] = startTime.split(':').map(Number);
+        const endH = (h + 1) % 24;
+        newEvent.end_time = `${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+      const newOtherEventIndex = variant.other_events.length;
       newSchedules[variantIndex] = {
         ...variant,
-        other_events: [...variant.other_events, { ...EMPTY_OTHER_EVENT }],
+        other_events: [...variant.other_events, newEvent],
       };
       updateProtocol({ ...protocol, schedules: newSchedules });
-      // Use stable identifier for the new event
       setEditingEvent({ source: 'other', sourceIndex: newOtherEventIndex });
-    }
-  }, [protocol, variantIndex, updateProtocol]);
+    },
+    [protocol, variantIndex, updateProtocol],
+  );
 
   // ── Routine editing handlers ──
 
@@ -662,6 +670,28 @@ export function ScheduleSection({
 
               {/* Events column */}
               <View style={styles.eventsColumn}>
+                {/* Long-press-on-blank-space to add a new event */}
+                {editable && (
+                  <Pressable
+                    style={StyleSheet.absoluteFillObject}
+                    delayLongPress={350}
+                    onLongPress={(e) => {
+                      const y = e.nativeEvent.locationY;
+                      const rawMin = rangeStartMin + (y / HOUR_HEIGHT) * 60;
+                      // Snap to nearest 15 min, clamp so a 60-min event fits in range
+                      const snapped = Math.round(rawMin / 15) * 15;
+                      const clamped = Math.max(
+                        rangeStartMin,
+                        Math.min(snapped, rangeEndMin - 60),
+                      );
+                      const hh = Math.floor(clamped / 60);
+                      const mm = clamped % 60;
+                      const startTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+                      handleAddOtherEvent(startTime);
+                    }}
+                  />
+                )}
+
                 {/* Hour divider lines */}
                 {hours.map((h) => (
                   <View
@@ -670,6 +700,7 @@ export function ScheduleSection({
                       styles.hourLine,
                       { top: (h - firstHour) * HOUR_HEIGHT },
                     ]}
+                    pointerEvents="none"
                   />
                 ))}
 
@@ -777,7 +808,7 @@ export function ScheduleSection({
             </View>
 
             {editable && (
-              <Pressable style={styles.addButton} onPress={handleAddOtherEvent}>
+              <Pressable style={styles.addButton} onPress={() => handleAddOtherEvent()}>
                 <Plus size={16} color={colors.primaryContainer} />
                 <Text style={styles.addButtonText}>Add other event</Text>
               </Pressable>
@@ -787,7 +818,7 @@ export function ScheduleSection({
           <View style={styles.emptyTimeline}>
             <Text style={styles.noEvents}>No events scheduled for this day</Text>
             {editable && (
-              <Pressable style={styles.addButton} onPress={handleAddOtherEvent}>
+              <Pressable style={styles.addButton} onPress={() => handleAddOtherEvent()}>
                 <Plus size={16} color={colors.primaryContainer} />
                 <Text style={styles.addButtonText}>Add other event</Text>
               </Pressable>

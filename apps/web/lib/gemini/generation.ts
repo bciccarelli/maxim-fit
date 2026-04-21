@@ -178,7 +178,6 @@ export const dailyProtocolGeminiSchema = {
     training: {
       type: 'object',
       properties: {
-        program_name: { type: 'string' },
         days_per_week: { type: 'integer', minimum: 1, maximum: 7 },
         workouts: {
           type: 'array',
@@ -219,11 +218,8 @@ export const dailyProtocolGeminiSchema = {
             required: ['name', 'day', 'time', 'duration_min', 'exercises'],
           },
         },
-        rest_days: { type: 'array', items: { type: 'string' } },
-        progression_notes: { type: 'string' },
-        general_notes: { type: 'array', items: { type: 'string' } },
       },
-      required: ['program_name', 'days_per_week', 'workouts', 'rest_days', 'progression_notes', 'general_notes'],
+      required: ['days_per_week', 'workouts'],
     },
   },
   required: ['schedules', 'diet', 'supplementation', 'training'],
@@ -669,7 +665,7 @@ ${JSON.stringify(config, null, 2)}${preferencesSection}
 ## Current Protocol Summary
 - Wake: ${protocol.schedules[0]?.wake_time || 'N/A'}, Sleep: ${protocol.schedules[0]?.sleep_time || 'N/A'}
 - Daily calories: ${protocol.diet.daily_calories}, Protein: ${protocol.diet.protein_target_g}g
-- Training: ${protocol.training.program_name} (${protocol.training.days_per_week}x/week)
+- Training: ${protocol.training.days_per_week}x/week
 - Supplements: ${protocol.supplementation.supplements.map(s => s.name).join(', ') || 'None'}
 
 ## User's Requested Changes
@@ -876,7 +872,7 @@ ${researchText}${preferencesSection}
 - Goals: ${goalsText}
 - Requirements: ${requirementsText}
 - Wake: ${protocol.schedules[0]?.wake_time || 'N/A'}, Sleep: ${protocol.schedules[0]?.sleep_time || 'N/A'}
-- Training: ${protocol.training.program_name} (${protocol.training.days_per_week}x/week)
+- Training: ${protocol.training.days_per_week}x/week
 
 ## Instructions
 
@@ -1220,29 +1216,77 @@ const chatOperationGeminiSchema = {
     },
     parentId: {
       type: 'string',
-      description: 'For create operations on nested elements (e.g., exercise within workout), the parent element ID. Set to "" if not applicable.',
+      description: 'For create operations on nested elements, the parent element id copied EXACTLY from the reference table. REQUIRED for create-exercise ops (must be a workout id starting with "wk_"). REQUIRED for create-other_event / create-routine_event ops (must be a schedule id starting with "sv_"). Set to "" for all other ops (modify, delete, create at the top level). Do NOT put the parent id in elementId — parentId is a separate field.',
     },
-    fields: {
+    // Per-elementType typed payload. Populate exactly one field matching
+    // elementType. This avoids the Pro model confusing fields across types
+    // when everything shares a single polymorphic object.
+    exerciseFields: {
       type: 'object',
-      description: `For modify: only include fields that are changing (partial update, e.g. {"sets": 4}). For delete: set to empty object {}.
-For create, include ALL required fields for the element type:
-- supplement: {name, dosage_amount (string), dosage_unit (string), time (HH:MM), timing (string e.g. "with breakfast"), purpose (string)}
-- meal: {name, time (HH:MM), foods (string array), calories (integer), protein_g (number), carbs_g (number), fat_g (number)}
-- exercise: {name, sets (integer), reps (string e.g. "8-10"), notes (string)}. Optional: duration_min (integer), rest_sec (integer). IMPORTANT: Always include name, sets, and reps for every exercise.
-- workout: {name, day (string), time (HH:MM), duration_min (integer), exercises (array)}
-- other_event: {start_time (HH:MM), end_time (HH:MM), activity (string)}
-IMPORTANT: All times MUST be 24-hour HH:MM with leading zeros (e.g. "06:00", "14:30", NOT "6:00" or "2:30 PM"). All numeric values MUST be numbers not strings.`,
+      description: 'Populate when elementType="exercise". For modify, include only the fields changing; for create, include name + sets + reps at minimum.',
+      properties: {
+        name: { type: 'string', description: 'Specific exercise name like "Pull-ups", "Barbell Back Squat". No placeholders.' },
+        sets: { type: 'integer', description: 'Number of sets.' },
+        reps: { type: 'string', description: 'Rep count or range as a plain string, e.g. "8-10", "5", "AMRAP".' },
+        rest_sec: { type: 'integer', description: 'Rest between sets in seconds.' },
+        duration_min: { type: 'integer', description: 'Duration in minutes (for duration-based movements).' },
+        notes: { type: 'string', description: 'Optional free-text coaching notes.' },
+      },
+    },
+    supplementFields: {
+      type: 'object',
+      description: 'Populate when elementType="supplement".',
+      properties: {
+        name: { type: 'string' },
+        dosage_amount: { type: 'string', description: 'Dosage amount as a string (e.g. "5", "2000").' },
+        dosage_unit: { type: 'string', description: 'Dosage unit (e.g. "g", "mg", "IU", "mcg").' },
+        time: { type: 'string', description: '24-hour HH:MM time (e.g. "07:30").' },
+        timing: { type: 'string', description: 'Human context (e.g. "with breakfast", "30 min before workout").' },
+        purpose: { type: 'string', description: 'Why this supplement is included.' },
+      },
+    },
+    mealFields: {
+      type: 'object',
+      description: 'Populate when elementType="meal".',
+      properties: {
+        name: { type: 'string' },
+        time: { type: 'string', description: '24-hour HH:MM.' },
+        foods: { type: 'array', items: { type: 'string' } },
+        calories: { type: 'integer' },
+        protein_g: { type: 'number' },
+        carbs_g: { type: 'number' },
+        fat_g: { type: 'number' },
+      },
+    },
+    workoutFields: {
+      type: 'object',
+      description: 'Populate when elementType="workout".',
+      properties: {
+        name: { type: 'string', description: 'Descriptive name like "Upper Body Strength". No placeholders.' },
+        day: { type: 'string', enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] },
+        time: { type: 'string', description: '24-hour HH:MM.' },
+        duration_min: { type: 'integer' },
+      },
+    },
+    otherEventFields: {
+      type: 'object',
+      description: 'Populate when elementType="other_event".',
+      properties: {
+        start_time: { type: 'string', description: '24-hour HH:MM.' },
+        end_time: { type: 'string', description: '24-hour HH:MM.' },
+        activity: { type: 'string' },
+      },
     },
     reason: {
       type: 'string',
       description: 'Brief human-readable explanation of why this change is suggested.',
     },
   },
-  required: ['op', 'elementId', 'elementType', 'parentId', 'fields', 'reason'],
+  required: ['op', 'elementId', 'elementType', 'parentId', 'reason'],
 } as const;
 
 // Phase 2 schema: Pro generates answer + operations together
-const askResultSchema = {
+export const askResultSchema = {
   type: 'object',
   properties: {
     answer: { type: 'string', description: 'Direct, conversational answer. When proposing changes, describe what you are suggesting and why — never describe changes as already applied. Prefer brevity but expand when the question warrants it. Base your answer on the research findings provided.' },
@@ -1284,7 +1328,7 @@ ${JSON.stringify(config, null, 2)}
 ## Current Protocol Summary
 - Wake: ${protocol.schedules[0]?.wake_time || 'N/A'}, Sleep: ${protocol.schedules[0]?.sleep_time || 'N/A'}
 - Daily calories: ${protocol.diet.daily_calories}, Protein: ${protocol.diet.protein_target_g}g
-- Training: ${protocol.training.program_name} (${protocol.training.days_per_week}x/week)
+- Training: ${protocol.training.days_per_week}x/week
 - Supplements: ${protocol.supplementation.supplements.map(s => s.name).join(', ') || 'None'}
 - Meals: ${protocol.diet.meals.map(m => m.name).join(', ') || 'None'}
 ${historySection}
@@ -1307,7 +1351,144 @@ Output clear, organized prose. Do NOT output JSON.`;
 /**
  * Phase 2 prompt: Pro model generates answer + operations from research.
  */
-function buildAskApplyPrompt(
+/**
+ * Extract a JSON object from text that may be wrapped in a ```json code fence,
+ * preceded by prose, or returned raw. Returns null if nothing parses.
+ */
+export function extractJsonObject(text: string): unknown {
+  if (!text) return null;
+  // Direct parse first (schema mode, or pure JSON responses).
+  try { return JSON.parse(text); } catch { /* fall through */ }
+
+  // Fenced code block.
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) {
+    try { return JSON.parse(fenced[1].trim()); } catch { /* fall through */ }
+  }
+
+  // Last-resort: find the outermost JSON object.
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    try { return JSON.parse(text.slice(firstBrace, lastBrace + 1)); } catch { /* fall through */ }
+  }
+  return null;
+}
+
+/**
+ * Build the single-phase Ask prompt used against a grounded Pro model.
+ *
+ * Framing: a *deterministic protocol editor*, not an advisor. This wording
+ * matters — Pro is tuned to apply judgment when cast as an advisor and will
+ * reduce operation counts to avoid what it sees as aggressive volume/dosage
+ * spikes. The explicit literal-count rule + "surface concerns in answer only"
+ * override flips that behavior consistently across 3-flash / 3.1-flash-lite /
+ * 3.1-pro in probe testing.
+ */
+export function buildAskSinglePhasePrompt(
+  protocol: DailyProtocol,
+  config: UserConfig | AnonymousUserConfig,
+  question: string,
+  history: QAHistoryItem[],
+): string {
+  const historySection = history.length > 0
+    ? `\n## Previous Conversation\n${history.map(qa => `User: ${qa.question}\nAssistant: ${qa.answer}`).join('\n\n')}\n`
+    : '';
+
+  const mealRefs = protocol.diet.meals
+    .map(m => `- "${m.name}" → id: "${m.id}"`)
+    .join('\n');
+  const supplementRefs = protocol.supplementation.supplements
+    .map(s => `- "${s.name}" → id: "${s.id}"`)
+    .join('\n');
+  const workoutRefs = protocol.training.workouts
+    .map(w => {
+      const exercises = w.exercises.map(e => `  - "${e.name}" → id: "${e.id}"`).join('\n');
+      return `- "${w.name}" (${w.day}) → id: "${w.id}"\n${exercises}`;
+    })
+    .join('\n');
+  const scheduleRefs = protocol.schedules.map(s => `- "${s.label}" (days: ${s.days.join(', ')}) → id: "${s.id}"`).join('\n');
+  const eventRefs = protocol.schedules.flatMap(s => [
+    ...s.other_events.map(e => `- "${e.activity}" → id: "${e.id}"`),
+    ...(s.routine_events ?? []).map(r => `- "${r.name}" → id: "${r.id}"`),
+  ]).join('\n');
+
+  return `You are a deterministic protocol editor for Maxim. Your job is to emit exactly the operations the user requests against their health protocol, then explain what you did in the answer text. Every op you emit is a proposal the user will review and accept or dismiss.
+
+## Core rules (non-negotiable)
+- Emit exactly the operations the user asks for. Do NOT second-guess their intent, reduce scope, phase changes in, or limit operation counts.
+- If the user asks to add N items to each of their M targets, emit exactly N × M ops — one per target. Do not consolidate. Do not phase.
+- If you have concerns (training volume, recovery, dosage, injury, adherence), surface them in the "answer" field only. Never by producing fewer ops than requested.
+- **Research first**: Before writing your answer or proposing changes, issue at least one Google Search query targeted at the user's specific question (study names, protocol specifics, current consensus, safety data). Ground your answer in what you retrieved. This is standard practice — do not skip it, even if you already know the answer. The *number* of operations is fixed by the user, not the research.
+
+## User Configuration
+${JSON.stringify(config, null, 2)}
+
+## Element ID Reference
+Use these ids exactly as shown when populating elementId (modify/delete) or parentId (nested create).
+
+### Meals
+${mealRefs || '(none)'}
+
+### Supplements
+${supplementRefs || '(none)'}
+
+### Workouts & Exercises
+${workoutRefs || '(none)'}
+
+### Schedule Variants
+${scheduleRefs || '(none)'}
+
+### Schedule Events
+${eventRefs || '(none)'}
+
+## Current Protocol
+${JSON.stringify(protocol, null, 2)}
+${historySection}
+## User's Question
+${question}
+
+## Op shapes
+
+Populate exactly one typed payload per op, matching elementType. Leave the others unset.
+
+\`\`\`json
+{
+  "op": "create" | "modify" | "delete",
+  "elementId": "",                // required for modify/delete; "" for create
+  "elementType": "exercise" | "supplement" | "meal" | "workout" | "other_event" | "routine_event",
+  "parentId": "",                 // REQUIRED for create-exercise (wk_...), create-other_event / create-routine_event (sv_...); "" otherwise
+  "exerciseFields": { "name": "...", "sets": 3, "reps": "8-10", "rest_sec": 90, "notes": "..." },
+  "supplementFields": { "name": "...", "dosage_amount": "5", "dosage_unit": "g", "time": "07:30", "timing": "with breakfast", "purpose": "..." },
+  "mealFields": { "name": "...", "time": "07:30", "foods": ["..."], "calories": 600, "protein_g": 40, "carbs_g": 70, "fat_g": 18 },
+  "workoutFields": { "name": "...", "day": "monday", "time": "17:30", "duration_min": 45 },
+  "otherEventFields": { "start_time": "21:00", "end_time": "21:30", "activity": "..." },
+  "reason": "one short sentence"
+}
+\`\`\`
+
+Rules:
+- **create-exercise**: exerciseFields MUST include name, sets, reps. parentId MUST be the target workout's id from the reference table (starts with "wk_"). Do not put the workout id in elementId.
+- **create-supplement / create-meal / create-workout / create-other_event**: populate the matching payload with all required fields (see above). parentId is "" for supplement/meal/workout; for other_event/routine_event set parentId to the schedule variant id (sv_...).
+- **modify**: elementId MUST be copied exactly from the reference table. Put ONLY the changing fields into the matching payload.
+- **delete**: elementId MUST be copied exactly from the reference table. Leave all payloads unset.
+- All times MUST be 24-hour HH:MM with leading zeros.
+
+## Return format
+
+Return ONLY a single JSON object with this shape — wrap in a \`\`\`json fence if you like, but no other prose before or after:
+
+\`\`\`json
+{
+  "answer": "conversational explanation of what you proposed and why; surface any concerns here",
+  "operations": [ ...ops... ]
+}
+\`\`\`
+
+If the user asked a pure information question (no edit), return operations: []. Otherwise, emit the full set of ops the user asked for, then explain in answer.`;
+}
+
+export function buildAskApplyPrompt(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
@@ -1373,9 +1554,24 @@ ${question}
 
    **Finding element IDs**: Use the Element ID Reference table above. For modify and delete operations, you MUST copy the exact id string from the reference table (e.g., "ml_a1b2c3d4"). Do not invent or guess IDs.
 
-   - **modify**: Propose changes to specific fields of an existing element. Copy the elementId from the reference table. Only include fields that are changing in "fields".
-   - **delete**: Propose removing an element. Copy the elementId from the reference table.
-   - **create**: Propose adding a new element. Set elementType and provide complete data in "fields" (no id needed). For exercises, set parentId to the target workout's id from the reference table.
+   - **modify**: Propose changes to specific fields of an existing element. Copy the elementId from the reference table. Populate ONLY the typed payload object that matches elementType (e.g. exerciseFields for an exercise) with the fields that are changing.
+   - **delete**: Propose removing an element. Copy the elementId from the reference table. Leave all the *Fields objects unset.
+   - **create**: Propose adding a new element. Set elementType, leave elementId as "", and populate the matching *Fields payload with the new element's data. For create-exercise ops, parentId MUST be the target workout's id (starting with "wk_") from the reference table. For create-other_event / create-routine_event, parentId MUST be the schedule variant's id (starting with "sv_").
+
+   **Bulk create pattern:** When the user asks to add an exercise (or set of exercises) to EVERY workout — e.g. "add pull-ups to each of my workouts" or "add a core finisher to every lift day" — emit ONE create op per workout, each with its own parentId. Do not try to express this with a single op.
+
+   **Exact shape for a create-exercise op** — populate exerciseFields (and nothing else):
+   \`\`\`json
+   {
+     "op": "create",
+     "elementId": "",
+     "elementType": "exercise",
+     "parentId": "wk_xxxxxxxx",
+     "exerciseFields": { "name": "Pull-ups", "sets": 3, "reps": "6-8", "rest_sec": 90, "notes": "slow eccentric" },
+     "reason": "Add vertical pull volume to balance pressing."
+   }
+   \`\`\`
+   For a modify-exercise op, same shape but set elementId (not parentId) and only put the changing fields inside exerciseFields, e.g. \`{ "sets": 4 }\`.
 
    Examples:
    - "Change my breakfast to oatmeal and eggs" → modify the breakfast meal. Look up the breakfast meal's id from the reference table, then set fields: {"name": "Oatmeal & Eggs", "foods": ["Oatmeal", "Scrambled eggs"], "calories": 450, "protein_g": 35, "carbs_g": 50, "fat_g": 12}
@@ -1464,20 +1660,83 @@ function coerceGeminiPayload(payload: Record<string, unknown>, elementType: stri
  * Normalize raw Gemini operations to match our Zod schemas.
  * Strips sentinel values, maps fields→data for create ops, coerces types, filters invalid ops.
  */
-function normalizeGeminiOperations(
+export function normalizeGeminiOperations(
   rawOps: unknown[]
 ): Array<Record<string, unknown>> | undefined {
+  // Per-elementType payload keys we introduced in the schema. Only one is meant
+  // to be populated per op — the one matching elementType.
+  const TYPED_PAYLOAD_KEYS: Record<string, string> = {
+    exercise: 'exerciseFields',
+    supplement: 'supplementFields',
+    meal: 'mealFields',
+    workout: 'workoutFields',
+    other_event: 'otherEventFields',
+    routine_event: 'otherEventFields', // Routine events reuse other_event shape.
+  };
+
   const normalized = rawOps
     .map((op: unknown) => {
       const raw = op as Record<string, unknown>;
       const clean = { ...raw };
+
+      // For create ops, the model sometimes puts the parent (workout) id in
+      // elementId instead of parentId. Recover it before stripping empties.
+      if (
+        clean.op === 'create' &&
+        clean.elementType === 'exercise' &&
+        (!clean.parentId || clean.parentId === '') &&
+        typeof clean.elementId === 'string' &&
+        clean.elementId.startsWith('wk_')
+      ) {
+        clean.parentId = clean.elementId;
+        delete clean.elementId;
+        console.log('[normalizeGeminiOperations] Recovered workout id from elementId → parentId for create exercise op');
+      }
+
       if (clean.elementId === '') delete clean.elementId;
       if (clean.parentId === '') delete clean.parentId;
 
-      // Map "fields" to "data" for create ops
-      if (clean.op === 'create' && clean.fields && !clean.data) {
-        const { fields, ...rest } = clean;
-        return { ...rest, data: fields };
+      // Collapse the per-type typed payload into `fields`/`data`. Pick the
+      // payload key matching elementType; fall back to any populated *Fields
+      // if the model put it in the wrong slot.
+      const et = typeof clean.elementType === 'string' ? clean.elementType : '';
+      const typedKey = TYPED_PAYLOAD_KEYS[et];
+      let payload: Record<string, unknown> | undefined;
+      if (typedKey && clean[typedKey] && typeof clean[typedKey] === 'object') {
+        payload = clean[typedKey] as Record<string, unknown>;
+      } else {
+        // Scan all *Fields for a populated one (defensive).
+        for (const k of Object.values(TYPED_PAYLOAD_KEYS)) {
+          const candidate = clean[k];
+          if (candidate && typeof candidate === 'object' && Object.keys(candidate as object).length > 0) {
+            payload = candidate as Record<string, unknown>;
+            break;
+          }
+        }
+      }
+      // Fallback to the legacy `fields` field if present (older schema).
+      if (!payload && clean.fields && typeof clean.fields === 'object') {
+        payload = clean.fields as Record<string, unknown>;
+      }
+      // Strip all the typed-payload keys now that we've picked one.
+      for (const k of Object.values(TYPED_PAYLOAD_KEYS)) delete clean[k];
+      delete clean.fields;
+
+      if (payload) {
+        // Strip null, undefined, empty strings, and non-finite numbers. The
+        // Gemini Pro model frequently emits `Infinity` (which JSON.stringify
+        // renders as `null`) for integer fields it's uncertain about, and
+        // populates placeholder empty strings in *Fields payloads it shouldn't
+        // have touched at all. Both corrupt downstream validation.
+        const cleanedPayload: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(payload)) {
+          if (v === null || v === undefined) continue;
+          if (typeof v === 'number' && !Number.isFinite(v)) continue;
+          if (typeof v === 'string' && v.trim() === '') continue;
+          cleanedPayload[k] = v;
+        }
+        if (clean.op === 'create') clean.data = cleanedPayload;
+        else clean.fields = cleanedPayload;
       }
       return clean;
     })
@@ -1510,7 +1769,7 @@ function normalizeGeminiOperations(
  * Phase 1: Research with Google Search grounding (flash-lite).
  * Returns free-form prose + citations. No structured output.
  */
-async function askResearch(
+export async function askResearch(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
@@ -1548,7 +1807,7 @@ async function askResearch(
 /**
  * Phase 2: Generate answer + operations (Pro model, structured output, no grounding).
  */
-async function askApply(
+export async function askApply(
   protocol: DailyProtocol,
   config: UserConfig | AnonymousUserConfig,
   question: string,
@@ -1593,9 +1852,18 @@ async function askApply(
 }
 
 /**
- * Answer a question about a protocol using two-phase approach:
- * Phase 1 (flash-lite): Google Search grounding → free-form research prose + citations
- * Phase 2 (pro): Answer + operations as structured JSON from research context
+ * Answer a question about a protocol in a single call against a grounded Pro
+ * model. Replaces the old research → apply pipeline.
+ *
+ * Design rationale (see /tmp/probe-*.log and scripts/probe-*.ts):
+ * - 3.1 supports grounding + generation in one call, so the two-phase split
+ *   is no longer architecturally necessary.
+ * - Dropping the responseSchema is intentional. With the typed per-type
+ *   payload schema, Gemini inflates output to 30k+ tokens filling placeholder
+ *   scaffolding. Grounding-only + JSON-in-prose keeps output under ~1.5k tok.
+ * - The reframed prompt ("deterministic editor" + literal-count override)
+ *   was the fix for Pro silently reducing bulk op counts. Without it, Pro
+ *   self-limits; with it, all three 3.x models emit the full op count.
  */
 export async function askAboutProtocol(
   protocol: DailyProtocol,
@@ -1604,12 +1872,47 @@ export async function askAboutProtocol(
   history: QAHistoryItem[] = [],
   image?: ImageData | null
 ): Promise<AskAboutProtocolResult> {
-  const research = await askResearch(protocol, config, question, history, image);
-  const result = await askApply(protocol, config, question, history, research.researchText);
+  const client = getGeminiClient();
+  const prompt = buildAskSinglePhasePrompt(protocol, config, question, history);
+
+  const parts: Part[] = [{ text: prompt }];
+  if (image) {
+    parts.push(createPartFromBase64(image.base64, image.mimeType));
+  }
+
+  const response = await client.models.generateContent({
+    model: MODEL_STRUCTURED,
+    contents: [{ role: 'user', parts }],
+    config: {
+      tools: [{ googleSearch: {} }],
+      // No responseSchema: inflates output tokens enormously with per-type payloads.
+    },
+  });
+
+  const text = response.text || '';
+  if (!text) {
+    throw new Error('No response from Gemini during single-phase ask');
+  }
+
+  const parsed = extractJsonObject(text) as { answer?: unknown; operations?: unknown } | null;
+  if (!parsed || typeof parsed !== 'object') {
+    console.error('[Ask single-phase] Could not extract JSON from response. First 400 chars:', text.slice(0, 400));
+    throw new Error('Ask response did not contain parseable JSON');
+  }
+
+  const answer = typeof parsed.answer === 'string' ? parsed.answer : '';
+  const rawOps = Array.isArray(parsed.operations) ? parsed.operations : [];
+  const operations = rawOps.length > 0 ? normalizeGeminiOperations(rawOps) : undefined;
+
+  console.log('[Ask single-phase] ops:', rawOps.length, 'raw →', operations?.length ?? 0, 'normalized');
+
+  const groundingMetadata = getGroundingMetadata(response);
+  const citations = extractCitations(groundingMetadata, 'ask');
 
   return {
-    ...result,
-    citations: research.citations,
+    answer,
+    operations,
+    citations,
   };
 }
 
@@ -1968,29 +2271,20 @@ export async function* askAboutProtocolStream(
   history: QAHistoryItem[] = [],
   image?: ImageData | null
 ): AsyncGenerator<string, AskAboutProtocolResult, unknown> {
-  // Phase 1: Research with grounding (flash-lite)
-  // Caller sends SSE stage "researching" before invoking this generator
-  const research = await askResearch(protocol, config, question, history, image);
-
-  // Phase 2: Answer + operations (Pro model)
-  // Yield a stage marker so the API route can send "generating" to the client
+  // Single-phase Ask: the Gemini streaming API does not expose grounding
+  // metadata, so we call non-streaming, then simulate streaming by chunking
+  // the answer. (See design rationale on askAboutProtocol.)
   yield '\x00stage:generating';
-  const result = await askApply(protocol, config, question, history, research.researchText);
+  const result = await askAboutProtocol(protocol, config, question, history, image);
 
-  // Stream answer text in chunks
   const chunkSize = 15;
   const answer = result.answer;
-
   for (let i = 0; i < answer.length; i += chunkSize) {
-    const chunk = answer.slice(i, i + chunkSize);
-    yield chunk;
-    await new Promise(resolve => setTimeout(resolve, 15));
+    yield answer.slice(i, i + chunkSize);
+    await new Promise((resolve) => setTimeout(resolve, 15));
   }
 
-  return {
-    ...result,
-    citations: research.citations,
-  };
+  return result;
 }
 
 // ---------------------------------------------------------------------------

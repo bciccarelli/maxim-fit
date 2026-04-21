@@ -385,9 +385,22 @@ export function validateOperations(
   operations: ProtocolOperation[]
 ): ProtocolOperation[] {
   const allIds = collectAllElementIds(protocol);
+  const workoutIds = new Set(protocol.training.workouts.map(w => w.id).filter(Boolean) as string[]);
 
   return operations.filter(op => {
-    if (op.op === 'create') return true; // No ID to validate
+    if (op.op === 'create') {
+      // Exercises must attach to an existing workout; otherwise applyCreate is a silent no-op.
+      if (op.elementType === 'exercise') {
+        if (!op.parentId || !workoutIds.has(op.parentId)) {
+          console.warn(
+            '[validateOperations] Dropping create-exercise op with missing/unknown parentId',
+            { parentId: op.parentId, knownWorkoutIds: [...workoutIds], data: op.data },
+          );
+          return false;
+        }
+      }
+      return true;
+    }
     return allIds.has(op.elementId);
   });
 }

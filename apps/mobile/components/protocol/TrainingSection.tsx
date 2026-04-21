@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Keyboard, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Plus, Trash2, X, Dumbbell, GripVertical } from 'lucide-react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import type { TrainingProgram, Workout, Exercise } from '@protocol/shared/schemas';
@@ -12,8 +12,47 @@ type Props = {
   onChange?: (training: TrainingProgram) => void;
 };
 
+const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+type Weekday = (typeof WEEKDAYS)[number];
+const WEEKDAY_SHORT: Record<Weekday, string> = {
+  monday: 'Mon',
+  tuesday: 'Tue',
+  wednesday: 'Wed',
+  thursday: 'Thu',
+  friday: 'Fri',
+  saturday: 'Sat',
+  sunday: 'Sun',
+};
+
+/** Parse a day string that may contain multiple days ("Monday/Thursday", "mon, thu") into an ordered list of weekdays. */
+function parseDays(dayStr: string): Weekday[] {
+  if (!dayStr) return [];
+  const tokens = dayStr
+    .toLowerCase()
+    .split(/[\/,&]|\s+and\s+|\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const out: Weekday[] = [];
+  for (const tok of tokens) {
+    const match = WEEKDAYS.find((d) => d === tok || d.startsWith(tok) || tok.startsWith(d.slice(0, 3)));
+    if (match && !out.includes(match)) out.push(match);
+  }
+  return out;
+}
+
+function formatDay(day: string): string {
+  const parsed = parseDays(day);
+  if (parsed.length === 0) return day;
+  return parsed.map((d) => WEEKDAY_SHORT[d]).join(' / ');
+}
+
+function pickNextAvailableDay(usedDays: string[]): Weekday {
+  const used = new Set(usedDays.flatMap((d) => parseDays(d)));
+  return WEEKDAYS.find((d) => !used.has(d)) ?? 'monday';
+}
+
 const EMPTY_EXERCISE: Exercise = {
-  name: 'New Exercise',
+  name: '',
   sets: 3,
   reps: '10',
   duration_min: null,
@@ -21,13 +60,13 @@ const EMPTY_EXERCISE: Exercise = {
   notes: null,
 };
 
-const EMPTY_WORKOUT: Workout = {
-  name: 'New Workout',
-  day: 'Day 1',
+const createEmptyWorkout = (day: Weekday): Workout => ({
+  name: '',
+  day,
   time: '06:00',
   duration_min: 45,
   exercises: [],
-};
+});
 
 // Format exercise data as "3 x 10 · 60s" or "45 min"
 const formatExerciseData = (exercise: Exercise): string => {
@@ -57,6 +96,29 @@ export function TrainingSection({
   const [selectedWorkoutIndex, setSelectedWorkoutIndex] = useState(0);
   const [editingWorkoutIndex, setEditingWorkoutIndex] = useState<number | null>(null);
   const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
+  const didSplitCombinedRef = useRef(false);
+
+  // Split any combined-day workouts ("Monday/Thursday") into separate entries.
+  // Runs once per training object reference when editable.
+  useEffect(() => {
+    if (!editable || !onChange || didSplitCombinedRef.current) return;
+    const needsSplit = training.workouts.some((w) => parseDays(w.day).length > 1);
+    if (!needsSplit) return;
+    const expanded: Workout[] = [];
+    for (const w of training.workouts) {
+      const days = parseDays(w.day);
+      if (days.length <= 1) {
+        expanded.push(w);
+        continue;
+      }
+      // Preserve the first one's id; clone for additional days without id so a new id is assigned downstream.
+      days.forEach((d, i) => {
+        expanded.push({ ...w, id: i === 0 ? w.id : undefined, day: d });
+      });
+    }
+    didSplitCombinedRef.current = true;
+    onChange({ ...training, workouts: expanded });
+  }, [editable, onChange, training]);
 
   const updateTraining = useCallback(
     (updates: Partial<TrainingProgram>) => {
@@ -86,7 +148,8 @@ export function TrainingSection({
   );
 
   const addWorkout = useCallback(() => {
-    const newWorkouts = [...training.workouts, { ...EMPTY_WORKOUT }];
+    const nextDay = pickNextAvailableDay(training.workouts.map((w) => w.day));
+    const newWorkouts = [...training.workouts, createEmptyWorkout(nextDay)];
     onChange?.({ ...training, workouts: newWorkouts });
     setSelectedWorkoutIndex(newWorkouts.length - 1);
     setEditingWorkoutIndex(newWorkouts.length - 1);
@@ -154,15 +217,6 @@ export function TrainingSection({
           </View>
 
           <View style={styles.editField}>
-            <Text style={styles.fieldLabel}>Program Name</Text>
-            <EditableField
-              value={training.program_name}
-              onChange={(program_name) => updateTraining({ program_name })}
-              editable
-            />
-          </View>
-
-          <View style={styles.editField}>
             <Text style={styles.fieldLabel}>Days per Week</Text>
             <EditableField
               value={String(training.days_per_week)}
@@ -181,7 +235,6 @@ export function TrainingSection({
         style={styles.programHeader}
         onPress={() => editable && setEditingProgramHeader(true)}
       >
-        <Text style={styles.programName}>{training.program_name}</Text>
         <Text style={styles.programDays}>{training.days_per_week} days/week</Text>
       </Pressable>
     );
@@ -236,7 +289,7 @@ export function TrainingSection({
 
     return (
       <View style={styles.workoutContent}>
-        {/* Workout header - tappable to edit */}
+        {/* Workout header - tappable to edit, trash icon deletes directly */}
         <Pressable
           style={styles.workoutHeader}
           onPress={() => {
@@ -247,13 +300,37 @@ export function TrainingSection({
           }}
         >
           <View style={styles.workoutHeaderLeft}>
-            <Text style={styles.workoutName}>{workout.name}</Text>
-            <Text style={styles.workoutDay}>{workout.day}</Text>
+            <Text style={styles.workoutName}>{workout.name || 'Untitled workout'}</Text>
+            <Text style={styles.workoutDay}>{formatDay(workout.day)}</Text>
           </View>
           <View style={styles.workoutHeaderRight}>
             <Text style={styles.workoutDuration}>{workout.duration_min} min</Text>
             <Text style={styles.workoutTime}>{workout.time}</Text>
           </View>
+          {editable && (
+            <Pressable
+              hitSlop={10}
+              style={styles.workoutHeaderDelete}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                const dayLabel = formatDay(workout.day) || 'this day';
+                Alert.alert(
+                  'Delete training day',
+                  `Remove ${dayLabel}${workout.name ? ` (${workout.name})` : ''} from the program?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => removeWorkout(selectedWorkoutIndex),
+                    },
+                  ],
+                );
+              }}
+            >
+              <Trash2 size={16} color={colors.destructive} />
+            </Pressable>
+          )}
         </Pressable>
 
         {/* Exercises - draggable list */}
@@ -315,7 +392,7 @@ export function TrainingSection({
                     selectedWorkoutIndex === index && styles.workoutChipTextActive,
                   ]}
                 >
-                  {workout.day}
+                  {formatDay(workout.day)}
                 </Text>
               </Pressable>
             ))}
@@ -325,36 +402,18 @@ export function TrainingSection({
         {renderSelectedWorkout()}
 
         {editable && (
-          <Pressable style={styles.addButton} onPress={addWorkout}>
+          <Pressable
+            style={[styles.addButton, training.workouts.length >= 7 && styles.addButtonDisabled]}
+            onPress={training.workouts.length >= 7 ? undefined : addWorkout}
+            disabled={training.workouts.length >= 7}
+          >
             <Plus size={16} color={colors.primaryContainer} />
-            <Text style={styles.addButtonText}>Add workout</Text>
+            <Text style={styles.addButtonText}>
+              {training.workouts.length >= 7 ? 'All 7 days assigned' : 'Add training day'}
+            </Text>
           </Pressable>
         )}
 
-        {training.rest_days.length > 0 && (
-          <View style={styles.restDays}>
-            <Text style={styles.restDaysLabel}>Rest Days</Text>
-            <Text style={styles.restDaysText}>{training.rest_days.join(', ')}</Text>
-          </View>
-        )}
-
-        {training.progression_notes && (
-          <View style={styles.progression}>
-            <Text style={styles.progressionLabel}>Progression</Text>
-            <Text style={styles.progressionText}>{training.progression_notes}</Text>
-          </View>
-        )}
-
-        {training.general_notes.length > 0 && (
-          <View style={styles.notes}>
-            <Text style={styles.notesTitle}>Notes</Text>
-            {training.general_notes.map((note, index) => (
-              <Text key={index} style={styles.noteItem}>
-                • {note}
-              </Text>
-            ))}
-          </View>
-        )}
       </View>
 
       {/* Edit Workout Modal */}
@@ -422,27 +481,49 @@ export function TrainingSection({
                     </View>
                   </View>
 
-                  <View style={styles.modalFieldRow}>
-                    <View style={[styles.modalField, { flex: 1 }]}>
-                      <Text style={styles.modalFieldLabel}>Day</Text>
-                      <EditableField
-                        value={editingWorkout.day}
-                        onChange={(day) => updateWorkout(editingWorkoutIndex, { day })}
-                        editable
-                        style={styles.modalFieldInput}
-                      />
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Day</Text>
+                    <View style={styles.dayPicker}>
+                      {WEEKDAYS.map((d) => {
+                        const selected = parseDays(editingWorkout.day)[0] === d;
+                        const usedByOther = training.workouts.some(
+                          (w, idx) => idx !== editingWorkoutIndex && parseDays(w.day).includes(d),
+                        );
+                        return (
+                          <Pressable
+                            key={d}
+                            onPress={() => updateWorkout(editingWorkoutIndex, { day: d })}
+                            style={[
+                              styles.dayChip,
+                              selected && styles.dayChipSelected,
+                              usedByOther && !selected && styles.dayChipUsed,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.dayChipText,
+                                selected && styles.dayChipTextSelected,
+                                usedByOther && !selected && styles.dayChipTextUsed,
+                              ]}
+                            >
+                              {WEEKDAY_SHORT[d]}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
                     </View>
-                    <View style={[styles.modalField, { flex: 1, marginLeft: 12 }]}>
-                      <Text style={styles.modalFieldLabel}>Time</Text>
-                      <EditableField
-                        value={editingWorkout.time}
-                        onChange={(time) => updateWorkout(editingWorkoutIndex, { time })}
-                        type="time"
-                        editable
-                        mono
-                        style={styles.modalFieldInput}
-                      />
-                    </View>
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Time</Text>
+                    <EditableField
+                      value={editingWorkout.time}
+                      onChange={(time) => updateWorkout(editingWorkoutIndex, { time })}
+                      type="time"
+                      editable
+                      mono
+                      style={styles.modalFieldInput}
+                    />
                   </View>
                 </View>
 
@@ -612,12 +693,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
   },
-  programName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.onSurface,
-    flex: 1,
-  },
   programDays: {
     fontSize: 13,
     color: colors.primaryContainer,
@@ -673,6 +748,11 @@ const styles = StyleSheet.create({
   },
   workoutHeaderRight: {
     alignItems: 'flex-end',
+  },
+  workoutHeaderDelete: {
+    marginLeft: 12,
+    padding: 6,
+    alignSelf: 'center',
   },
   workoutName: {
     fontSize: 15,
@@ -741,51 +821,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 
-  // Rest days, progression, notes
-  restDays: {
-    marginBottom: 12,
-  },
-  restDaysLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  restDaysText: {
-    fontSize: 13,
-    color: colors.onSurface,
-  },
-  progression: {
-    marginBottom: 12,
-  },
-  progressionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  progressionText: {
-    fontSize: 13,
-    color: colors.onSurface,
-  },
-  notes: {
-    paddingTop: 12,
-  },
-  notesTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  },
-  noteItem: {
-    fontSize: 13,
-    color: colors.onSurfaceVariant,
-    lineHeight: 20,
-  },
-
   // Edit header
   editHeader: {
     flexDirection: 'row',
@@ -827,6 +862,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 4,
     gap: 6,
+  },
+  addButtonDisabled: {
+    opacity: 0.4,
   },
   addButtonText: {
     fontSize: 14,
@@ -892,6 +930,39 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 0,
     padding: 12,
+  },
+  dayPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  dayChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainerLow,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  dayChipSelected: {
+    backgroundColor: colors.primaryContainer,
+    borderColor: colors.primaryContainer,
+  },
+  dayChipUsed: {
+    opacity: 0.4,
+  },
+  dayChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.onSurfaceVariant,
+  },
+  dayChipTextSelected: {
+    color: colors.surfaceContainerLowest,
+    fontWeight: '600',
+  },
+  dayChipTextUsed: {
+    color: colors.onSurfaceVariant,
   },
   modalDeleteButton: {
     flexDirection: 'row',

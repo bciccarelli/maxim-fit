@@ -195,12 +195,16 @@ export const workoutSchema = z.object({
 export type Workout = z.infer<typeof workoutSchema>;
 
 export const trainingProgramSchema = z.object({
-  program_name: z.string(),
+  // Legacy: program_name is no longer generated or surfaced in the UI, but
+  // accepted on parse so existing stored protocols still validate.
+  program_name: z.string().optional().default(''),
   days_per_week: z.number().int().min(1).max(7),
   workouts: z.array(workoutSchema),
-  rest_days: z.array(z.string()),
-  progression_notes: z.string(),
-  general_notes: z.array(z.string()),
+  // Legacy fields — accepted on parse for backward compatibility with existing
+  // stored protocols, but no longer generated or surfaced in the UI.
+  rest_days: z.array(z.string()).optional().default([]),
+  progression_notes: z.string().optional().default(''),
+  general_notes: z.array(z.string()).optional().default([]),
 });
 
 export type TrainingProgram = z.infer<typeof trainingProgramSchema>;
