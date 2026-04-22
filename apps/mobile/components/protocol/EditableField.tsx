@@ -39,8 +39,8 @@ export function EditableField({
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    if (!editing) setDraft(value);
+  }, [value, editing]);
 
   useEffect(() => {
     if (editing && inputRef.current) {

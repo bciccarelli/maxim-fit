@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TextInput, Pressable, Platform } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { PersonalInfoStepProps } from './types';
 import { KEYBOARD_ACCESSORY_ID } from '@/components/shared/KeyboardAccessoryProvider';
@@ -20,48 +20,114 @@ const FITNESS_OPTIONS: { value: FitnessLevel; label: string }[] = [
   { value: 'advanced', label: 'Advanced' },
 ];
 
+const digits = (text: string) => text.replace(/[^0-9]/g, '');
+const parseOrUndef = (text: string) => {
+  const n = parseInt(text, 10);
+  return isNaN(n) ? undefined : n;
+};
+
 export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepProps) {
   const [useMetric, setUseMetric] = useState(false);
   const [showOtherConsiderations, setShowOtherConsiderations] = useState(false);
 
-  // Height in feet/inches for display
-  const heightFeet = personalInfo.height_in ? Math.floor(personalInfo.height_in / 12) : undefined;
-  const heightInches = personalInfo.height_in ? personalInfo.height_in % 12 : undefined;
+  // Local text state so typing is never reformatted mid-input. We only seed
+  // from personalInfo on mount; after that the input is the source of truth
+  // and the parsed number flows to onChange.
+  const [ageText, setAgeText] = useState(() => personalInfo.age?.toString() ?? '');
+  const [weightLbsText, setWeightLbsText] = useState(() => personalInfo.weight_lbs?.toString() ?? '');
+  const [weightKgText, setWeightKgText] = useState(() =>
+    personalInfo.weight_lbs ? Math.round(personalInfo.weight_lbs * 0.453592).toString() : ''
+  );
+  const [heightFtText, setHeightFtText] = useState(() =>
+    personalInfo.height_in ? Math.floor(personalInfo.height_in / 12).toString() : ''
+  );
+  const [heightInText, setHeightInText] = useState(() =>
+    personalInfo.height_in ? (personalInfo.height_in % 12).toString() : ''
+  );
+  const [heightCmText, setHeightCmText] = useState(() =>
+    personalInfo.height_in ? Math.round(personalInfo.height_in * 2.54).toString() : ''
+  );
 
-  // Weight in kg for display
-  const weightKg = personalInfo.weight_lbs ? Math.round(personalInfo.weight_lbs * 0.453592) : undefined;
+  const [lifestyleText, setLifestyleText] = useState(
+    () => personalInfo.lifestyle_considerations?.join(', ') ?? ''
+  );
+  const [dietText, setDietText] = useState(
+    () => personalInfo.dietary_restrictions?.join(', ') ?? ''
+  );
 
-  // Height in cm for display
-  const heightCm = personalInfo.height_in ? Math.round(personalInfo.height_in * 2.54) : undefined;
+  // Keep a ref so we can call the latest onChange without re-running effects.
+  const onChangeRef = useRef(onChange);
+  const infoRef = useRef(personalInfo);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    infoRef.current = personalInfo;
+  });
 
   const updateField = <K extends keyof typeof personalInfo>(
     key: K,
-    value: typeof personalInfo[K]
+    value: (typeof personalInfo)[K]
   ) => {
-    onChange({ ...personalInfo, [key]: value });
+    onChangeRef.current({ ...infoRef.current, [key]: value });
   };
 
-  const updateHeightImperial = (feet: number | undefined, inches: number | undefined) => {
-    const totalInches = (feet || 0) * 12 + (inches || 0);
-    updateField('height_in', totalInches > 0 ? totalInches : undefined);
+  const onAge = (text: string) => {
+    const clean = digits(text).slice(0, 3);
+    setAgeText(clean);
+    updateField('age', parseOrUndef(clean));
   };
 
-  const updateHeightMetric = (cm: number | undefined) => {
-    if (cm) {
-      const inches = Math.round(cm / 2.54);
-      updateField('height_in', inches);
-    } else {
-      updateField('height_in', undefined);
-    }
+  const onWeightLbs = (text: string) => {
+    const clean = digits(text).slice(0, 3);
+    setWeightLbsText(clean);
+    updateField('weight_lbs', parseOrUndef(clean));
   };
 
-  const updateWeightMetric = (kg: number | undefined) => {
-    if (kg) {
-      const lbs = Math.round(kg / 0.453592);
-      updateField('weight_lbs', lbs);
-    } else {
-      updateField('weight_lbs', undefined);
-    }
+  const onWeightKg = (text: string) => {
+    const clean = digits(text).slice(0, 3);
+    setWeightKgText(clean);
+    const kg = parseOrUndef(clean);
+    updateField('weight_lbs', kg == null ? undefined : Math.round(kg / 0.453592));
+  };
+
+  const commitImperial = (ft: string, inches: string) => {
+    const f = parseOrUndef(ft) ?? 0;
+    const i = parseOrUndef(inches) ?? 0;
+    const total = f * 12 + i;
+    updateField('height_in', total > 0 ? total : undefined);
+  };
+
+  const onHeightFt = (text: string) => {
+    const clean = digits(text).slice(0, 1);
+    setHeightFtText(clean);
+    commitImperial(clean, heightInText);
+  };
+
+  const onHeightIn = (text: string) => {
+    const clean = digits(text).slice(0, 2);
+    setHeightInText(clean);
+    commitImperial(heightFtText, clean);
+  };
+
+  const onHeightCm = (text: string) => {
+    const clean = digits(text).slice(0, 3);
+    setHeightCmText(clean);
+    const cm = parseOrUndef(clean);
+    // Store cm directly (converted to inches) but don't round-trip the display.
+    updateField('height_in', cm == null ? undefined : Math.round(cm / 2.54));
+  };
+
+  const onLifestyle = (text: string) => {
+    setLifestyleText(text);
+    // Only finalize the array shape on commit; during typing just split on
+    // commas without trimming so trailing spaces and partial words survive.
+    const items = text.split(',').map((s) => s.trim()).filter(Boolean);
+    updateField('lifestyle_considerations', items);
+  };
+
+  const onDiet = (text: string) => {
+    setDietText(text);
+    const items = text.split(',').map((s) => s.trim()).filter(Boolean);
+    updateField('dietary_restrictions', items);
   };
 
   return (
@@ -75,11 +141,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
         <Text style={styles.label}>Age</Text>
         <TextInput
           style={styles.input}
-          value={personalInfo.age?.toString() || ''}
-          onChangeText={(text) => {
-            const num = parseInt(text, 10);
-            updateField('age', isNaN(num) ? undefined : num);
-          }}
+          value={ageText}
+          onChangeText={onAge}
           placeholder="Enter age"
           placeholderTextColor={colors.onSurfaceVariant}
           keyboardType="numeric"
@@ -135,11 +198,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
         {useMetric ? (
           <TextInput
             style={styles.input}
-            value={weightKg?.toString() || ''}
-            onChangeText={(text) => {
-              const num = parseInt(text, 10);
-              updateWeightMetric(isNaN(num) ? undefined : num);
-            }}
+            value={weightKgText}
+            onChangeText={onWeightKg}
             placeholder="Enter weight in kg"
             placeholderTextColor={colors.onSurfaceVariant}
             keyboardType="numeric"
@@ -150,11 +210,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
         ) : (
           <TextInput
             style={styles.input}
-            value={personalInfo.weight_lbs?.toString() || ''}
-            onChangeText={(text) => {
-              const num = parseInt(text, 10);
-              updateField('weight_lbs', isNaN(num) ? undefined : num);
-            }}
+            value={weightLbsText}
+            onChangeText={onWeightLbs}
             placeholder="Enter weight in lbs"
             placeholderTextColor={colors.onSurfaceVariant}
             keyboardType="numeric"
@@ -185,11 +242,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
         {useMetric ? (
           <TextInput
             style={styles.input}
-            value={heightCm?.toString() || ''}
-            onChangeText={(text) => {
-              const num = parseInt(text, 10);
-              updateHeightMetric(isNaN(num) ? undefined : num);
-            }}
+            value={heightCmText}
+            onChangeText={onHeightCm}
             placeholder="Enter height in cm"
             placeholderTextColor={colors.onSurfaceVariant}
             keyboardType="numeric"
@@ -202,11 +256,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             <View style={styles.heightInputWrapper}>
               <TextInput
                 style={styles.heightInput}
-                value={heightFeet?.toString() || ''}
-                onChangeText={(text) => {
-                  const num = parseInt(text, 10);
-                  updateHeightImperial(isNaN(num) ? undefined : num, heightInches);
-                }}
+                value={heightFtText}
+                onChangeText={onHeightFt}
                 placeholder="ft"
                 placeholderTextColor={colors.onSurfaceVariant}
                 keyboardType="numeric"
@@ -219,11 +270,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             <View style={styles.heightInputWrapper}>
               <TextInput
                 style={styles.heightInput}
-                value={heightInches?.toString() || ''}
-                onChangeText={(text) => {
-                  const num = parseInt(text, 10);
-                  updateHeightImperial(heightFeet, isNaN(num) ? undefined : num);
-                }}
+                value={heightInText}
+                onChangeText={onHeightIn}
                 placeholder="in"
                 placeholderTextColor={colors.onSurfaceVariant}
                 keyboardType="numeric"
@@ -283,11 +331,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             <Text style={styles.label}>Lifestyle considerations</Text>
             <TextInput
               style={[styles.input, styles.multilineInput]}
-              value={personalInfo.lifestyle_considerations?.join(', ') || ''}
-              onChangeText={(text) => {
-                const items = text.split(',').map(s => s.trim()).filter(Boolean);
-                updateField('lifestyle_considerations', items);
-              }}
+              value={lifestyleText}
+              onChangeText={onLifestyle}
               placeholder="e.g., office worker, frequent travel"
               placeholderTextColor={colors.onSurfaceVariant}
               multiline
@@ -299,11 +344,8 @@ export function PersonalInfoStep({ personalInfo, onChange }: PersonalInfoStepPro
             <Text style={styles.label}>Dietary restrictions</Text>
             <TextInput
               style={[styles.input, styles.multilineInput]}
-              value={personalInfo.dietary_restrictions?.join(', ') || ''}
-              onChangeText={(text) => {
-                const items = text.split(',').map(s => s.trim()).filter(Boolean);
-                updateField('dietary_restrictions', items);
-              }}
+              value={dietText}
+              onChangeText={onDiet}
               placeholder="e.g., vegetarian, gluten-free, nut allergy"
               placeholderTextColor={colors.onSurfaceVariant}
               multiline
