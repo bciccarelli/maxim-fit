@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono, Fraunces } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { ClaimProtocolProvider } from '@/components/providers/ClaimProtocolProvider';
 import './globals.css';
@@ -12,6 +12,13 @@ const inter = Inter({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
+});
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-display',
+  axes: ['opsz'],
+  weight: ['400', '500'],
 });
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://maxim.fit';
@@ -158,7 +165,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${inter.variable} ${jetbrainsMono.variable} ${fraunces.variable} font-sans antialiased`}
       >
         <ClaimProtocolProvider>{children}</ClaimProtocolProvider>
         <Analytics />
