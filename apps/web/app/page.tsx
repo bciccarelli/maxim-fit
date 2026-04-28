@@ -111,8 +111,8 @@ export default function HomePage() {
                         <div className={s.phScoreLabel}>Goal</div>
                       </div>
                       <div className={s.phScore}>
-                        <div className={`${s.phScoreNum} ${s.phScoreNumGood}`}>92</div>
-                        <div className={s.phScoreLabel}>Viability</div>
+                        <div className={`${s.phScoreNum} ${s.phScoreNumGood}`}>✓</div>
+                        <div className={s.phScoreLabel}>Reqs met</div>
                       </div>
                       <div className={s.phScore}>
                         <div className={s.phScoreNum}>+14</div>
@@ -213,10 +213,12 @@ export default function HomePage() {
             </div>
             <div className={s.workingItem}>
               <div className={s.workingNum}>03 — EVALUATE</div>
-              <div className={s.workingTitle}>Score against goal fit and life viability.</div>
+              <div className={s.workingTitle}>Score goal fit. Check every requirement.</div>
               <div className={s.workingBody}>
-                Two scores: how well it serves your goals, and how realistic it is for your
-                actual life. Critiques surface anything weak. You verify, accept, ship.
+                A weighted goal score tells you how well the protocol serves your priorities. A
+                requirements check confirms every hard constraint — sleep window, training days,
+                dietary limits — is satisfied. Critiques surface anything weak. You verify,
+                accept, ship.
               </div>
               <div className={s.workingBar}>
                 <span style={{ animationDelay: '0.8s' }} />
@@ -493,11 +495,11 @@ export default function HomePage() {
                 </div>
                 <div className={s.scoreCell}>
                   <div className={s.scoreCellRow}>
-                    <span className={s.scoreOld}>92</span>
-                    <span className={s.scoreArrow}>→</span>
-                    <span className={`${s.scoreNew} ${s.scoreNewDown}`}>90</span>
+                    <span className={`${s.scoreNew} ${s.scoreNewUp}`}>✓</span>
+                    <span className={s.scoreArrow}>·</span>
+                    <span className={s.scoreOld} style={{ textDecoration: 'none' }}>14/14</span>
                   </div>
-                  <div className={s.scoreLabel}>VIABILITY −2</div>
+                  <div className={s.scoreLabel}>REQS MET</div>
                 </div>
               </div>
             </div>
@@ -528,7 +530,7 @@ export default function HomePage() {
                     <span className={s.versionDate}>2026-04-15</span>
                   </div>
                   <div className={s.versionDesc}>Tuned Meal 2 carbs + added glycine</div>
-                  <div className={s.versionScores}>GOAL 87 · VIA 92</div>
+                  <div className={s.versionScores}>GOAL 87 · REQS ✓</div>
                 </div>
                 <div className={s.versionItem}>
                   <div className={`${s.versionDot} ${s.versionDotPast}`} />
@@ -537,7 +539,7 @@ export default function HomePage() {
                     <span className={s.versionDate}>2026-04-02</span>
                   </div>
                   <div className={s.versionDesc}>Added Zone 2 Wednesday · K2 dose</div>
-                  <div className={s.versionScores}>GOAL 83 · VIA 90</div>
+                  <div className={s.versionScores}>GOAL 83 · REQS ✓</div>
                 </div>
                 <div className={s.versionItem}>
                   <div className={`${s.versionDot} ${s.versionDotPast}`} />
@@ -546,7 +548,7 @@ export default function HomePage() {
                     <span className={s.versionDate}>2026-03-24</span>
                   </div>
                   <div className={s.versionDesc}>Shifted training to 17:00</div>
-                  <div className={s.versionScores}>GOAL 78 · VIA 88</div>
+                  <div className={s.versionScores}>GOAL 78 · REQS 13/14</div>
                 </div>
               </div>
             </div>

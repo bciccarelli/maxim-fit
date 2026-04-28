@@ -18,7 +18,6 @@ const fraunces = Fraunces({
   subsets: ['latin'],
   variable: '--font-display',
   axes: ['opsz'],
-  weight: ['400', '500'],
 });
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://maxim.fit';
